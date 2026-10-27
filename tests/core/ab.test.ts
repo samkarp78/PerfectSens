@@ -1,0 +1,57 @@
+import { describe, expect, it } from 'vitest';
+import { defaultConfig } from '../../src/core/config';
+import { createRng } from '../../src/core/rng';
+import { abSequence, decideAB, extendSequence, type AbBlock } from '../../src/core/ab';
+import type { Arm } from '../../src/core/types';
+
+const mk = (p: number, c: number, se: number): AbBlock[] => [
+  { arm: 'P', logS: p, se }, { arm: 'C', logS: c, se }, { arm: 'C', logS: c, se }, { arm: 'P', logS: p, se },
+];
+
+describe('abSequence', () => {
+  it('is one of the two ABBA patterns', () => {
+    for (let seed = 1; seed < 20; seed++) {
+      const s = abSequence(createRng(seed)).join('');
+      expect(['PCCP', 'CPPC']).toContain(s);
+    }
+  });
+  it('produces both patterns across seeds', () => {
+    const seen = new Set(Array.from({ length: 40 }, (_, i) => abSequence(createRng(i + 1)).join('')));
+    expect(seen.size).toBe(2);
+  });
+  it('extended sequence balances positions', () => {
+    const s = abSequence(createRng(3));
+    const all: Arm[] = [...s, ...extendSequence(s)];
+    const sum = (a: Arm) => all.reduce((acc, x, i) => acc + (x === a ? i : 0), 0);
+    expect(sum('P')).toBe(sum('C'));
+  });
+});
+
+describe('decideAB', () => {
+  const cfg = defaultConfig;
+  it('change when P clearly better', () => expect(decideAB(mk(0.08, 0, 0.01), 1, cfg).decision).toBe('change'));
+  it('keep when P clearly worse', () => expect(decideAB(mk(-0.08, 0, 0.01), 1, cfg).decision).toBe('keep'));
+  it('none when effect is tiny and precise', () => {
+    const r = decideAB(mk(0.005, 0, 0.005), 1, cfg);
+    expect(r.decision).toBe('none');
+    expect(r.delta).toBeCloseTo(0.005, 10);
+  });
+  it('continue at look 1, none at look 2 when inconclusive', () => {
+    const blocks = mk(0.03, 0, 0.02);
+    const r1 = decideAB(blocks, 1, cfg);
+    expect(r1.se).toBeCloseTo(0.02, 10);
+    expect(r1.decision).toBe('continue');
+    expect(decideAB(blocks, 2, cfg).decision).toBe('none');
+    expect(r1.look).toBe(1);
+  });
+  it('handles a missing arm without NaN', () => {
+    const only: AbBlock[] = [{ arm: 'P', logS: 0.1, se: 0.01 }];
+    const r1 = decideAB(only, 1, cfg);
+    const r2 = decideAB(only, 2, cfg);
+    expect(r1.decision).toBe('continue');
+    expect(r2.decision).toBe('none');
+    expect(r1.delta).toBe(0);
+    expect(r1.se).toBe(Infinity);
+    expect(decideAB([], 1, cfg).decision).toBe('continue');
+  });
+});
