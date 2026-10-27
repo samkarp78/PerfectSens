@@ -1,3 +1,7 @@
+import type { FlickSummary, TrialMetrics } from './measure/flick';
+import type { TrackingSummary } from './measure/tracking';
+import type { StepScore } from './score';
+
 export interface Aim { yaw: number; pitch: number }                 // degrees; +yaw right, +pitch up; yaw unwrapped
 export interface MoveSample { t: number; dx: number; dy: number }   // raw counts, t in ms
 export interface AimSample { t: number; yaw: number; pitch: number }
@@ -14,3 +18,5 @@ export interface FlickClick { t: number; aim: Aim; hit: boolean }
 export interface FlickTrial { target: FlickTarget; spawnT: number; spawnAim: Aim; clicks: FlickClick[]; hitT: number | null; timedOut: boolean }
 export interface FlickBlockLog { spec: BlockSpec; t0: number; trials: FlickTrial[]; path: AimSample[] }
 export interface TrackingBlockLog { spec: BlockSpec; t0: number; endT: number; path: AimSample[] }
+export interface StepResult { order: number; stage: Exclude<Stage, 'warmup'>; arm: Arm | null; cm360: number;
+  trials: TrialMetrics[]; flick: FlickSummary; tracking: TrackingSummary; score: StepScore }
