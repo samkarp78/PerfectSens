@@ -19,6 +19,9 @@ export const defaultConfig = {
     refTp: 4.5, refTot: 0.5, imbalance: 0.15 },
   store: { keepRawSessions: 5 },
   sim: { sampleHz: 500 },
+  geometry: { maxPitchDeg: 89 },
+  setup: { dpi: { min: 100, max: 32000 }, cm360: { min: 5, max: 200 },
+    fov: { horizontal: { min: 60, max: 130 }, vertical: { min: 40, max: 110 } } },
 } as const;
 
 export type Config = typeof defaultConfig;
