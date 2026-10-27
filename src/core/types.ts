@@ -10,3 +10,7 @@ export type Arm = 'P' | 'C';                        // pick / current
 export type FlickClass = 'small' | 'medium' | 'big';
 export interface BlockSpec { id: string; stage: Stage; kind: BlockKind; cm360: number; seed: number; stepIndex: number; arm: Arm | null }
 export interface FlickTarget { index: number; aim: Aim; distance: number; cls: FlickClass; scored: boolean }
+export interface FlickClick { t: number; aim: Aim; hit: boolean }
+export interface FlickTrial { target: FlickTarget; spawnT: number; spawnAim: Aim; clicks: FlickClick[]; hitT: number | null; timedOut: boolean }
+export interface FlickBlockLog { spec: BlockSpec; t0: number; trials: FlickTrial[]; path: AimSample[] }
+export interface TrackingBlockLog { spec: BlockSpec; t0: number; endT: number; path: AimSample[] }
