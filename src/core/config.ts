@@ -4,7 +4,7 @@ export const defaultConfig = {
     adaptationTargets: 6, warmupTargets: 300, targetRadiusDeg: 1.5, timeoutMs: 4000,
     smallMaxDeg: 22, bigMinDeg: 35, directionSpreadDeg: 30, bounds: { yaw: 75, pitch: 30 },
   },
-  tracking: { durationMs: 25000, leadInMs: 3000, targetRadiusDeg: 1.5, segmentMs: { min: 300, max: 1200 },
+  tracking: { durationMs: 25000, leadInMs: 3000, directionSpreadDeg: 30, targetRadiusDeg: 1.5, segmentMs: { min: 300, max: 1200 },
     speedDegPerSec: { min: 25, max: 60 }, bounds: { yaw: 40, pitch: 10 }, gridHz: 120, minSpeedForLeadLag: 5 },
   submovement: { binMs: 5, smoothBins: 3, onsetDegPerSec: 30, endDegPerSec: 20, endHoldMs: 30 },
   score: { flickWeight: 0.6, bootstrapSamples: 200, trackingSegmentMs: 1000, minWeDeg: 0.1, minTot: 0.01 },
