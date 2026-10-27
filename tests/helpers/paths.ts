@@ -1,4 +1,5 @@
-import type { Aim, MoveSample } from '../../src/core/types';
+import type { Aim, AimSample, MoveSample } from '../../src/core/types';
+import { applyMove } from '../../src/core/geometry';
 
 const minJerk = (tau: number): number => 10 * tau ** 3 - 15 * tau ** 4 + 6 * tau ** 5;
 
@@ -14,6 +15,17 @@ export function minJerkMoves(from: Aim, to: Aim, t0: number, durMs: number, hz: 
     const nx = Math.round(s * totalDx), ny = Math.round(s * totalDy);
     out.push({ t: t0 + k * (1000 / hz), dx: nx - cx, dy: ny - cy });
     cx = nx; cy = ny;
+  }
+  return out;
+}
+
+/** Fold integer-count moves into absolute aim samples (aim after each move). */
+export function movesToPath(start: Aim, moves: MoveSample[], dpc: number): AimSample[] {
+  const out: AimSample[] = [];
+  let aim = start;
+  for (const m of moves) {
+    aim = applyMove(aim, m.dx, m.dy, dpc);
+    out.push({ t: m.t, yaw: aim.yaw, pitch: aim.pitch });
   }
   return out;
 }
