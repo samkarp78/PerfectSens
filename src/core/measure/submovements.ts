@@ -36,8 +36,8 @@ export function segmentSubmovements(path: AimSample[], tStart: number, tEnd: num
   let i = 0;
   while (i < n) {
     if (speed[i]! <= c.onsetDegPerSec) { i++; continue; }
-    // Smoothing is centred, so speed really crossed onset about half a window before bin i; back up by that lag.
-    const lead = Math.max(0, i - half);
+    // Speed only exceeds onset after some distance has been covered (and drops below end before the aim stops), so widen both edges by edgeBins.
+    const lead = Math.max(0, i - c.edgeBins);
     let peak = speed[i]!;
     let end = -1;
     for (let j = i + 1; j < n; j++) {
@@ -49,11 +49,12 @@ export function segmentSubmovements(path: AimSample[], tStart: number, tEnd: num
       peak = Math.max(peak, speed[j]!);
     }
     const finished = end >= 0;
+    const tail = Math.min(n, end + c.edgeBins + 1); // pos index: end of bin end + edgeBins
     out.push({
       t0: tStart + lead * c.binMs,
-      t1: finished ? tStart + end * c.binMs : tEnd,
+      t1: finished ? tStart + tail * c.binMs : tEnd,
       from: pos[lead]!,
-      to: finished ? pos[end]! : posAt(tEnd),
+      to: finished ? pos[tail]! : posAt(tEnd),
       peakSpeed: peak,
     });
     i = finished ? end + endBins : n;
