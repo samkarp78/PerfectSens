@@ -6,9 +6,11 @@ import { fitCurve, type FitPoint } from '../../src/core/fit';
 const x0 = Math.log(30);
 const us = Array.from({ length: 7 }, (_, i) => (i - 3) / 15); // u = -0.2 ... 0.2
 
-function dataset(peak: number, extra: (u: number, t: number) => number = () => 0): FitPoint[] {
+const inOrder = [0, 1, 2, 3, 4, 5, 6];
+
+function dataset(peak: number, extra: (u: number, t: number) => number = () => 0, order = inOrder): FitPoint[] {
   return us.map((u, i) => {
-    const t = i / 6;
+    const t = order[i]! / 6;
     return { x: x0 + u, y: -2 * (u - peak) ** 2 + extra(u, t), se: 0.01, t, isCurrent: u === 0 };
   });
 }
@@ -27,6 +29,9 @@ describe('fitCurve', () => {
     expect(r.range).not.toBeNull();
     expect(r.range![0]).toBeLessThanOrEqual(r.pickCm360);
     expect(r.range![1]).toBeGreaterThanOrEqual(r.pickCm360);
+    // strictly narrower than the tested span [exp(x0 - 0.2), exp(x0 + 0.2)]
+    expect(r.range![0] >= Math.exp(x0 - 0.2) - 1e-9 && r.range![1] <= Math.exp(x0 + 0.2) + 1e-9).toBe(true);
+    expect(r.range![1] / r.range![0]).toBeLessThan(Math.exp(0.4) * (1 - 1e-9));
   });
 
   it('clamps a peak beyond the slow end to maxU with edge slower', () => {
@@ -69,11 +74,25 @@ describe('fitCurve', () => {
     expect(pts.filter((p) => p.isCurrent).map((p) => p.t).sort()).toEqual([0, 0.5]);
     const r = fit(pts);
     expect(Math.abs(r.pickCm360 / Math.exp(x0 + 0.1) - 1)).toBeLessThan(0.05);
+    // f absorbs most of the bonus, shrunk by the ridge (no f term -> 0, no ridge -> 0.03)
+    expect(r.coef!.f).toBeGreaterThan(0.015);
+    expect(r.coef!.f).toBeLessThan(0.0295);
   });
 
   it('attributes a linear time trend to drift', () => {
-    const r = fit(dataset(0.1, (_u, t) => 0.05 * t));
-    expect(r.coef!.d).toBeGreaterThan(0);
+    // block order decoupled from u, so t is not collinear with the intercept and u
+    const r = fit(dataset(0.1, (_u, t) => 0.05 * t, [3, 0, 5, 1, 6, 2, 4]));
+    // ridge shrinks d below the true 0.05 (no d term -> 0)
+    expect(r.coef!.d).toBeGreaterThan(0.02);
+    expect(r.coef!.d).toBeLessThan(0.05);
+    expect(Math.abs(r.pickCm360 / Math.exp(x0 + 0.1) - 1)).toBeLessThan(0.02);
+  });
+
+  it('down-weights a noisy point by its se', () => {
+    const clean = fit(dataset(0.1));
+    const noisy = dataset(0.1).map((p, i) => (i === 0 ? { ...p, y: p.y + 0.3, se: 0.2 } : p));
+    const r = fit(noisy);
+    expect(Math.abs(r.pickCm360 / clean.pickCm360 - 1)).toBeLessThan(0.01);
   });
 
   it('is deterministic for a given seed', () => {
