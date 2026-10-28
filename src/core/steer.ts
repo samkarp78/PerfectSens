@@ -7,6 +7,16 @@ import type { StepResult } from './types';
 export interface SteerContext {
   currentCm360: number; baseline: StepResult; steps: StepResult[]; fit: FitResult | null;
   stepIndex: number; totalSteps: number; rng: Rng;
+  /** Measured play-area width; caps the slowest test sens. */
+  padWidthCm?: number | null;
+}
+
+/** The slowest cm/360 the test may use: the steering limit, and (with a measured pad) a 180° turn within
+ *  pad.turnFraction of the pad, but never below the current sens. */
+export function maxTestCm360(current: number, padWidthCm: number | null | undefined, cfg: Config): number {
+  const limit = cfg.steer.limits.max * current;
+  if (!padWidthCm) return limit;
+  return Math.max(current, Math.min(limit, 2 * cfg.pad.turnFraction * padWidthCm));
 }
 export interface SteerDecision { cm360: number; direction: 'slower' | 'faster'; stepSize: number; signal: number; reason: string }
 
@@ -52,7 +62,7 @@ export function chooseNext(ctx: SteerContext, cfg: Config): SteerDecision {
       ? (first.cm360 > current ? -1 : 1)
       : (ctx.rng.next() < 0.5 ? 1 : -1);
     return {
-      cm360: current * (1 + sc.bracket) ** dir, direction: dirName(dir), stepSize: size, signal: 0,
+      cm360: Math.min(current * (1 + sc.bracket) ** dir, maxTestCm360(current, ctx.padWidthCm, cfg)), direction: dirName(dir), stepSize: size, signal: 0,
       reason: `Bracketing: testing a ${dirName(dir)} sens`,
     };
   }
@@ -105,7 +115,7 @@ export function chooseNext(ctx: SteerContext, cfg: Config): SteerDecision {
   }
 
   const lo = sc.limits.min * current;
-  const hi = sc.limits.max * current;
+  const hi = maxTestCm360(current, ctx.padWidthCm, cfg);
   /** `k` steps of `size` from center in direction `d`, clamped to the limits. */
   const place = (d: Dir, k = 1): number => Math.min(hi, Math.max(lo, center * (1 + size) ** (k * d)));
   const minSep = Math.log(1 + sc.minSeparation);

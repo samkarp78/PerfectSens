@@ -187,7 +187,7 @@ function planNext(s: SessionState): SessionState {
       const i = pos < recheckPos(s) ? pos : pos - 1;
       const decision = chooseNext({
         currentCm360: current, baseline: s.steps[0]!, steps: seq, fit: s.fit, stepIndex: i, totalSteps: n,
-        rng: rootFork(s, `steer-${i}`),
+        rng: rootFork(s, `steer-${i}`), padWidthCm: s.setup.padWidthCm ?? null,
       }, s._cfg);
       return {
         ...s, steerLog: [...s.steerLog, decision],

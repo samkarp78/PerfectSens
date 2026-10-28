@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { defaultConfig as cfg } from '../../src/core/config';
+import { defaultConfig as cfg, defaultConfig } from '../../src/core/config';
 import { createRng } from '../../src/core/rng';
 import type { FitResult } from '../../src/core/fit';
 import type { StepResult } from '../../src/core/types';
-import { chooseNext, stepSize, type SteerContext } from '../../src/core/steer';
+import { chooseNext, maxTestCm360, stepSize, type SteerContext } from '../../src/core/steer';
 
 const current = 30;
 
@@ -236,5 +236,24 @@ describe('chooseNext after bracketing', () => {
       expect(d.reason).not.toMatch(/\d\s*cm/i);
       expect(d.reason).not.toMatch(/\d/);
     }
+  });
+});
+
+describe('play-area cap', () => {
+  const pad = (current * 1.1) / (2 * defaultConfig.pad.turnFraction); // a pad that fits at most 1.1 × current
+  it('maxTestCm360 limits the slowest sens to a 180° turn within turnFraction of the pad', () => {
+    expect(maxTestCm360(current, pad, defaultConfig)).toBeCloseTo(current * 1.1, 9);
+    expect(maxTestCm360(current, null, defaultConfig)).toBeCloseTo(current * defaultConfig.steer.limits.max, 9);
+    expect(maxTestCm360(current, 5, defaultConfig)).toBe(current); // current already doesn't fit: never test slower than it
+  });
+  it('the slower bracket step is clamped to the pad', () => {
+    for (let seed = 0; seed < 6; seed++) {
+      const d = chooseNext(ctx({ stepIndex: 0, rng: createRng(seed), padWidthCm: pad }), defaultConfig);
+      expect(d.cm360).toBeLessThanOrEqual(current * 1.1 + 1e-9);
+    }
+  });
+  it('later steps never exceed the pad cap', () => {
+    const d = chooseNext(ctx({ fit: fitAt(current * 1.5), padWidthCm: pad, steps: [step(1, current * 0.87), step(2, current * 1.05)] }), defaultConfig);
+    expect(d.cm360).toBeLessThanOrEqual(current * 1.1 + 1e-9);
   });
 });
