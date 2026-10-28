@@ -7,6 +7,7 @@ import { defaultSimPlayer } from '../core/sim/player';
 import { runSimSession } from '../core/sim/runSession';
 import { openHistory, recordFromSession, type History as HistoryStore, type SessionRecord, type SessionSummary } from '../store/history';
 import { saveSetup } from '../store/setupStore';
+import { Demo } from './Demo';
 import { History } from './History';
 import { Results } from './Results';
 import { Run } from './Run';
@@ -77,13 +78,7 @@ export function App() {
     case 'history':
       return <History history={history} onBack={() => setScreen(done ? 'results' : 'setup')} onQuickAb={onQuickAb} />;
     case 'demo':
-      return (
-        <main class="page">
-          <h1 class="title">Demo</h1>
-          <p class="lede">Demo coming in the next update.</p>
-          <div class="actions"><button type="button" class="btn" onClick={() => setScreen('setup')}>Back</button></div>
-        </main>
-      );
+      return <Demo onExit={() => setScreen('setup')} onHistory={() => setScreen('history')} />;
     default:
       return <Setup unsupported={unsupported} onStart={onStart} onDemo={() => setScreen('demo')} onHistory={() => setScreen('history')} />;
   }
