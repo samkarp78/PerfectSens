@@ -1,20 +1,14 @@
 {
   "name": "blind-sens-finder",
   "version": "1.0.0",
-  "description": "",
-  "directories": {
-    "doc": "docs"
-  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "vitest run --exclude tests/stats/**",
+    "test": "vitest run --exclude \"tests/stats/**\"",
     "test:stats": "vitest run tests/stats"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "type": "module",
+  "engines": { "node": ">=20.19" },
   "dependencies": {
     "preact": "^11.1.0",
     "three": "^0.186.1"
