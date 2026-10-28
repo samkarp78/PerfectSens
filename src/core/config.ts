@@ -3,19 +3,21 @@ export const defaultConfig = {
     distancesDeg: [6,8,10,12,14,15,17,18,20,21, 23,24,26,27,28,29,31,32,33,34, 37,40,43,46,49,52,55,58,62,66],
     // Flick blocks run for blockMs in waves: wavePerClass small + medium + big targets, roughly small→big (order jittered).
     // Wave 0 is unscored warm-in; only complete waves are scored, so every scored wave has the same class mix.
-    blockMs: 20000, wavePerClass: 2, waveOrderJitter: 0.15, maxBlockTargets: 240,
+    blockMs: 14000, wavePerClass: 1, waveOrderJitter: 0.15, maxBlockTargets: 240,
     warmupTargets: 300, targetRadiusDeg: 1.5, timeoutMs: 4000,
     smallMaxDeg: 22, bigMinDeg: 35, directionSpreadDeg: 30, bounds: { yaw: 75, pitch: 30 },
   },
-  tracking: { durationMs: 15000, leadInMs: 2000, directionSpreadDeg: 30, targetRadiusDeg: 2, segmentMs: { min: 700, max: 2000 },
+  tracking: { durationMs: 12000, leadInMs: 2000, directionSpreadDeg: 30, targetRadiusDeg: 2, segmentMs: { min: 700, max: 2000 },
     speedDegPerSec: { min: 10, max: 25 }, bounds: { yaw: 40, pitch: 10 }, gridHz: 120, minSpeedForLeadLag: 5,
     /** Turn metrics: a segment change of more than turnMinDeg; reaction = crosshair speed along the new direction reaching
      *  turnReactFraction of target speed; settled = within the radius for settleMs. */
     turnMinDeg: 90, turnReactFraction: 0.5, settleMs: 100 },
   /** Target switching: `active` static targets up at once; hitting one replaces it at a seeded spot in the forward region.
    *  The first `warmKills` kills are unscored warm-in. */
-  switch: { blockMs: 15000, active: 3, targetRadiusDeg: 1.5, region: { yaw: 35, pitch: 15 }, minSeparationDeg: 8, warmKills: 2,
+  switch: { blockMs: 14000, active: 3, targetRadiusDeg: 1.5, region: { yaw: 35, pitch: 15 }, minSeparationDeg: 8, warmKills: 2,
     maxTargets: 200 },
+  /** Every part of a round has the same length (partMs); between parts a cueMs handover with ticks cueTickMs apart. */
+  round: { cueMs: 1800, cueTickMs: 600 },
   submovement: { binMs: 5, smoothBins: 3, onsetDegPerSec: 30, endDegPerSec: 20, endHoldMs: 30, edgeBins: 1 },
   /** Composite score weights for the three round parts (sum to 1). */
   score: { weights: { flick: 0.4, switch: 0.3, tracking: 0.3 }, bootstrapSamples: 200, trackingSegmentMs: 1000, minWeDeg: 0.1, weFactor: 4.133, minTot: 0.01, minTp: 0.01 },
@@ -34,7 +36,7 @@ export const defaultConfig = {
   store: { keepRawSessions: 5 },
   demo: { player: { optimalRatio: 0.75 } },
   /** Quick test mode (about 5 min, for trying the tool out): shorter blocks; too little data for a reliable answer. */
-  quick: { distancesDeg: [8,12,17,21, 23,27,31,34, 40,49,58,66], flickBlockMs: 10000, wavePerClass: 2, switchBlockMs: 8000, trackingDurationMs: 8000, trackingLeadInMs: 1000 },
+  quick: { distancesDeg: [8,12,17,21, 23,27,31,34, 40,49,58,66], flickBlockMs: 8000, wavePerClass: 1, switchBlockMs: 8000, trackingDurationMs: 7000, trackingLeadInMs: 1000 },
   sim: { sampleHz: 500, blockGapMs: 1000,
     player: { optimalRatio: 0.88, curvature: 2, familiarityBonus: 0.02, adaptationRate: 0.15, gainExponent: 1, motorNoise: 1,
       driftPerBlock: 0.002, familiarityTolLn: 1e-9 },
@@ -48,6 +50,17 @@ export const defaultConfig = {
 } as const;
 
 export type Config = typeof defaultConfig;
+
+/** The parts of a round, in order. */
+export const PART_KINDS = ['flick', 'switch', 'tracking'] as const;
+export type PartKind = (typeof PART_KINDS)[number];
+
+/** A part's whole slot (ms), unscored lead-in included. */
+export function partMs(kind: PartKind, cfg: Config): number {
+  if (kind === 'flick') return cfg.flick.blockMs;
+  if (kind === 'switch') return cfg.switch.blockMs;
+  return cfg.tracking.leadInMs + cfg.tracking.durationMs;
+}
 
 /** The config a session in this mode runs with: quick mode swaps in the shorter block sizes. */
 export function configForMode(mode: 'default' | 'thorough' | 'quick', cfg: Config = defaultConfig): Config {

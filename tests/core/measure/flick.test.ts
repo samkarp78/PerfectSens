@@ -165,7 +165,7 @@ describe('measureFlickBlock: only complete waves are scored', () => {
       }
       return measureFlickBlock(r.log(), defaultConfig); // mid-block: the open wave is still unresolved
     };
-    expect(play(W + 3).filter((m) => m.scored)).toHaveLength(0); // wave 0 is warm-in, wave 1 unfinished
+    expect(play(2 * W - 1).filter((m) => m.scored)).toHaveLength(0); // wave 0 is warm-in, wave 1 unfinished
     expect(play(2 * W).filter((m) => m.scored)).toHaveLength(W);
   });
 });
