@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { degPerCount, applyMove, aimToVec, angleBetween, offsetAim, alongPerp, vfovDeg } from '../../src/core/geometry';
+import { degPerCount, applyMove, aimToVec, angleBetween, offsetAim, alongPerp, vfovDeg , countsToCm } from '../../src/core/geometry';
 
 describe('geometry', () => {
   it('degPerCount', () => { expect(degPerCount(800, 34.29)).toBeCloseTo(0.033333, 5); });
@@ -34,5 +34,12 @@ describe('geometry', () => {
   it('vfovDeg', () => {
     expect(vfovDeg(103, 'horizontal', 16 / 9)).toBeCloseTo(70.53, 1);
     expect(vfovDeg(70, 'vertical', 16 / 9)).toBe(70);
+  });
+});
+
+describe('countsToCm', () => {
+  it('converts mouse counts to centimetres of travel', () => {
+    expect(countsToCm(800, 800)).toBeCloseTo(2.54, 9);
+    expect(countsToCm(-1600, 400)).toBeCloseTo(10.16, 9);
   });
 });

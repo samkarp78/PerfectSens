@@ -5,11 +5,13 @@ import { toCsv, toJson } from '../store/export';
 import { BlockLog } from './BlockLog';
 import { CurveChart } from './CurveChart';
 import { download, fmt } from './format';
+import type { ScoreState } from './scoreKeeper';
+import { SessionStats } from './SessionStats';
 
 const TOP_FINDINGS = 2;
 const CAVEAT = 'Your current sens has a familiarity advantage in this test, and we have not shown that results here transfer to your in-game performance.';
 
-export interface ResultsProps { rec: SessionRecord; fit: FitResult | null; saveFailed?: boolean; onAgain(): void; onHistory(): void }
+export interface ResultsProps { rec: SessionRecord; fit: FitResult | null; stats?: ScoreState | null; saveFailed?: boolean; onAgain(): void; onHistory(): void }
 const SAVE_FAILED = "This session couldn't be saved to History.";
 const PCT = 100;
 const pct = (): number => Math.round(defaultConfig.ab.minEffect * PCT);
@@ -66,7 +68,15 @@ function notes(rec: SessionRecord): string[] {
   return [];
 }
 
-export function Results({ rec, fit, saveFailed = false, onAgain, onHistory }: ResultsProps) {
+/** How much of the measured play area a 180° turn uses at the recommended sens. */
+function padLine(rec: SessionRecord): string | null {
+  const pad = rec.setup.padWidthCm;
+  if (!pad) return null;
+  const half = rec.result.recommendedCm360 / 2;
+  return `A 180° turn at ${fmt(rec.result.recommendedCm360)} cm/360 uses ${fmt(half)} cm of your ${fmt(pad)} cm play area.`;
+}
+
+export function Results({ rec, fit, stats = null, saveFailed = false, onAgain, onHistory }: ResultsProps) {
   const r = rec.result;
   const why = explainer(rec);
   const range = rangeLine(rec);
@@ -81,8 +91,11 @@ export function Results({ rec, fit, saveFailed = false, onAgain, onHistory }: Re
         </p>
       )}
       {range && <p>{range}</p>}
+      {padLine(rec) && <p>{padLine(rec)}</p>}
       {saveFailed && <p class="note">{SAVE_FAILED}</p>}
       {notes(rec).map((n) => <p key={n} class="note">{n}</p>)}
+
+      {stats && <SessionStats stats={stats} />}
 
       {r.findings.length > 0 && (
         <section class="panel">

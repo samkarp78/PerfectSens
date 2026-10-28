@@ -1,5 +1,7 @@
 import { useState } from 'preact/hooks';
+import { defaultConfig } from '../core/config';
 import { validateSetup } from '../core/setup';
+import type { Prefs } from '../store/prefs';
 import type { Setup as SetupValues } from '../core/types';
 import { loadSetup } from '../store/setupStore';
 
@@ -8,23 +10,38 @@ export const UNSUPPORTED_TEXT = "Raw mouse input isn't supported in this browser
 
 export interface SetupProps {
   unsupported: boolean;
+  prefs: Prefs;
+  /** Form values to restore (after returning from calibration). */
+  draft?: Fields | null;
+  onPrefs(p: Prefs): void;
+  onCalibrate(fields: Fields): void;
   onStart(setup: SetupValues, warmup: boolean): void;
   onDemo(): void;
   onHistory(): void;
 }
 
-type Fields = { dpi: string; cm360: string; inGameSens: string; fov: string; fovType: string; mode: string };
+export type Fields = { dpi: string; cm360: string; inGameSens: string; fov: string; fovType: string; mode: string; padWidthCm: string };
 
 function initialFields(): Fields {
   const s = { ...DEFAULT_SETUP, ...loadSetup() };
   return {
     dpi: String(s.dpi), cm360: String(s.cm360), inGameSens: s.inGameSens === null || s.inGameSens === undefined ? '' : String(s.inGameSens),
     fov: String(s.fov), fovType: String(s.fovType), mode: String(s.mode),
+    padWidthCm: s.padWidthCm === null || s.padWidthCm === undefined ? '' : String(s.padWidthCm),
   };
 }
 
-export function Setup({ unsupported, onStart, onDemo, onHistory }: SetupProps) {
-  const [f, setF] = useState<Fields>(initialFields);
+/** A note when the current sens already needs more room for a 180° turn than the measured play area gives. */
+function fitWarning(f: Fields): string | null {
+  const cm360 = Number(f.cm360), pad = Number(f.padWidthCm);
+  if (!f.padWidthCm || !(cm360 > 0) || !(pad > 0)) return null;
+  const half = cm360 / 2;
+  if (half <= pad * defaultConfig.pad.turnFraction) return null;
+  return `A 180° turn at your sens needs ${half.toFixed(1)} cm, more than your ${pad} cm play area comfortably allows.`;
+}
+
+export function Setup({ unsupported, prefs, draft, onPrefs, onCalibrate, onStart, onDemo, onHistory }: SetupProps) {
+  const [f, setF] = useState<Fields>(() => draft ?? initialFields());
   const [warmup, setWarmup] = useState(true);
   const [errors, setErrors] = useState<Partial<Record<keyof Fields, string>>>({});
   const set = (k: keyof Fields) => (e: Event) => setF({ ...f, [k]: (e.target as HTMLInputElement).value });
@@ -71,14 +88,27 @@ export function Setup({ unsupported, onStart, onDemo, onHistory }: SetupProps) {
             {errors.fovType && <span class="field-error" role="alert">{errors.fovType}</span>}
           </label>
         </div>
+        <div class="field">
+          <span class="field-label">Play area (optional)</span>
+          <div class="row row-tight">
+            <input class="input" type="text" inputMode="decimal" name="padWidthCm" value={f.padWidthCm} onInput={set('padWidthCm')}
+              placeholder="cm" aria-invalid={errors.padWidthCm ? 'true' : undefined} />
+            <button type="button" class="btn" onClick={() => onCalibrate(f)}>Calibrate</button>
+          </div>
+          <span class="field-hint">How far your mouse can travel on your pad. Calibrate measures it with a couple of slides.</span>
+          {errors.padWidthCm && <span class="field-error" role="alert">{errors.padWidthCm}</span>}
+          {fitWarning(f) && <span class="field-warn">{fitWarning(f)}</span>}
+        </div>
         <fieldset class="field fieldset">
           <legend class="field-label">Mode</legend>
-          <label class="radio"><input type="radio" name="mode" value="default" checked={f.mode === 'default'} onChange={set('mode')} /> Default (about 10 min)</label>
+          <label class="radio"><input type="radio" name="mode" value="default" checked={f.mode === 'default'} onChange={set('mode')} /> Default (about 11 min)</label>
           <label class="radio"><input type="radio" name="mode" value="thorough" checked={f.mode === 'thorough'} onChange={set('mode')} /> Thorough (about 15 min)</label>
           <label class="radio"><input type="radio" name="mode" value="quick" checked={f.mode === 'quick'} onChange={set('mode')} /> Quick test (about 5 min, for trying it out; not a reliable answer)</label>
           {errors.mode && <span class="field-error" role="alert">{errors.mode}</span>}
         </fieldset>
         <label class="radio"><input type="checkbox" checked={warmup} onChange={(e) => setWarmup((e.target as HTMLInputElement).checked)} /> Warm up first (recommended, 1 min)</label>
+        <label class="radio"><input type="checkbox" checked={prefs.autoContinue} onChange={(e) => onPrefs({ ...prefs, autoContinue: (e.target as HTMLInputElement).checked })} /> Start rounds automatically (3-2-1 countdown)</label>
+        <label class="radio"><input type="checkbox" checked={prefs.sound} onChange={(e) => onPrefs({ ...prefs, sound: (e.target as HTMLInputElement).checked })} /> Sound effects</label>
         <div class="actions">
           <button type="submit" class="btn btn-primary">Start</button>
           <button type="button" class="btn" onClick={onHistory}>History</button>

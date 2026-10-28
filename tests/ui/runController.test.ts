@@ -152,3 +152,22 @@ describe('run controller: tracking needs the mouse button', () => {
     expect(r.state.held).toBe(false);
   });
 });
+
+describe('breaks between stretches of rounds', () => {
+  it('rests normally after most rounds and takes a break after every breakEveryRounds-th round', async () => {
+    const { restPhase } = await import('../../src/ui/runController');
+    const { simulateBlock } = await import('../../src/core/sim/simulate');
+    const { createRng } = await import('../../src/core/rng');
+    const { defaultConfig } = await import('../../src/core/config');
+    let s = createSession(setup, opts);
+    const phases: string[] = [];
+    for (let i = 0; s.steps.length < 4; i++) {
+      const before = s.steps.length;
+      const spec = nextBlock(s)!;
+      s = submitBlock(s, simulateBlock(spec, setup, defaultSimPlayer(CURRENT), { adaptedCm360: CURRENT, blocksDone: i }, createRng(i), defaultConfig, 0).log);
+      if (s.steps.length > before) phases.push(restPhase(s, true));
+    }
+    expect(phases).toEqual(['rest', 'rest', 'break', 'rest']);
+    expect(restPhase(s, false)).toBe('rest');
+  });
+});

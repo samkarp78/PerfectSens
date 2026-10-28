@@ -7,7 +7,8 @@ import { extendAb, nextBlock, submitBlock, type SessionState } from '../core/ses
 import type { MoveSample } from '../core/types';
 
 /** 'asking': the first A/B round was too close to call and the player chooses whether to play the second. */
-export type RunPhase = 'rest' | 'running' | 'paused' | 'asking' | 'finished';
+/** 'break': a longer pause after every few rounds (the player clicks to go on). */
+export type RunPhase = 'rest' | 'running' | 'paused' | 'break' | 'asking' | 'finished';
 
 export interface RunController {
   readonly phase: RunPhase;
@@ -30,7 +31,7 @@ export type Runner = FlickRunner | SwitchRunner | TrackingRunner;
 
 export const WARMUP_REST_TEXT = 'Warm-up — free targets at your current sens, not scored.';
 /** Shown before a round: a flick block followed straight away by a tracking block. */
-export const ROUND_REST_TEXT = 'Next round: click each target as fast as you can, then hold the mouse button and track the moving target.';
+export const ROUND_REST_TEXT = 'Next round: flick each target, clear the targets in any order, then hold the mouse button and track.';
 export const TRACKING_REST_TEXT = 'Next: tracking — hold the mouse button and keep the crosshair on the moving target.';
 
 const kindLabel = (p: Progress): string => (p.kind === 'tracking' ? 'Tracking' : p.kind === 'switch' ? 'Switching' : 'Flicks');
@@ -46,14 +47,24 @@ export function hudText(p: Progress): string {
   }
 }
 
+/** Where the run goes once no block is running: the end, the A/B question, a break after every
+ *  session.breakEveryRounds-th completed round, or a normal rest. */
+export function restPhase(session: SessionState, completedRound: boolean): RunPhase {
+  if (session.result) return 'finished';
+  if (session.awaitingExtension) return 'asking';
+  const every = session._cfg.session.breakEveryRounds;
+  if (completedRound && session.steps.length % every === 0 && nextBlock(session)) return 'break';
+  return 'rest';
+}
+
 export function createRunController(initial: SessionState, cfg: Config = initial._cfg): RunController {
   let session = initial;
   let phase: RunPhase = session.result ? 'finished' : session.awaitingExtension ? 'asking' : 'rest';
   let runner: Runner | null = null;
 
-  const settle = (): void => {
+  const settle = (completedRound = false): void => {
     runner = null;
-    phase = session.result ? 'finished' : session.awaitingExtension ? 'asking' : 'rest';
+    phase = restPhase(session, completedRound);
   };
 
   const start = (t: number): void => {
@@ -70,8 +81,9 @@ export function createRunController(initial: SessionState, cfg: Config = initial
   const checkDone = (t: number): void => {
     if (!runner || !runner.state.done) return;
     const kind = runner.log().spec.kind;
+    const rounds = session.steps.length;
     session = submitBlock(session, runner.log());
-    settle();
+    settle(session.steps.length > rounds);
     const next = nextBlock(session)?.kind;
     const continues = (kind === 'flick' && next === 'switch') || (kind === 'switch' && next === 'tracking');
     if (continues && phase === 'rest') start(t);
@@ -89,7 +101,7 @@ export function createRunController(initial: SessionState, cfg: Config = initial
       return spec.kind === 'tracking' ? TRACKING_REST_TEXT : ROUND_REST_TEXT;
     },
     begin(t) {
-      if (phase !== 'rest' && phase !== 'paused') return;
+      if (phase !== 'rest' && phase !== 'paused' && phase !== 'break') return;
       start(t);
     },
     onMove(s) {

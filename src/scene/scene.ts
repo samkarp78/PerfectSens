@@ -6,9 +6,9 @@ import { aimToEuler, targetPosition, sphereRadiusFor } from './camera';
 // Scene constants.
 export const ROOM_HALF_SIZE = 30;
 export const TARGET_DISTANCE = 20;
-export const ROOM_COLOR = 0x07080b; // near-black room
-export const GRID_BG = '#0b0d12';
-export const GRID_LINE = '#1c212b'; // subtle grid lines
+export const ROOM_COLOR = 0x161a22; // dark slate room (brighter than the first draft)
+export const GRID_BG = '#1f2430';
+export const GRID_LINE = '#353c4b'; // visible but quiet grid lines
 export const GRID_CELLS = 6; // grid cells per texture tile
 export const GRID_TEXTURE_SIZE = 512;
 export const WALL_TILES = 5; // texture repeats across each wall
@@ -19,11 +19,17 @@ export const DIRECTIONAL_INTENSITY = 2.2;
 export const CAMERA_NEAR = 0.1;
 export const CAMERA_FAR = 200;
 export const MAX_PIXEL_RATIO = 2;
+export const MAX_SWITCH_TARGETS = 3;
+export const POP_MS = 220; // hit effect duration
+export const POP_GROWTH = 2.4; // the ring grows to this multiple of the target size
 
 export interface SceneApi {
   setAim(a: Aim): void;
   setFlickTarget(a: Aim | null): void;
   setTrackingTarget(a: Aim | null, onTarget: boolean): void;
+  setSwitchTargets(aims: readonly Aim[]): void;
+  /** A short expanding ring where a target was hit. */
+  popAt(a: Aim): void;
   resize(w: number, h: number): void;
   render(): void;
   dispose(): void;
@@ -83,6 +89,15 @@ export function createScene(
   flickMesh.visible = false;
   trackMesh.visible = false;
   scene.add(flickMesh, trackMesh);
+  const switchMeshes = Array.from({ length: MAX_SWITCH_TARGETS }, () => {
+    const m = new THREE.Mesh(targetGeo, flickMat);
+    m.visible = false;
+    scene.add(m);
+    return m;
+  });
+  const ringGeo = new THREE.RingGeometry(0.8, 1, 32);
+  const pops: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; born: number }[] = [];
+  const baseRadius = sphereRadiusFor(opts.targetRadiusDeg, TARGET_DISTANCE);
 
   const place = (mesh: THREE.Mesh, a: Aim | null) => {
     if (!a) { mesh.visible = false; return; }
@@ -97,6 +112,16 @@ export function createScene(
       camera.rotation.set(e.x, e.y, 0, e.order);
     },
     setFlickTarget(a) { place(flickMesh, a); },
+    setSwitchTargets(aims) { switchMeshes.forEach((m, i) => place(m, aims[i] ?? null)); },
+    popAt(a) {
+      const mat = new THREE.MeshBasicMaterial({ color: TARGET_ON_COLOR, transparent: true, side: THREE.DoubleSide, depthWrite: false });
+      const mesh = new THREE.Mesh(ringGeo, mat);
+      const p = targetPosition(a, TARGET_DISTANCE);
+      mesh.position.set(p[0], p[1], p[2]);
+      mesh.lookAt(0, 0, 0);
+      scene.add(mesh);
+      pops.push({ mesh, mat, born: performance.now() });
+    },
     setTrackingTarget(a, onTarget) {
       place(trackMesh, a);
       trackMat.color.setHex(onTarget ? TARGET_ON_COLOR : TARGET_COLOR);
@@ -109,9 +134,21 @@ export function createScene(
       camera.fov = vfovDeg(opts.fov, opts.fovType, w / h);
       camera.updateProjectionMatrix();
     },
-    render() { renderer.render(scene, camera); },
+    render() {
+      const now = performance.now();
+      for (let i = pops.length - 1; i >= 0; i--) {
+        const p = pops[i]!;
+        const k = (now - p.born) / POP_MS;
+        if (k >= 1) { scene.remove(p.mesh); p.mat.dispose(); pops.splice(i, 1); continue; }
+        p.mesh.scale.setScalar(baseRadius * (1 + (POP_GROWTH - 1) * k));
+        p.mat.opacity = 1 - k;
+      }
+      renderer.render(scene, camera);
+    },
     dispose() {
       roomGeo.dispose(); roomMat.dispose(); gridTex.dispose();
+      for (const p of pops) p.mat.dispose();
+      ringGeo.dispose();
       targetGeo.dispose(); trackGeo.dispose(); flickMat.dispose(); trackMat.dispose();
       renderer.dispose();
     },

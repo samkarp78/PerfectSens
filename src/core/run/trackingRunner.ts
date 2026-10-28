@@ -20,9 +20,11 @@ export class TrackingRunner {
     this.lastT = t0;
   }
 
-  get state(): { aim: Aim; targetAim: Aim; held: boolean; onTarget: boolean; done: boolean } {
+  /** endsAt: the block's end; scoredFrom: the end of the unscored lead-in. */
+  get state(): { aim: Aim; targetAim: Aim; held: boolean; onTarget: boolean; done: boolean; endsAt: number; scoredFrom: number } {
     const near = angleBetween(this.aim, this.targetAim) <= this.cfg.tracking.targetRadiusDeg;
-    return { aim: this.aim, targetAim: this.targetAim, held: this.held, onTarget: this.held && near, done: this.finished };
+    return { aim: this.aim, targetAim: this.targetAim, held: this.held, onTarget: this.held && near, done: this.finished,
+      endsAt: this.endT, scoredFrom: this.t0 + this.cfg.tracking.leadInMs };
   }
 
   onPress(t: number): void { this.setHeld(t, true); }

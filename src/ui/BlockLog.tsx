@@ -24,7 +24,7 @@ export function BlockLog({ rec }: { rec: SessionRecord }) {
         <table class="table">
           <thead>
             <tr>
-              <th>#</th><th>Stage</th><th>cm/360</th><th>TP</th><th>ToT</th><th>Gain S/M/B</th><th>Corrections</th>
+              <th>#</th><th>Stage</th><th>cm/360</th><th>Flick TP</th><th>Switch TP</th><th>ToT</th><th>Gain S/M/B</th><th>Corrections</th>
               <th>Spread</th><th>Steering reason</th><th>A/B</th>
             </tr>
           </thead>
@@ -37,6 +37,7 @@ export function BlockLog({ rec }: { rec: SessionRecord }) {
                   <td>{s.stage}{s.arm ? ` (${s.arm})` : ''}</td>
                   <td>{fmt(s.cm360)}</td>
                   <td>{fmt(s.flick.tp)}</td>
+                  <td>{s.switch ? fmt(s.switch.tp) : ''}</td>
                   <td>{fmt(s.tracking.tot, 3)}</td>
                   <td>{fmtOpt(s.flick.smallGain)} / {fmtOpt(s.flick.mediumGain)} / {fmtOpt(s.flick.bigGain)}</td>
                   <td>{fmt(s.flick.corrections)}</td>

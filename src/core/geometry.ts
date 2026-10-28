@@ -47,3 +47,8 @@ export function vfovDeg(fov: number, type: FovType, aspect: number): number {
   if (type === 'vertical') return fov;
   return 2 * Math.atan(Math.tan((fov * RAD) / 2) / aspect) * DEG;
 }
+
+/** Distance the mouse travelled for a number of counts (sign ignored). */
+export function countsToCm(counts: number, dpi: number): number {
+  return (Math.abs(counts) / dpi) * CM_PER_INCH;
+}

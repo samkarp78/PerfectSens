@@ -19,8 +19,8 @@ export class FlickRunner {
     this.spawn(t0);
   }
 
-  get state(): { aim: Aim; target: FlickTarget | null; trialIndex: number; total: number; done: boolean } {
-    return { aim: this.aim, target: this.finished ? null : (this.targets[this.resolved] ?? null), trialIndex: this.resolved, total: this.targets.length, done: this.finished };
+  get state(): { aim: Aim; target: FlickTarget | null; trialIndex: number; total: number; done: boolean; endsAt: number } {
+    return { aim: this.aim, target: this.finished ? null : (this.targets[this.resolved] ?? null), trialIndex: this.resolved, total: this.targets.length, done: this.finished, endsAt: this.endAt };
   }
 
   private get current(): FlickTrial {

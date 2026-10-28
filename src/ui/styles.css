@@ -129,3 +129,23 @@ p { line-height: 1.5; }
 .demo-hint { font-family: var(--mono); font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 .demo-banner { margin: 0; padding: 16px 16px 0; max-width: 860px; margin-inline: auto; box-sizing: border-box; font-size: 14px; font-family: var(--mono);
   text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); }
+
+/* Revision 2: part timer, live score, breaks, calibration. */
+.part-timer { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 2; font-family: var(--mono);
+  font-size: 18px; letter-spacing: 0.04em; color: var(--text); pointer-events: none; user-select: none; }
+.score-hud { position: absolute; top: 40px; right: 16px; z-index: 2; font-family: var(--mono); font-size: 14px; color: var(--accent);
+  pointer-events: none; user-select: none; }
+.break-body { width: min(460px, calc(100vw - 32px)); padding: 28px; box-sizing: border-box; text-align: center; cursor: pointer; outline: none;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.break-title { margin: 0 0 16px; font-size: 22px; font-weight: 600; }
+.break-stats { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; margin: 8px 0 16px; }
+.break-stats > div { display: flex; flex-direction: column; align-items: center; min-width: 72px; }
+.break-grade { font-family: var(--mono); font-size: 44px; line-height: 1; color: var(--accent); }
+.break-num { font-family: var(--mono); font-size: 24px; line-height: 1.2; }
+.break-label { margin-top: 4px; font-size: 12px; color: var(--muted); }
+.field-warn { color: var(--accent); font-size: 13px; }
+.row-tight { gap: 8px; align-items: center; }
+.calib-area { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 200px; margin: 16px 0;
+  padding: 24px; box-sizing: border-box; text-align: center; background: var(--panel); border: 1px dashed var(--line); border-radius: 10px; cursor: pointer; }
+.calib-step { margin: 0; font-size: 17px; line-height: 1.5; }
+.calib-live { margin: 12px 0 0; font-family: var(--mono); font-size: 32px; color: var(--accent); }
