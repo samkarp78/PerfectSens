@@ -61,10 +61,12 @@ export function App() {
 
   const onStart = (setup: SetupValues, warmup: boolean) => {
     saveSetup(setup);
+    setDraft(null); // the saved setup is the source of truth from here on
     begin(setup, warmup, null);
   };
 
   const onQuickAb = (s: SessionSummary) => {
+    setDraft(null);
     const setup: SetupValues = { ...s.setup, cm360: s.result.recommendedCm360, inGameSens: s.result.newInGameSens };
     begin(setup, false, s.result.currentCm360);
   };

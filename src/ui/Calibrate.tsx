@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import './styles.css';
+import { defaultConfig } from '../core/config';
 import { countsToCm } from '../core/geometry';
 import { requestRawPointerLock, startCapture } from '../input/rawInput';
 
@@ -43,7 +44,10 @@ export function Calibrate({ dpi, onDone, onCancel, onUnsupported }: CalibratePro
           setLive(0);
           setStep({ kind: 'right', pass: st.pass });
         } else if (st.kind === 'right') {
-          widths.current.push(countsToCm(counts.current, dpi));
+          const cm = countsToCm(counts.current, dpi);
+          // A pass shorter than any real pad is a slip (e.g. a double click): redo that pass.
+          if (cm < defaultConfig.setup.padWidthCm.min) { setStep({ kind: 'left', pass: st.pass }); return; }
+          widths.current.push(cm);
           if (st.pass + 1 < PASSES) setStep({ kind: 'left', pass: st.pass + 1 });
           else {
             setStep({ kind: 'done', cm: Math.min(...widths.current) });

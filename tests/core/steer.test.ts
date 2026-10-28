@@ -257,3 +257,16 @@ describe('play-area cap', () => {
     expect(d.cm360).toBeLessThanOrEqual(current * 1.1 + 1e-9);
   });
 });
+
+describe('play-area cap equal to the current sens', () => {
+  const tight = current / (2 * defaultConfig.pad.turnFraction); // no room for any slower sens
+  it('both bracket steps test faster, distinct sens values (never a repeat of current)', () => {
+    for (let seed = 0; seed < 8; seed++) {
+      const s0 = chooseNext(ctx({ stepIndex: 0, rng: createRng(seed), padWidthCm: tight }), defaultConfig);
+      const s1 = chooseNext(ctx({ stepIndex: 1, rng: createRng(seed), padWidthCm: tight, steps: [step(1, s0.cm360)] }), defaultConfig);
+      expect(s0.cm360).toBeLessThan(current);
+      expect(s1.cm360).toBeLessThan(current);
+      expect(Math.abs(Math.log(s0.cm360 / s1.cm360))).toBeGreaterThan(Math.log(1 + defaultConfig.steer.minSeparation));
+    }
+  });
+});

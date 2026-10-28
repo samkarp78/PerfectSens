@@ -53,17 +53,21 @@ export function createScoreKeeper(): ScoreKeeper {
 
 export interface ShotEvent { hit: boolean; ms: number }
 
-/** Hits and misses from flick trials resolved since index `from` (misclicks and timeouts are misses). */
-export function flickEvents(trials: readonly FlickTrial[], from: number): { events: ShotEvent[]; next: number } {
+/** Read position in a flick block: the trial, and how many of its clicks were already reported. */
+export interface FlickCursor { trial: number; click: number }
+
+/** Hits and misses since `from`: misclicks as soon as they happen (also on the target still up), then each resolved
+ *  trial's hit or timeout. */
+export function flickEvents(trials: readonly FlickTrial[], from: FlickCursor): { events: ShotEvent[]; next: FlickCursor } {
   const events: ShotEvent[] = [];
-  let i = from;
-  for (; i < trials.length; i++) {
+  let { trial: i, click } = from;
+  for (; i < trials.length; i++, click = 0) {
     const t = trials[i]!;
+    for (; click < t.clicks.length; click++) if (!t.clicks[click]!.hit) events.push({ hit: false, ms: 0 });
     if (t.hitT === null && !t.timedOut) break;
-    for (const c of t.clicks) if (!c.hit) events.push({ hit: false, ms: 0 });
     events.push(t.hitT !== null ? { hit: true, ms: t.hitT - t.spawnT } : { hit: false, ms: 0 });
   }
-  return { events, next: i };
+  return { events, next: { trial: i, click } };
 }
 
 /** Hits (with the time since the previous kill) and misses from switching clicks since index `from`. */

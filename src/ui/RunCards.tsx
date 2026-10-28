@@ -28,7 +28,8 @@ export function AskCard({ onAnswer }: { onAnswer(accept: boolean): void }) {
   );
 }
 
-export interface BreakStats extends Stretch { grade: string }
+/** grade is null when there is no calibration round to compare against (Quick A/B). */
+export interface BreakStats extends Stretch { grade: string | null }
 
 export function BreakCard({ stats, onContinue }: { stats: BreakStats | null; onContinue(): void }) {
   const acc = stats && stats.shots > 0 ? Math.round((100 * stats.hits) / stats.shots) : null;
@@ -38,7 +39,7 @@ export function BreakCard({ stats, onContinue }: { stats: BreakStats | null; onC
       <p class="break-title">Break</p>
       {stats && (
         <div class="break-stats">
-          <div><span class="break-grade">{stats.grade}</span><span class="break-label">Grade</span></div>
+          {stats.grade && <div><span class="break-grade">{stats.grade}</span><span class="break-label">Grade</span></div>}
           <div><span class="break-num">{stats.points.toLocaleString()}</span><span class="break-label">Points</span></div>
           <div><span class="break-num">×{stats.bestStreak}</span><span class="break-label">Best streak</span></div>
           {acc !== null && <div><span class="break-num">{acc}%</span><span class="break-label">Accuracy</span></div>}

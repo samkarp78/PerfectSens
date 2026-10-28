@@ -57,12 +57,15 @@ export function chooseNext(ctx: SteerContext, cfg: Config): SteerDecision {
   const size = stepSize(ctx.stepIndex, ctx.totalSteps, cfg);
 
   if (ctx.stepIndex < BRACKET_STEPS) {
+    // With no room for a slower sens (play-area cap at current), both brackets go faster: one and two steps out.
+    const noSlower = Math.log(maxTestCm360(current, ctx.padWidthCm, cfg) / current) < Math.log(1 + sc.minSeparation);
     const first = ctx.steps[0];
-    const dir: Dir = ctx.stepIndex === 1 && first
-      ? (first.cm360 > current ? -1 : 1)
-      : (ctx.rng.next() < 0.5 ? 1 : -1);
+    let dir: Dir = ctx.stepIndex === 1 && first ? (first.cm360 > current ? -1 : 1) : (ctx.rng.next() < 0.5 ? 1 : -1);
+    let steps = 1;
+    if (noSlower) { dir = -1; steps = ctx.stepIndex === 1 ? 2 : 1; }
     return {
-      cm360: Math.min(current * (1 + sc.bracket) ** dir, maxTestCm360(current, ctx.padWidthCm, cfg)), direction: dirName(dir), stepSize: size, signal: 0,
+      cm360: Math.min(current * (1 + sc.bracket) ** (dir * steps), maxTestCm360(current, ctx.padWidthCm, cfg)),
+      direction: dirName(dir), stepSize: size, signal: 0,
       reason: `Bracketing: testing a ${dirName(dir)} sens`,
     };
   }

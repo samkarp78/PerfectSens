@@ -47,8 +47,10 @@ describe('event diffs', () => {
       trial({ spawnT: 700, timedOut: true }),
       trial({ spawnT: 4700 }), // still up: not resolved yet
     ];
-    expect(flickEvents(trials, 0)).toEqual({ events: [{ hit: true, ms: 250 }, { hit: false, ms: 0 }, { hit: true, ms: 450 }, { hit: false, ms: 0 }], next: 3 });
-    expect(flickEvents(trials, 3).events).toEqual([]);
+    const r = flickEvents(trials, { trial: 0, click: 0 });
+    expect(r.events).toEqual([{ hit: true, ms: 250 }, { hit: false, ms: 0 }, { hit: true, ms: 450 }, { hit: false, ms: 0 }]);
+    expect(r.next).toEqual({ trial: 3, click: 0 });
+    expect(flickEvents(trials, r.next).events).toEqual([]);
   });
   it('switch: new clicks map to hits (with the interval since the previous kill) and misses', () => {
     const log = { t0: 0, kills: [{ t: 400, target: { yaw: 0, pitch: 0 }, from: { yaw: 0, pitch: 0 } }], clicks: [{ t: 300, hit: false }, { t: 400, hit: true }] };
@@ -63,5 +65,17 @@ describe('gradeFor', () => {
     expect(gradeFor(0)).toBe('B');
     expect(gradeFor(-0.04)).toBe('C');
     expect(gradeFor(-0.2)).toBe('D');
+  });
+});
+
+describe('flick events are live', () => {
+  it('reports a misclick on the target that is still up, once, before it is hit', () => {
+    const open = [trial({ clicks: [{ t: 100, aim: { yaw: 5, pitch: 0 }, hit: false }] })];
+    const a = flickEvents(open, { trial: 0, click: 0 });
+    expect(a.events).toEqual([{ hit: false, ms: 0 }]);
+    const b = flickEvents(open, a.next);
+    expect(b.events).toEqual([]);
+    const hitNow = [trial({ hitT: 300, clicks: [{ t: 100, aim: { yaw: 5, pitch: 0 }, hit: false }, { t: 300, aim: { yaw: 0, pitch: 0 }, hit: true }] })];
+    expect(flickEvents(hitNow, b.next).events).toEqual([{ hit: true, ms: 300 }]);
   });
 });

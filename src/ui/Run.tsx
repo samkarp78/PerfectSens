@@ -69,7 +69,7 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
 
   // While the mouse stays locked between rounds, count down and start the next round on its own.
   useEffect(() => {
-    if (view.phase !== 'rest' || !locked) { setCountdown(null); return; }
+    if (view.phase !== 'rest' || !locked || !prefs.autoContinue) { setCountdown(null); return; }
     let left = COUNTDOWN_S;
     setCountdown(left);
     sounds.countdown(false);
@@ -124,7 +124,7 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
           const every = ctrl.session._cfg.session.breakEveryRounds;
           const recent = ctrl.session.steps.slice(-every);
           const mean = recent.reduce((s, st) => s + st.score.logS, 0) / Math.max(1, recent.length);
-          setBreakStats({ ...keeper.stretch(), grade: gradeFor(mean) });
+          setBreakStats({ ...keeper.stretch(), grade: ctrl.session.mode === 'quickab' ? null : gradeFor(mean) });
         }
         setView(v);
         // Between rounds the lock is kept for the countdown (unless auto-continue is off); it is released for
@@ -147,15 +147,16 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
     // Turns runner progress into points, sounds and hit effects (display only).
     let seen: Runner | null = null;
     let cursor = 0, kills = 0, lastFrame = performance.now(), lastTick = 0, scoreText = '';
+    let flickAt = { trial: 0, click: 0 };
     const feedback = (r: Runner | null, now: number) => {
-      if (r !== seen) { seen = r; cursor = 0; kills = 0; }
+      if (r !== seen) { seen = r; cursor = 0; kills = 0; flickAt = { trial: 0, click: 0 }; }
       if (r instanceof FlickRunner && r.log().spec.kind === 'warmup') {
         // warm-up: no points
       } else if (r instanceof FlickRunner) {
         const trials = r.log().trials;
-        const { events, next } = flickEvents(trials, cursor);
-        for (let i = cursor; i < next; i++) if (trials[i]!.hitT !== null) scene.popAt(trials[i]!.target.aim);
-        cursor = next;
+        const { events, next } = flickEvents(trials, flickAt);
+        for (let i = flickAt.trial; i < next.trial; i++) if (trials[i]!.hitT !== null) scene.popAt(trials[i]!.target.aim);
+        flickAt = next;
         for (const e of events) { if (e.hit) { keeper.hit(e.ms); sounds.hit(keeper.state.streak - 1); } else { keeper.miss(); sounds.miss(); } }
       } else if (r instanceof SwitchRunner) {
         const log = r.log();
