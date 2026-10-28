@@ -19,7 +19,22 @@ The first draft feels like a chore. All of these are safe for the measurement as
 - Show the block score only at the end of the block, not live, to limit effort changes after a block that "feels bad".
 - Sounds and effects must be identical in every block.
 
+## Variety and fatigue (from the second play-test, 10-minute session)
+
+Feedback: "still feels like a chore", and 10 minutes with no breaks of the same two tasks is very fatiguing.
+
+- **Mix it up inside each round, not between rounds.** Every round contains the same set of short segments, for example about 15 s of flick waves, 15 s of target switching (several targets up at once, clear them in any order) and 15 s of tracking.
+  - The mix must be identical in every round. The A/B's two sens land on different rounds, so rotating styles between rounds would give them different tasks and break the comparison.
+  - Scoring: each segment type gets its own score, normalised to the baseline. The composite weights go in config. Switching is a new metric (time per kill, or throughput across switches) and needs its own measure and tests.
+  - Each segment type needs its own short unscored lead-in, because switching tasks costs a moment of readjustment.
+  - Re-run the simulator checks: shorter segments mean less data per type. The simulated player needs a switching model.
+- **Real breaks:** 15–20 s every 2–3 rounds that the player can end early. Show the stretch's score, grade and best streak, so the break feels like a milestone. Fatigue also biases later rounds, so this helps the data too.
+- **Optional auto-continue:** a setting for the 3-2-1 countdown, so players can choose to always click to start instead.
+- **A different look per stage** (baseline, dial-in, final showdown): purely visual and safe for the measurement.
+
 ## Session flow and search
+
+- **Open decision: 4 or 5 hidden steps.** The 10-minute build uses 4, which gives about 76% re-run agreement in the simulator against an 80% bar. 5 steps gives about 80% for roughly 1 extra minute. The stats test-retest check is failing until this is decided.
 
 - **Wide blind opening round (from the Low/Medium/High idea):** test three widely spaced sens, for example 0.6×, 1× and 1.6× current, in random order. Pick the best by measured score, without telling the player, then dial in from there. This keeps the idea blind. A player-chosen Low/Medium/High would bring back familiarity bias.
 - **Wider first bracket** (PSA-style start wide, then narrow): about ±30% instead of ±15%. The first quick run hit the edge of its tested range. Re-run the simulator stats after changing this.
