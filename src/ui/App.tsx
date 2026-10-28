@@ -83,7 +83,11 @@ export function App() {
 
   useEffect(() => {
     paStoreRef.current = openPlayAlongStore().catch(() => null);
-    void paStoreRef.current.then((st) => st?.load()).then((s) => { if (s) setPa(s); }).catch(() => undefined);
+    // A search saved by an older version (before the spec 19 grade) can't be continued; it is set aside.
+    void paStoreRef.current.then(async (st) => {
+      const s = await st?.load();
+      if (s?.version === 2) setPa(s); else if (s) await st?.clear();
+    }).catch(() => undefined);
   }, []);
 
   const savePa = (s: PaState) => { setPa(s); void paStoreRef.current?.then((st) => st?.save(s)).catch(() => undefined); };

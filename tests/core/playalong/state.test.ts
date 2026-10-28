@@ -3,7 +3,7 @@ import { defaultConfig } from '../../../src/core/config';
 import { nextBlock } from '../../../src/core/session';
 import { finalsToCm360, gameSensOf } from '../../../src/core/playalong/gameSens';
 import {
-  abandonTest, aimNudge, answerFeel, answerHourCheck, createPlayAlong, currentTarget, feelFlagsOf, isStale, markBack, resume, startNight,
+  abandonTest, answerFeel, directionNudge, answerHourCheck, createPlayAlong, currentTarget, feelFlagsOf, isStale, markBack, resume, startNight,
   submitTest, testSession, type Feel, type PaSetup, type PaState, type TestRole,
 } from '../../../src/core/playalong/state';
 import { fakeDone } from '../../helpers/paSteps';
@@ -277,32 +277,42 @@ describe('final review fixes', () => {
   });
 });
 
-describe('aim nudge (overshoot steers Play-Along pairs)', () => {
-  /** Default test, then both first-pair tests; the faster one (Finals 40) overshoots small flicks by `gain`. */
-  const withGain = (gain: number): PaState => {
+describe('direction (overshoot and ahead/behind steer Play-Along pairs)', () => {
+  /** Default test, then both first-pair tests; tests on Finals 40 land small flicks at `gain` × the distance. */
+  const withGain = (gain: number, onDefault = 1): PaState => {
     let x = createPlayAlong(setup, 1, 0);
     const now = { t: 0 };
-    const one = (y: PaState, g: number): PaState => {
+    const one = (y: PaState): PaState => {
       const head = y.queue[0]!;
       now.t += MIN;
-      return submitTest(answerFeel(markBack(y, now.t), 'right'), fakeDone(head.cm360, 0, 0.03, 2, { small: num(head.cm360) === 40 ? g : 1 }), now.t);
+      const g = num(head.cm360) === 40 ? gain : num(head.cm360) === 33 ? onDefault : 1;
+      return submitTest(answerFeel(markBack(y, now.t), 'right'), fakeDone(head.cm360, 0, 0.03, 2, { small: g }), now.t);
     };
-    x = one(x, 1);
-    x = one(x, gain);
-    return one(x, gain);
+    return one(one(one(x)));
   };
 
   it('overshooting on the centre sens moves the centre slower', () => {
-    const n = aimNudge(withGain(1.3), finals(40));
+    const n = directionNudge(withGain(1.3), finals(40));
     expect(n.cm360).toBeGreaterThan(finals(40));
-    expect(n.reason).toMatch(/overshot/);
+    expect(n.reason).toMatch(/Overshooting/);
   });
 
-  it('no overshoot leaves the centre where it is', () => {
-    expect(aimNudge(withGain(1), finals(40)).cm360).toBe(finals(40));
+  it('undershooting moves it faster', () => {
+    expect(directionNudge(withGain(0.75), finals(40)).cm360).toBeLessThan(finals(40));
   });
 
-  it('the default sens is never nudged against itself', () => {
-    expect(aimNudge(withGain(1.3), DEFAULT).cm360).toBe(DEFAULT);
+  it('landing on target leaves the centre where it is', () => {
+    expect(directionNudge(withGain(1), finals(40)).cm360).toBe(finals(40));
+  });
+
+  it('is judged against the normal pattern, not the starting sens (the control can be too fast too)', () => {
+    expect(directionNudge(withGain(1, 1.3), DEFAULT).cm360).toBeGreaterThan(DEFAULT);
+  });
+
+  it('every test stores its direction and part grades', () => {
+    const x = withGain(1.3);
+    const t40 = x.tests.find((t) => num(t.cm360) === 40)!;
+    expect(t40.direction.dir).toBe('lower');
+    expect(t40.parts.flick.n).toBe(20);
   });
 });

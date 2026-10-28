@@ -33,6 +33,19 @@ describe('measureTrackSwitch', () => {
     expect(s.acquireMs).toBeNull();
     expect(s.killMs).toBeNull();
     expect(Number.isFinite(s.logDmgSe)).toBe(true);
-    for (const [k, v] of Object.entries(s)) expect(v === null || Number.isFinite(v), k).toBe(true);
+    for (const [k, v] of Object.entries(s)) if (!Array.isArray(v)) expect(v === null || Number.isFinite(v), k).toBe(true);
+    expect(s.killItems).toEqual([]);
+  });
+});
+
+describe('measureTrackSwitch killItems', () => {
+  it('lists each scored kill with its lock-on and kill time', () => {
+    const s = measureTrackSwitch(playTrackSwitch(spec, cfg, { gapMs: 200 }), cfg, createRng(1));
+    expect(s.killItems!.length).toBeGreaterThan(3);
+    for (const k of s.killItems!) {
+      expect(k.acquireMs).toBeGreaterThan(195);
+      expect(k.acquireMs).toBeLessThan(215);
+      expect(k.killMs).toBeGreaterThan(cfg.trackswitch.healthMs - 10);
+    }
   });
 });

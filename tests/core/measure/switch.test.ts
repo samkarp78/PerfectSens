@@ -86,3 +86,16 @@ describe('measureSwitch', () => {
     expect(measureSwitch(l, cfg, createRng(4)).logTpSe).toBe(a);
   });
 });
+
+describe('measureSwitchTrials misses', () => {
+  it('counts missed clicks before each kill', () => {
+    const spec: BlockSpec = { id: 'sw', stage: 'baseline', kind: 'switch', cm360: 30, seed: 1, stepIndex: 0, arm: null };
+    const log: SwitchBlockLog = {
+      spec, t0: 0, endT: 2000, path: [],
+      kills: [{ t: 300, target: { yaw: 10, pitch: 0 }, from: { yaw: 0, pitch: 0 } }, { t: 700, target: { yaw: 20, pitch: 0 }, from: { yaw: 10, pitch: 0 } }],
+      clicks: [{ t: 200, aim: { yaw: 6, pitch: 0 }, hit: false }, { t: 300, aim: { yaw: 10, pitch: 0 }, hit: true },
+        { t: 700, aim: { yaw: 20, pitch: 0 }, hit: true }],
+    };
+    expect(measureSwitchTrials(log, cfg).map((t) => t.misses)).toEqual([1, 0]);
+  });
+});

@@ -14,10 +14,15 @@ const VEL_H = 0.5;
 
 /** Tracking switching (spec §17.5). dmg (the score term): fraction of scored time dealing damage. Per-kill means over
  *  kills after the lead-in; acquireGain is recorded but never steers (moving targets confound it). */
+/** One scored kill: time to lock on (ms), time from lock-on to kill (ms), and the lock-on first-move gain. */
+export interface TrackSwitchKill { acquireMs: number; killMs: number; gain: number | null }
+
 export interface TrackSwitchSummary {
   dmg: number; logDmgSe: number; kills: number;
   acquireMs: number | null; acquireGain: number | null; killMs: number | null;
   losses: number; reacquireMs: number | null; leadLagDeg: number | null; heldFraction: number; n: number;
+  /** Per-kill items for the Play-Along grade (absent on summaries saved before spec 19). */
+  killItems?: TrackSwitchKill[];
 }
 
 const mean = (xs: number[]): number | null => (xs.length === 0 ? null : xs.reduce((a, b) => a + b, 0) / xs.length);
@@ -38,6 +43,7 @@ export function measureTrackSwitch(log: TrackSwitchBlockLog, cfg: Config, rng: R
   const flags = scored.map((g) => g.hit !== null);
 
   const acquire: number[] = [], killTimes: number[] = [], gains: number[] = [], reacq: number[] = [], lags: number[] = [];
+  const killItems: TrackSwitchKill[] = [];
   let losses = 0;
   log.kills.forEach((k, j) => {
     if (k.t < scoredFrom) return;
@@ -60,11 +66,13 @@ export function measureTrackSwitch(log: TrackSwitchBlockLog, cfg: Config, rng: R
       }
     }
     const subs = segmentSubmovements(log.path, prevT, k.t, from, cfg);
+    let gain: number | null = null;
     if (subs.length > 0) {
       const end = trackSwitchTargetAim(target, subs[0]!.t1, cfg);
       const d = angleBetween(from, end);
-      if (d > 0) gains.push(alongPerp(from, end, subs[0]!.to).along / d);
+      if (d > 0) { gain = alongPerp(from, end, subs[0]!.to).along / d; gains.push(gain); }
     }
+    killItems.push({ acquireMs: span[first]!.t - prevT, killMs: k.t - span[first]!.t, gain });
   });
 
   return {
@@ -72,7 +80,7 @@ export function measureTrackSwitch(log: TrackSwitchBlockLog, cfg: Config, rng: R
     logDmgSe: chunkBootstrapSe(flags, cfg, rng), kills: log.kills.length,
     acquireMs: mean(acquire), acquireGain: mean(gains), killMs: mean(killTimes),
     losses, reacquireMs: mean(reacq), leadLagDeg: mean(lags),
-    heldFraction: scored.length > 0 ? scored.filter((g) => g.held).length / scored.length : 0, n: scored.length,
+    heldFraction: scored.length > 0 ? scored.filter((g) => g.held).length / scored.length : 0, n: scored.length, killItems,
   };
 }
 

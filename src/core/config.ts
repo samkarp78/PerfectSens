@@ -46,6 +46,9 @@ export const defaultConfig = {
   /** Play-Along mode (§18): real game matches between short tests. finalsK: The Finals cm/360 = finalsK / (sens × DPI). */
   playAlong: { roundsPerTest: 2, partMs: 20000, leadInMs: 15000, firstStep: 0.2, minStep: 0.04, hourCheckMs: 3_000_000, staleDays: 14,
     maxH2hPerNight: 2, h2hBlocksPerSide: 1, z: 2.5, nightPriorSd: 0.03, finalsK: 914_400, holdMs: 1000, testTimeScale: 0.25, sameNightMs: 10_800_000,
+    /** The grade (spec 19.1): per-item costs. Direction (19.2): ideal first-move gains by distance class and signal scales. */
+    grade: { correctionCost: 0.1, missCost: 0.2, maxGainCost: 1 },
+    direction: { idealGain: { small: 1, medium: 0.97, big: 0.93 }, gainScale: 0.1, leadScaleDeg: 1, threshold: 0.5 },
     sim: { matchMs: 600_000, familiarityShrink: 0.5, nightSd: 0.03, maxNights: 4 } },
   demo: { player: { optimalRatio: 0.75 } },
   /** Quick test mode (about 5 min, for trying the tool out): shorter blocks; too little data for a reliable answer. */

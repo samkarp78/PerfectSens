@@ -27,6 +27,7 @@ export function measureSwitchTrials(log: SwitchBlockLog, cfg: Config): TrialMetr
       corrections: Math.max(0, subs.length - 1),
       endAlong: end ? end.along - distance : null, endPerp: end ? end.perp : null,
       hit: true, timedOut: false, scored: i >= cfg.switch.warmKills,
+      misses: log.clicks.filter((c) => c.t > prevT && c.t <= k.t && !c.hit).length,
     };
   });
 }

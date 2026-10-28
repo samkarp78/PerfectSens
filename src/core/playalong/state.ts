@@ -7,7 +7,7 @@ import type { ScoreBaseline } from '../score';
 import { createSession, type SessionState } from '../session';
 import type { FovType, Setup, StepResult } from '../types';
 import { gameSensOf, sameSens, snapCm360, type GameId } from './gameSens';
-import { aimDrivers } from '../steer';
+import { directionInputs, directionSignal, partGrades, testGrade, type Direction, type PartGrades } from './grade';
 import { choosePair, nextStep, type PairDecision } from './steer';
 
 /** The player's answer to "How did that feel?". */
@@ -18,7 +18,7 @@ export interface PaSetup { game: GameId; dpi: number; defaultCm360: number; padW
 export type TestRole = 'default' | 'pair' | 'h2h' | 'anchor';
 export interface QueueItem { cm360: number; role: TestRole }
 export interface PaTest { id: string; night: number; indexInNight: number; cm360: number; role: TestRole; feel: Feel;
-  awayMs: number; finishedAt: number; steps: StepResult[]; logS: number; se: number }
+  awayMs: number; finishedAt: number; steps: StepResult[]; logS: number; se: number; parts: PartGrades; direction: Direction }
 /** bestGuess ("I'm done" before the head-to-head) is not a change verdict and carries no false-change guarantee. */
 export interface PaResult { kind: 'change' | 'keep' | 'none' | 'bestGuess'; recommendedCm360: number; recommendedGameSens: number | null;
   rangeCm360: [number, number] | null; tieBrokenByFeel: boolean; feelFlags: { cm360: number; feel: 'fast' | 'slow' }[];
@@ -28,7 +28,7 @@ export interface DiscardedTest { cm360: number; night: number; at: number; phase
 /** The whole search, saved between tests and nights. step: the step of the latest pair. logs: raw logs per test id.
  *  hourCheckedNight: the night whose hour check was already answered (searches saved before it existed lack the field,
  *  as they lack discarded). */
-export interface PaState { version: 1; setup: PaSetup; seed: number; createdAt: number; phase: PaPhase;
+export interface PaState { version: 2; setup: PaSetup; seed: number; createdAt: number; phase: PaPhase;
   nights: { startedAt: number }[]; tests: PaTest[]; queue: QueueItem[]; step: number;
   h2h: { leaderCm360: number; testIds: string[] } | null; h2hTonight: number; waitingSince: number;
   pendingFeel: Feel | null; pendingAwayMs: number; steerLog: PairDecision[]; result: PaResult | null;
@@ -46,7 +46,7 @@ const mean = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length
 
 export function createPlayAlong(setup: PaSetup, seed: number, now: number, cfg: Config = defaultConfig): PaState {
   return {
-    version: 1, setup, seed, createdAt: now, phase: 'waiting', nights: [{ startedAt: now }], tests: [],
+    version: 2, setup, seed, createdAt: now, phase: 'waiting', nights: [{ startedAt: now }], tests: [],
     queue: [{ cm360: setup.defaultCm360, role: 'default' }], step: cfg.playAlong.firstStep, h2h: null, h2hTonight: 0,
     waitingSince: now, pendingFeel: null, pendingAwayMs: 0, steerLog: [], result: null, logs: {},
   };
@@ -108,11 +108,13 @@ export function submitTest(s: PaState, done: SessionState, now: number, cfg: Con
   const head = s.queue[0]!;
   const night = s.nights.length - 1;
   const id = `t${s.tests.length}`;
+  // The grade is against the control's first test (the first test of the search, on the starting sens).
+  const parts = partGrades(done, cfg);
+  const grade = testGrade(parts, s.tests[0]?.parts ?? parts);
   const test: PaTest = {
     id, night, indexInNight: s.tests.filter((t) => t.night === night).length, cm360: head.cm360, role: head.role,
     feel: s.pendingFeel ?? 'right', awayMs: s.pendingAwayMs, finishedAt: now, steps: done.steps,
-    logS: mean(done.steps.map((st) => st.score.logS)),
-    se: Math.sqrt(done.steps.reduce((a, st) => a + st.score.se ** 2, 0)) / done.steps.length,
+    logS: grade.logS, se: grade.se, parts, direction: directionSignal(directionInputs(done, cfg), cfg),
   };
   const h2h = s.h2h && head.role === 'h2h' ? { ...s.h2h, testIds: [...s.h2h.testIds, id] } : s.h2h;
   const next = plan({ ...s, tests: [...s.tests, test], queue: s.queue.slice(1), h2h, pendingFeel: null,
@@ -147,22 +149,16 @@ function shuffled<T>(s: PaState, items: T[], label: string): T[] {
 }
 
 /**
- * Overshoot steering (the §6 aim signals): the centre's latest test against the default's first test, each round
- * compared and averaged. Both follow a match on that sens, so a clear signal is the sens, not adaptation: overshooting
- * or clicking past moves the centre half a step slower, falling short half a step faster. The default is never nudged.
+ * Direction (spec 19.2): the centre's latest test says which way to go. Overshooting or running ahead (too fast) moves
+ * the centre half a step slower (a higher cm/360); undershooting or trailing, half a step faster.
  */
-export function aimNudge(s: PaState, center: number, step: number = s.step, cfg: Config = defaultConfig): { cm360: number; reason: string } {
-  const def = s.setup.defaultCm360;
+export function directionNudge(s: PaState, center: number, step: number = s.step): { cm360: number; reason: string } {
   const at = testsAt(s, center);
-  const base = testsAt(s, def)[0]?.steps[0];
-  if (same(s, center, def) || at.length === 0 || !base) return { cm360: center, reason: '' };
-  const rounds = at[at.length - 1]!.steps.map((st) => aimDrivers(st, base, cfg));
-  const signal = mean(rounds.map((ds) => ds.reduce((a, d) => a + d.value, 0)));
-  if (Math.abs(signal) < cfg.steer.deadband) return { cm360: center, reason: '' };
-  const summed = rounds[0]!.map((d, i) => ({ ...d, value: mean(rounds.map((ds) => ds[i]!.value)) }));
-  const main = summed.reduce((a, b) => (Math.abs(b.value) > Math.abs(a.value) ? b : a));
-  const dir = signal > 0 ? 1 : -1;
-  return { cm360: center * (1 + step / 2) ** dir, reason: `${main.text(main.value > 0)} → centre nudged ${dir > 0 ? 'slower' : 'faster'}` };
+  const d = at[at.length - 1]?.direction;
+  if (!d || d.dir === 'none') return { cm360: center, reason: '' };
+  const k = d.dir === 'lower' ? 1 : -1;
+  const why = d.dir === 'lower' ? 'Overshooting or running ahead on the best sens' : 'Undershooting or trailing on the best sens';
+  return { cm360: center * (1 + step / 2) ** k, reason: `${why} → centre moved ${d.dir === 'lower' ? 'slower' : 'faster'}` };
 }
 
 function queuePair(s: PaState, center: number, step: number, cfg: Config, note = ''): PaState | null {
@@ -208,7 +204,7 @@ function plan(s: PaState, cfg: Config): PaState {
   if (!pairsPlayed) return queuePair(s, s.setup.defaultCm360, cfg.playAlong.firstStep, cfg) ?? startH2h(s, cfg);
   if (s.step <= cfg.playAlong.minStep) return startH2h(s, cfg);
   const step = nextStep(s.step, cfg);
-  const nudge = aimNudge(s, leader(s, cfg), step, cfg);
+  const nudge = directionNudge(s, leader(s, cfg), step);
   return queuePair(s, nudge.cm360, step, cfg, nudge.reason) ?? startH2h({ ...s, step }, cfg);
 }
 

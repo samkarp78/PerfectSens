@@ -7,6 +7,8 @@ import { segmentSubmovements } from './submovements';
 export interface TrialMetrics {
   index: number; cls: FlickClass; distance: number; mtMs: number; firstGain: number | null;
   corrections: number; endAlong: number | null; endPerp: number | null; hit: boolean; timedOut: boolean; scored: boolean;
+  /** Clicks that missed before the hit (absent on metrics saved before spec 19). */
+  misses?: number;
 }
 export interface FlickSummary {
   tp: number; logTpSe: number; smallGain: number | null; mediumGain: number | null; bigGain: number | null;
@@ -40,6 +42,7 @@ export function measureTrial(trial: FlickTrial, path: AimSample[], cfg: Config):
     corrections: Math.max(0, subs.length - 1),
     endAlong: end ? end.along - distance : null, endPerp: end ? end.perp : null,
     hit: trial.hitT !== null && !trial.timedOut, timedOut: trial.timedOut, scored: target.scored,
+    misses: trial.clicks.filter((c) => !c.hit).length,
   };
 }
 

@@ -201,3 +201,15 @@ describe('summarizeFlick click bias and class counts', () => {
     expect(summarizeFlick(trials, defaultConfig, createRng(1)).classN).toEqual({ small: 2, medium: 0, big: 1 });
   });
 });
+
+describe('measureTrial misses', () => {
+  it('counts the clicks that missed before the hit', () => {
+    const trial: FlickTrial = {
+      target: { index: 0, aim: { yaw: 20, pitch: 0 }, distance: 20, cls: 'small', scored: true, wave: 1 },
+      spawnT: 0, spawnAim: { yaw: 0, pitch: 0 }, hitT: 400, timedOut: false,
+      clicks: [{ t: 250, aim: { yaw: 14, pitch: 0 }, hit: false }, { t: 330, aim: { yaw: 25, pitch: 0 }, hit: false },
+        { t: 400, aim: { yaw: 20, pitch: 0 }, hit: true }],
+    };
+    expect(measureTrial(trial, [], defaultConfig).misses).toBe(2);
+  });
+});
