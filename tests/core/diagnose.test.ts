@@ -5,10 +5,10 @@ import type { FlickSummary } from '../../src/core/measure/flick';
 import type { TrackingSummary } from '../../src/core/measure/tracking';
 
 const flick = (o: Partial<FlickSummary> = {}): FlickSummary => ({
-  tp: 4.5, logTpSe: 0.01, smallGain: 1.0, mediumGain: 1.0, bigGain: 1.0, corrections: 0.5, weDeg: 1,
+  tp: defaultConfig.diagnose.refTp, logTpSe: 0.01, smallGain: 1.0, mediumGain: 1.0, bigGain: 1.0, corrections: 0.5, weDeg: 1,
   spreadRatio: 0.8, timeoutFraction: 0, n: 30, ...o,
 });
-const track = (o: Partial<TrackingSummary> = {}): TrackingSummary => ({ tot: 0.5, logTotSe: 0.01, leadLagDeg: 0, n: 1, ...o });
+const track = (o: Partial<TrackingSummary> = {}): TrackingSummary => ({ tot: defaultConfig.diagnose.refTot, logTotSe: 0.01, leadLagDeg: 0, n: 1, ...o });
 const cfg = defaultConfig;
 
 describe('diagnose', () => {
@@ -27,12 +27,13 @@ describe('diagnose', () => {
     expect(f.map((x) => x.id)).toEqual(['corrections', 'bigShort', 'spread', 'smallOvershoot']);
   });
   it('flags tracking weaker and flicking weaker with rel', () => {
-    const tw = diagnose([flick()], [track({ tot: 0.3 })], cfg);
+    const ref = cfg.diagnose.refTot;
+    const tw = diagnose([flick()], [track({ tot: 0.6 * ref })], cfg);
     expect(tw.map((x) => x.id)).toEqual(['trackingWeaker']);
     expect(tw[0]!.value).toBeCloseTo(0.6, 6);
     expect(tw[0]!.threshold).toBeCloseTo(0.85, 6);
     expect(tw[0]!.severity).toBeCloseTo(0.85 / 0.6 - 1, 6);
-    const fw = diagnose([flick()], [track({ tot: 0.7 })], cfg);
+    const fw = diagnose([flick()], [track({ tot: 1.4 * ref })], cfg);
     expect(fw.map((x) => x.id)).toEqual(['flickingWeaker']);
     expect(fw[0]!.threshold).toBeCloseTo(1.15, 6);
     expect(fw[0]!.severity).toBeCloseTo(1.4 / 1.15 - 1, 6);
@@ -41,7 +42,7 @@ describe('diagnose', () => {
     const f = diagnose([flick({ smallGain: null, bigGain: 0.5 }), flick({ smallGain: null, bigGain: null })], [track()], cfg);
     expect(f.map((x) => x.id)).toEqual(['bigShort']);
     expect(f[0]!.value).toBeCloseTo(0.5, 6);
-    expect(f[0]!.severity).toBeCloseTo(0.92 / 0.5 - 1, 6);
+    expect(f[0]!.severity).toBeCloseTo(cfg.diagnose.bigGainMin / 0.5 - 1, 6);
   });
   it('handles empty inputs', () => {
     expect(diagnose([], [], cfg)).toEqual([]);

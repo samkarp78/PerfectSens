@@ -14,7 +14,8 @@ describe('quick test mode', () => {
     expect(d).toHaveLength(12);
     expect(d.filter((x) => x < c.flick.smallMaxDeg)).toHaveLength(4);
     expect(d.filter((x) => x > c.flick.bigMinDeg)).toHaveLength(4);
-    expect(c.flick.blockMs).toBe(20000);
+    expect(c.flick.blockMs).toBe(10000);
+    expect(c.switch.blockMs).toBe(8000);
     expect(c.flick.wavePerClass).toBe(2);
     expect(c.tracking.durationMs).toBe(8000);
     expect(c.tracking.leadInMs).toBe(1000);
@@ -33,8 +34,8 @@ describe('quick test mode', () => {
   it('a simulated quick session completes with at most 9 non-A/B blocks before the A/B', () => {
     const { state, blocks } = runSimSession(setup, defaultSimPlayer(34.6), { seed: 5, warmup: false, quickAbCm360: null }, configForMode('quick'));
     expect(state.result).not.toBeNull();
-    expect(blocks.filter((b) => b.spec.stage !== 'ab')).toHaveLength(10); // baseline + 3 dial-in + recheck, 2 blocks each
+    expect(blocks.filter((b) => b.spec.stage !== 'ab')).toHaveLength(15); // baseline + 3 dial-in + recheck, 3 blocks each
     const flick = blocks.find((b) => b.spec.kind === 'flick')!.log as { trials: unknown[] };
-    expect(flick.trials.length).toBeGreaterThanOrEqual(24); // 20 s of flicks at sim speed: several 6-target waves
+    expect(flick.trials.length).toBeGreaterThanOrEqual(12); // 10 s of flicks at sim speed: a few 6-target waves
   });
 });

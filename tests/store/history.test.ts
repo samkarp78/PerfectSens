@@ -16,7 +16,7 @@ beforeAll(() => {
 
 // Full raw logs make fake-indexeddb's structured clone slow; a small slice is enough to tell raw from null.
 const make = (i: number): SessionRecord => ({
-  ...base, steps: base.steps.slice(0, 1), raw: { flick: base.raw!.flick.slice(0, 1), tracking: [] }, id: `s${i}`, createdAt: new Date(Date.UTC(2026, 9, 1 + i)).toISOString(),
+  ...base, steps: base.steps.slice(0, 1), raw: { flick: base.raw!.flick.slice(0, 1), switch: [], tracking: [] }, id: `s${i}`, createdAt: new Date(Date.UTC(2026, 9, 1 + i)).toISOString(),
 });
 
 beforeEach(() => { globalThis.indexedDB = new IDBFactory(); });

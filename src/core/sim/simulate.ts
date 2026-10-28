@@ -3,14 +3,15 @@ import type { Config } from '../config';
 import { angleBetween, degPerCount } from '../geometry';
 import type { Rng } from '../rng';
 import { FlickRunner } from '../run/flickRunner';
+import { SwitchRunner } from '../run/switchRunner';
 import { TrackingRunner } from '../run/trackingRunner';
-import type { Aim, BlockSpec, FlickBlockLog, MoveSample, Setup, TrackingBlockLog } from '../types';
+import type { Aim, BlockSpec, FlickBlockLog, MoveSample, Setup, SwitchBlockLog, TrackingBlockLog } from '../types';
 import { adaptToward, moveGain, performance, type SimPlayer, type SimState } from './player';
 
 const MS_PER_S = 1000;
 const RAD = Math.PI / 180;
 
-export interface SimBlockResult { log: FlickBlockLog | TrackingBlockLog; state: SimState; endT: number }
+export interface SimBlockResult { log: FlickBlockLog | SwitchBlockLog | TrackingBlockLog; state: SimState; endT: number }
 
 const minJerk = (tau: number): number => 10 * tau ** 3 - 15 * tau ** 4 + 6 * tau ** 5;
 
@@ -37,17 +38,56 @@ function plan(from: Aim, to: Aim, scale: number, rotDeg: number): { dYaw: number
   return { dYaw: ((x * c - y * s) * scale) / kc, dPitch: (x * s + y * c) * scale, dist: Math.hypot(x, y) };
 }
 
+interface Motor { em: CountEmitter; rng: Rng; cfg: Config; perf: number; k: number; stepMs: number; radius: number }
+
+/**
+ * One target acquisition: a minimum-jerk first move (gain and noise from the player model), corrections while off target,
+ * then a click; a miss starts another correction cycle. Returns the time of the hitting click, or null once `alive` says
+ * the target is gone (timed out or the block ended).
+ */
+function strike(m: Motor, aim: () => Aim, target: Aim, gain: number, start: number,
+  alive: (t: number) => boolean, click: (t: number) => boolean): number | null {
+  const sc = m.cfg.sim;
+  const move = (from: number, d: { dYaw: number; dPitch: number }, durMs: number): number | null => {
+    const n = Math.max(1, Math.round((durMs * sc.sampleHz) / MS_PER_S));
+    let prev = 0;
+    for (let i = 1; i <= n; i++) {
+      const ts = from + i * m.stepMs;
+      if (!alive(ts)) return null;
+      const s = minJerk(i / n);
+      m.em.emit(ts, (s - prev) * d.dYaw, (s - prev) * d.dPitch);
+      prev = s;
+    }
+    return from + n * m.stepMs;
+  };
+  const first = plan(aim(), target, gain * (1 + sc.amplitudeNoise * m.k * m.rng.normal()), sc.directionNoiseDeg * m.k * m.rng.normal());
+  let t: number | null = move(start, first, (sc.durationMs.base + sc.durationMs.slope * Math.log2(first.dist / (2 * m.radius) + 1)) / m.perf);
+  let corrections = 0;
+  const correct = (from: number): number | null => {
+    corrections++;
+    const d = plan(aim(), target, 1 + sc.correctionNoise * m.k * m.rng.normal(), 0);
+    return move(from + sc.correctionPauseMs, d, sc.correctionDurationMs / m.perf);
+  };
+  while (t !== null) {
+    while (t !== null && corrections < sc.maxCorrections && angleBetween(aim(), target) > sc.correctionThreshold * m.radius) t = correct(t);
+    if (t === null) return null;
+    t += sc.clickDelayMs;
+    if (!alive(t)) return null;
+    if (click(t)) return t;
+    t = correct(t); // a miss starts another correction cycle from the actual aim
+  }
+  return null;
+}
+
 function simulateFlick(spec: BlockSpec, setup: Setup, player: SimPlayer, state: SimState, rng: Rng, cfg: Config, t0: number): SimBlockResult {
   const sc = cfg.sim;
   const dpc = degPerCount(setup.dpi, spec.cm360);
   const runner = new FlickRunner(spec, dpc, cfg, t0);
   const perf = performance(player, spec.cm360, state);
-  const k = player.motorNoise / perf;
-  const r = cfg.flick.targetRadiusDeg;
-  const stepMs = MS_PER_S / sc.sampleHz;
   let adapted = state.adaptedCm360;
   let lastT = t0;
   const em = new CountEmitter(dpc, (s) => { runner.onMove(s); lastT = s.t; });
+  const m: Motor = { em, rng, cfg, perf, k: player.motorNoise / perf, stepMs: MS_PER_S / sc.sampleHz, radius: cfg.flick.targetRadiusDeg };
 
   while (!runner.state.done) {
     const index = runner.state.trialIndex;
@@ -56,45 +96,39 @@ function simulateFlick(spec: BlockSpec, setup: Setup, player: SimPlayer, state: 
     const trial = trials[trials.length - 1];
     if (!target || !trial) break;
     const alive = (t: number): boolean => { runner.tick(t); return !runner.state.done && runner.state.trialIndex === index; };
-
-    /** Minimum-jerk move starting at `start`; returns its end time, or null if the target was lost (timed out) meanwhile. */
-    const move = (start: number, d: { dYaw: number; dPitch: number }, durMs: number): number | null => {
-      const n = Math.max(1, Math.round((durMs * sc.sampleHz) / MS_PER_S));
-      let prev = 0;
-      for (let i = 1; i <= n; i++) {
-        const ts = start + i * stepMs;
-        if (!alive(ts)) return null;
-        const s = minJerk(i / n);
-        em.emit(ts, (s - prev) * d.dYaw, (s - prev) * d.dPitch);
-        prev = s;
-      }
-      return start + n * stepMs;
-    };
-
-    let t: number | null = trial.spawnT + Math.max(sc.reactionMs.min, sc.reactionMs.mean + sc.reactionMs.sd * rng.normal());
-    const gain = moveGain(player, adapted, spec.cm360);
-    const first = plan(runner.state.aim, target.aim, gain * (1 + sc.amplitudeNoise * k * rng.normal()), sc.directionNoiseDeg * k * rng.normal());
-    t = move(t, first, (sc.durationMs.base + sc.durationMs.slope * Math.log2(first.dist / (2 * r) + 1)) / perf);
-
-    let corrections = 0;
-    const correct = (start: number): number | null => {
-      corrections++;
-      const d = plan(runner.state.aim, target.aim, 1 + sc.correctionNoise * k * rng.normal(), 0);
-      return move(start + sc.correctionPauseMs, d, sc.correctionDurationMs / perf);
-    };
-    while (t !== null) {
-      while (t !== null && corrections < sc.maxCorrections && angleBetween(runner.state.aim, target.aim) > sc.correctionThreshold * r) t = correct(t);
-      if (t === null) break;
-      t += sc.clickDelayMs;
-      if (!alive(t)) break;
-      lastT = t;
-      if (runner.onClick(t).hit) break;
-      t = correct(t); // a miss starts another correction cycle from the actual aim
-    }
+    const reaction = Math.max(sc.reactionMs.min, sc.reactionMs.mean + sc.reactionMs.sd * rng.normal());
+    strike(m, () => runner.state.aim, target.aim, moveGain(player, adapted, spec.cm360), trial.spawnT + reaction, alive,
+      (t) => { lastT = t; return runner.onClick(t).hit; });
     adapted = adaptToward(player, adapted, spec.cm360);
   }
   const log = runner.log();
   return { log, state: { adaptedCm360: adapted, blocksDone: state.blocksDone + 1 }, endT: Math.max(lastT, finishTime(log, cfg)) };
+}
+
+/** Switching: the player clears the nearest target each time, with the same motor model as flicks. */
+function simulateSwitch(spec: BlockSpec, setup: Setup, player: SimPlayer, state: SimState, rng: Rng, cfg: Config, t0: number): SimBlockResult {
+  const sc = cfg.sim;
+  const dpc = degPerCount(setup.dpi, spec.cm360);
+  const runner = new SwitchRunner(spec, dpc, cfg, t0);
+  const perf = performance(player, spec.cm360, state);
+  let adapted = state.adaptedCm360;
+  let lastT = t0;
+  const em = new CountEmitter(dpc, (s) => { runner.onMove(s); lastT = s.t; });
+  const m: Motor = { em, rng, cfg, perf, k: player.motorNoise / perf, stepMs: MS_PER_S / sc.sampleHz, radius: cfg.switch.targetRadiusDeg };
+  const same = (a: Aim, b: Aim) => a.yaw === b.yaw && a.pitch === b.pitch;
+
+  while (!runner.state.done) {
+    const here = runner.state.aim;
+    const target = [...runner.state.targets].sort((a, b) => angleBetween(here, a) - angleBetween(here, b))[0];
+    if (!target) break;
+    const alive = (t: number): boolean => { runner.tick(t); return !runner.state.done && runner.state.targets.some((x) => same(x, target)); };
+    const reaction = Math.max(sc.reactionMs.min, sc.switchReactionMs + sc.reactionMs.sd * rng.normal());
+    const hitT = strike(m, () => runner.state.aim, target, moveGain(player, adapted, spec.cm360), lastT + reaction, alive,
+      (t) => { lastT = t; return runner.onClick(t).hit; });
+    if (hitT === null) runner.tick(runner.state.endsAt);
+    adapted = adaptToward(player, adapted, spec.cm360);
+  }
+  return { log: runner.log(), state: { adaptedCm360: adapted, blocksDone: state.blocksDone + 1 }, endT: t0 + cfg.switch.blockMs };
 }
 
 /** When the runner finished: the last hit, the last target's timeout, or the block's time limit with a target still up. */
@@ -141,7 +175,7 @@ function simulateTracking(spec: BlockSpec, setup: Setup, player: SimPlayer, stat
 
 /** Plays one block with the simulated player, feeding integer-count moves and clicks into the real runner. Warmup plays like flick. */
 export function simulateBlock(spec: BlockSpec, setup: Setup, player: SimPlayer, state: SimState, rng: Rng, cfg: Config, t0: number): SimBlockResult {
-  return spec.kind === 'tracking'
-    ? simulateTracking(spec, setup, player, state, rng, cfg, t0)
-    : simulateFlick(spec, setup, player, state, rng, cfg, t0);
+  if (spec.kind === 'tracking') return simulateTracking(spec, setup, player, state, rng, cfg, t0);
+  if (spec.kind === 'switch') return simulateSwitch(spec, setup, player, state, rng, cfg, t0);
+  return simulateFlick(spec, setup, player, state, rng, cfg, t0);
 }

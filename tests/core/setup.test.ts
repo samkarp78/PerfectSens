@@ -8,7 +8,7 @@ describe('validateSetup', () => {
   it('accepts a valid setup', () => {
     const r = validateSetup(good);
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.setup).toEqual(good);
+    if (r.ok) expect(r.setup).toEqual({ ...good, padWidthCm: null });
   });
   it('rejects bad dpi', () => { expect(errs({ dpi: 0 }).dpi).toBeDefined(); expect(errs({ dpi: 800.5 }).dpi).toBeDefined(); });
   it('rejects bad cm360', () => { expect(errs({ cm360: 9999 }).cm360).toBeDefined(); });
@@ -34,5 +34,21 @@ describe('validateSetup', () => {
   it('accepts numeric strings', () => {
     const r = validateSetup({ ...good, dpi: '1600' });
     expect(r.ok && r.setup.dpi).toBe(1600);
+  });
+});
+
+describe('validateSetup: play-area width', () => {
+  const base = { dpi: 800, cm360: 34, inGameSens: null, fov: 103, fovType: 'horizontal', mode: 'default' };
+  it('is optional', () => {
+    const r = validateSetup(base);
+    expect(r.ok && r.setup.padWidthCm).toBeNull();
+  });
+  it('accepts a measured width in range', () => {
+    const r = validateSetup({ ...base, padWidthCm: 42.5 });
+    expect(r.ok && r.setup.padWidthCm).toBe(42.5);
+  });
+  it('rejects nonsense widths', () => {
+    const r = validateSetup({ ...base, padWidthCm: 3 });
+    expect(r.ok).toBe(false);
   });
 });

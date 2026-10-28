@@ -5,14 +5,15 @@ import { measureTrial, summarizeFlick } from '../../../src/core/measure/flick';
 import { measureTracking } from '../../../src/core/measure/tracking';
 import { defaultSimPlayer, performance, type SimPlayer } from '../../../src/core/sim/player';
 import { simulateBlock } from '../../../src/core/sim/simulate';
-import type { BlockSpec, FlickBlockLog, Setup, TrackingBlockLog } from '../../../src/core/types';
+import type { BlockSpec, FlickBlockLog, Setup, SwitchBlockLog, TrackingBlockLog } from '../../../src/core/types';
+import { measureSwitch } from '../../../src/core/measure/switch';
 
 const CURRENT = 40;
 const setup: Setup = { dpi: 800, cm360: CURRENT, inGameSens: null, fov: 103, fovType: 'horizontal', mode: 'default' };
 const player = (over: Partial<SimPlayer> = {}): SimPlayer => defaultSimPlayer(CURRENT, over);
 const OPT = player().optimalCm360;
 
-const spec = (kind: 'flick' | 'tracking', cm360: number, seed: number): BlockSpec =>
+const spec = (kind: 'flick' | 'switch' | 'tracking', cm360: number, seed: number): BlockSpec =>
   ({ id: `${kind}-${seed}`, stage: 'dialin', kind, cm360, seed, stepIndex: 0, arm: null });
 
 const runFlick = (cm360: number, adapted: number, seed: number, over: Partial<SimPlayer> = {}): FlickBlockLog =>
@@ -36,14 +37,14 @@ describe('performance', () => {
 });
 
 describe('simulateBlock: flick', () => {
-  it('at test = adapted = optimal: a full 40 s block, ≥ 95% hits, no timeouts, first gain ≈ 1', () => {
+  it('at test = adapted = optimal: a full block, ≥ 95% hits, no timeouts, first gain ≈ 1', () => {
     const log = runFlick(OPT, OPT, 3);
     const done = log.trials.filter((t) => t.hitT !== null || t.timedOut);
-    expect(done.length).toBeGreaterThanOrEqual(40);
+    expect(done.length).toBeGreaterThanOrEqual(20);
     expect(done.filter((t) => t.hitT !== null).length / done.length).toBeGreaterThanOrEqual(0.95);
     expect(log.trials.filter((t) => t.timedOut)).toHaveLength(0);
     const gains = log.trials.filter((t) => t.target.scored).map((t) => measureTrial(t, log.path, cfg).firstGain).filter((g): g is number => g !== null);
-    expect(gains.length).toBeGreaterThanOrEqual(28);
+    expect(gains.length).toBeGreaterThanOrEqual(18);
     expect(Math.abs(mean(gains) - 1)).toBeLessThan(0.05);
   });
 
@@ -90,12 +91,12 @@ describe('simulateBlock: tracking', () => {
 });
 
 describe('simulateBlock: flick endT', () => {
-  it('when the last target times out, endT is that trial’s spawnT + timeoutMs', () => {
+  it('a block where every target times out ends at the time limit', () => {
     const fast = { ...cfg, flick: { ...cfg.flick, timeoutMs: 100 } } as unknown as Config; // shorter than the reaction-time floor: every target times out
     const r = simulateBlock(spec('flick', OPT, 4), setup, player(), { adaptedCm360: OPT, blocksDone: 0 }, createRng(4), fast, 1000);
     const trials = (r.log as FlickBlockLog).trials;
-    expect(trials.every((t) => t.timedOut)).toBe(true);
-    expect(r.endT).toBe(trials[trials.length - 1]!.spawnT + 100);
+    expect(trials.slice(0, -1).every((t) => t.timedOut)).toBe(true);
+    expect(r.endT).toBe(1000 + cfg.flick.blockMs);
   });
 
   it('a warmup that ends by time ends at t0 + warmupMs', () => {
@@ -103,5 +104,26 @@ describe('simulateBlock: flick endT', () => {
     const w: BlockSpec = { id: 'warmup', stage: 'warmup', kind: 'warmup', cm360: OPT, seed: 6, stepIndex: 0, arm: null };
     const r = simulateBlock(w, setup, player(), { adaptedCm360: OPT, blocksDone: 0 }, createRng(6), short, 1000);
     expect(r.endT).toBe(1000 + 5000);
+  });
+});
+
+describe('simulateBlock: switch', () => {
+  it('clears targets for the whole block with high accuracy and ends at the time limit', () => {
+    const r = simulateBlock(spec('switch', OPT, 5), setup, player(), { adaptedCm360: OPT, blocksDone: 0 }, createRng(5), cfg, 1000);
+    const log = r.log as SwitchBlockLog;
+    expect(r.endT).toBe(1000 + cfg.switch.blockMs);
+    expect(log.kills.length).toBeGreaterThanOrEqual(15);
+    expect(log.kills.length / log.clicks.length).toBeGreaterThanOrEqual(0.9);
+  });
+  it('switch throughput is higher at the optimum than at 1.4·optimum (10 seeds)', () => {
+    const tp = (cm: number) => {
+      let s = 0;
+      for (let seed = 0; seed < 10; seed++) {
+        const r = simulateBlock(spec('switch', cm, seed), setup, player(), { adaptedCm360: cm, blocksDone: 0 }, createRng(seed), cfg, 0);
+        s += measureSwitch(r.log as SwitchBlockLog, cfg, createRng(seed)).tp;
+      }
+      return s / 10;
+    };
+    expect(tp(OPT)).toBeGreaterThan(tp(1.4 * OPT));
   });
 });

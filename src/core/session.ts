@@ -3,12 +3,13 @@ import { defaultConfig, type Config } from './config';
 import { diagnose } from './diagnose';
 import { fitCurve, type FitPoint, type FitResult } from './fit';
 import { measureFlickBlock, summarizeFlick, type FlickSummary, type TrialMetrics } from './measure/flick';
+import { measureSwitch, type SwitchSummary } from './measure/switch';
 import { measureTracking } from './measure/tracking';
 import { buildResult, type SessionResult } from './result';
 import { createRng, type Rng } from './rng';
 import { stepScore } from './score';
 import { chooseNext, type SteerDecision } from './steer';
-import type { Arm, BlockKind, BlockSpec, FlickBlockLog, Setup, Stage, StepResult, TrackingBlockLog } from './types';
+import type { Arm, BlockKind, BlockSpec, FlickBlockLog, Setup, Stage, StepResult, SwitchBlockLog, TrackingBlockLog } from './types';
 
 export interface SessionOptions { seed: number; warmup: boolean; quickAbCm360: number | null; askBeforeExtending?: boolean }
 
@@ -20,12 +21,13 @@ interface PendingStep {
   /** Spec stepIndex: sequence position for dial-in/recheck, A/B index for A/B, 0 for baseline. */
   specIndex: number;
   flick: { trials: TrialMetrics[]; summary: FlickSummary } | null;
+  switch: SwitchSummary | null;
 }
 
 export interface SessionState {
   readonly setup: Setup; readonly mode: 'full' | 'quickab'; readonly steps: StepResult[];
   readonly fit: FitResult | null; readonly steerLog: SteerDecision[]; readonly abDecisions: AbDecision[];
-  readonly logs: { flick: FlickBlockLog[]; tracking: TrackingBlockLog[] }; readonly result: SessionResult | null;
+  readonly logs: { flick: FlickBlockLog[]; switch: SwitchBlockLog[]; tracking: TrackingBlockLog[] }; readonly result: SessionResult | null;
   /** The first A/B round was too close to call and the player must choose (extendAb) whether to play the second. */
   readonly awaitingExtension: boolean;
   /** blocksDone/blocksTotal count scored flick + tracking blocks (warm-up excluded); the total is an estimate
@@ -43,6 +45,9 @@ export interface SessionState {
   /** @internal ask the player before the second A/B round instead of extending automatically */ readonly _ask: boolean;
 }
 
+/** Each step is a round of three blocks: flicks, switching, tracking. */
+export const BLOCKS_PER_STEP = 3;
+
 /** Spec seeds are integers in [0, 2^31). */
 const SEED_RANGE = 2 ** 31;
 
@@ -56,7 +61,7 @@ export function createSession(setup: Setup, opts: SessionOptions, cfg: Config = 
   const quick = opts.quickAbCm360 !== null;
   const base: SessionState = {
     setup, mode: quick ? 'quickab' : 'full', steps: [], fit: null, steerLog: [], abDecisions: [],
-    logs: { flick: [], tracking: [] }, result: null, progress: null, awaitingExtension: false, _ask: opts.askBeforeExtending ?? false,
+    logs: { flick: [], switch: [], tracking: [] }, result: null, progress: null, awaitingExtension: false, _ask: opts.askBeforeExtending ?? false,
     _cfg: cfg, _seed: opts.seed, _warmupPending: opts.warmup, _pending: null, _retries: 0,
     _arms: [], _pick: null,
   };
@@ -64,7 +69,7 @@ export function createSession(setup: Setup, opts: SessionOptions, cfg: Config = 
   return withProgress(planNext(start));
 }
 
-function specOf(s: SessionState, p: PendingStep, kind: 'flick' | 'tracking'): BlockSpec {
+function specOf(s: SessionState, p: PendingStep, kind: 'flick' | 'switch' | 'tracking'): BlockSpec {
   const id = `${p.idBase}-${kind}`;
   return { id, stage: p.stage, kind, cm360: p.cm360, seed: seedFor(s, id), stepIndex: p.specIndex, arm: p.arm };
 }
@@ -81,7 +86,7 @@ export function nextBlock(s: SessionState): BlockSpec | null {
   }
   const p = s._pending;
   if (!p) return null;
-  return specOf(s, p, p.flick ? 'tracking' : 'flick');
+  return specOf(s, p, !p.flick ? 'flick' : !p.switch ? 'switch' : 'tracking');
 }
 
 /** Position in the combined dial-in + recheck sequence of the current step (0 for baseline, warmup and A/B). */
@@ -89,12 +94,12 @@ function withProgress(s: SessionState): SessionState {
   const spec = nextBlock(s);
   if (!spec) return { ...s, progress: null };
   const inSequence = spec.stage === 'dialin' || spec.stage === 'recheck';
-  const blocksDone = 2 * s.steps.length + (s._pending?.flick ? 1 : 0);
+  const blocksDone = BLOCKS_PER_STEP * s.steps.length + (s._pending?.flick ? 1 : 0) + (s._pending?.switch ? 1 : 0);
   return {
     ...s,
     progress: {
       stage: spec.stage, stepIndex: inSequence ? spec.stepIndex : 0, totalSteps: dialinCount(s) + 1, kind: spec.kind,
-      blocksDone, blocksTotal: 2 * plannedSteps(s),
+      blocksDone, blocksTotal: BLOCKS_PER_STEP * plannedSteps(s),
     },
   };
 }
@@ -107,7 +112,7 @@ function plannedSteps(s: SessionState): number {
   return 1 + dialinCount(s) + 1 + ab;
 }
 
-export function submitBlock(s: SessionState, log: FlickBlockLog | TrackingBlockLog | null): SessionState {
+export function submitBlock(s: SessionState, log: FlickBlockLog | SwitchBlockLog | TrackingBlockLog | null): SessionState {
   const spec = nextBlock(s);
   if (!spec) throw new Error('submitBlock: the session is finished');
   if (spec.kind === 'warmup') return withProgress({ ...s, _warmupPending: false });
@@ -128,17 +133,26 @@ export function submitBlock(s: SessionState, log: FlickBlockLog | TrackingBlockL
     return withProgress({ ...next, _retries: 0, _pending: { ...p, flick: { trials, summary } } });
   }
 
+  if (spec.kind === 'switch') {
+    const sl = log as SwitchBlockLog;
+    const next: SessionState = { ...s, logs: { ...s.logs, switch: [...s.logs.switch, sl] } };
+    const summary = measureSwitch(sl, cfg, rng);
+    if (summary.n === 0 && canRetry) return withProgress({ ...next, _retries: s._retries + 1 });
+    return withProgress({ ...next, _retries: 0, _pending: { ...p, switch: summary } });
+  }
+
   const tl = log as TrackingBlockLog;
   const next: SessionState = { ...s, logs: { ...s.logs, tracking: [...s.logs.tracking, tl] } };
   const tracking = measureTracking(tl, cfg, rng);
   if (tracking.tot < cfg.session.invalidMinTot && canRetry) return withProgress({ ...next, _retries: s._retries + 1 });
   const flick = p.flick!;
+  const sw = p.switch!;
   const baseline = s.mode === 'quickab' ? null
-    : p.stage === 'baseline' ? { tp: flick.summary.tp, tot: tracking.tot }
-    : { tp: s.steps[0]!.flick.tp, tot: s.steps[0]!.tracking.tot };
+    : p.stage === 'baseline' ? { tp: flick.summary.tp, switchTp: sw.tp, tot: tracking.tot }
+    : { tp: s.steps[0]!.flick.tp, switchTp: s.steps[0]!.switch.tp, tot: s.steps[0]!.tracking.tot };
   const step: StepResult = {
     order: s.steps.length, stage: p.stage, arm: p.arm, cm360: p.cm360, trials: flick.trials,
-    flick: flick.summary, tracking, score: stepScore(flick.summary, tracking, baseline, cfg),
+    flick: flick.summary, switch: sw, tracking, score: stepScore(flick.summary, sw, tracking, baseline, cfg),
   };
   const steps = [...s.steps, step];
   const fit = s.mode === 'full' && isFitStep(step) ? refit(s, steps) : s.fit;
@@ -161,14 +175,14 @@ function planNext(s: SessionState): SessionState {
   const current = s.setup.cm360;
   if (s.mode === 'full') {
     if (s.steps.length === 0) {
-      return { ...s, _pending: { stage: 'baseline', arm: null, cm360: current, idBase: 'baseline', specIndex: 0, flick: null } };
+      return { ...s, _pending: { stage: 'baseline', arm: null, cm360: current, idBase: 'baseline', specIndex: 0, flick: null, switch: null } };
     }
     const seq = s.steps.filter((st) => st.stage === 'dialin' || st.stage === 'recheck');
     const n = dialinCount(s);
     if (seq.length < n + 1) {
       const pos = seq.length;
       if (pos === recheckPos(s)) {
-        return { ...s, _pending: { stage: 'recheck', arm: null, cm360: current, idBase: 'recheck', specIndex: pos, flick: null } };
+        return { ...s, _pending: { stage: 'recheck', arm: null, cm360: current, idBase: 'recheck', specIndex: pos, flick: null, switch: null } };
       }
       const i = pos < recheckPos(s) ? pos : pos - 1;
       const decision = chooseNext({
@@ -177,7 +191,7 @@ function planNext(s: SessionState): SessionState {
       }, s._cfg);
       return {
         ...s, steerLog: [...s.steerLog, decision],
-        _pending: { stage: 'dialin', arm: null, cm360: decision.cm360, idBase: `dialin-${i}`, specIndex: pos, flick: null },
+        _pending: { stage: 'dialin', arm: null, cm360: decision.cm360, idBase: `dialin-${i}`, specIndex: pos, flick: null, switch: null },
       };
     }
     if (s._pick === null) {
@@ -203,7 +217,7 @@ function planAb(s: SessionState): SessionState {
   const j = ab.length;
   const arm = s._arms[j]!;
   return {
-    ...s, _pending: { stage: 'ab', arm, cm360: arm === 'P' ? s._pick! : s.setup.cm360, idBase: `ab-${j}`, specIndex: j, flick: null },
+    ...s, _pending: { stage: 'ab', arm, cm360: arm === 'P' ? s._pick! : s.setup.cm360, idBase: `ab-${j}`, specIndex: j, flick: null, switch: null },
   };
 }
 

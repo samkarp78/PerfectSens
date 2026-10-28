@@ -1,6 +1,7 @@
 import type { Config } from '../core/config';
 import { degPerCount } from '../core/geometry';
 import { FlickRunner } from '../core/run/flickRunner';
+import { SwitchRunner } from '../core/run/switchRunner';
 import { TrackingRunner } from '../core/run/trackingRunner';
 import { extendAb, nextBlock, submitBlock, type SessionState } from '../core/session';
 import type { MoveSample } from '../core/types';
@@ -21,33 +22,34 @@ export interface RunController {
   onLockLost(): void;
   skipWarmup(): void;
   answerExtension(accept: boolean): void;
-  readonly runner: FlickRunner | TrackingRunner | null;
+  readonly runner: Runner | null;
 }
 
 type Progress = NonNullable<SessionState['progress']>;
+export type Runner = FlickRunner | SwitchRunner | TrackingRunner;
 
 export const WARMUP_REST_TEXT = 'Warm-up — free targets at your current sens, not scored.';
 /** Shown before a round: a flick block followed straight away by a tracking block. */
 export const ROUND_REST_TEXT = 'Next round: click each target as fast as you can, then hold the mouse button and track the moving target.';
 export const TRACKING_REST_TEXT = 'Next: tracking — hold the mouse button and keep the crosshair on the moving target.';
 
-const kindLabel = (p: Progress): string => (p.kind === 'tracking' ? 'Tracking' : 'Flick');
+const kindLabel = (p: Progress): string => (p.kind === 'tracking' ? 'Tracking' : p.kind === 'switch' ? 'Switching' : 'Flicks');
 
 /** HUD label for a block. Never contains a sensitivity value; the recheck reads as a normal step. */
 export function hudText(p: Progress): string {
   switch (p.stage) {
     case 'warmup': return 'Warm-up';
-    case 'baseline': return `Baseline · ${kindLabel(p)}`;
+    case 'baseline': return `Calibration · ${kindLabel(p)}`;
     case 'dialin':
-    case 'recheck': return `Step ${p.stepIndex + 1} of ${p.totalSteps} · ${kindLabel(p)}`;
-    case 'ab': return `Final check · ${kindLabel(p)}`;
+    case 'recheck': return `Dial-in ${p.stepIndex + 1} of ${p.totalSteps} · ${kindLabel(p)}`;
+    case 'ab': return `Final Showdown · ${kindLabel(p)}`;
   }
 }
 
 export function createRunController(initial: SessionState, cfg: Config = initial._cfg): RunController {
   let session = initial;
   let phase: RunPhase = session.result ? 'finished' : session.awaitingExtension ? 'asking' : 'rest';
-  let runner: FlickRunner | TrackingRunner | null = null;
+  let runner: Runner | null = null;
 
   const settle = (): void => {
     runner = null;
@@ -58,17 +60,21 @@ export function createRunController(initial: SessionState, cfg: Config = initial
     const spec = nextBlock(session);
     if (!spec) return;
     const dpc = degPerCount(session.setup.dpi, spec.cm360);
-    runner = spec.kind === 'tracking' ? new TrackingRunner(spec, dpc, cfg, t) : new FlickRunner(spec, dpc, cfg, t);
+    runner = spec.kind === 'tracking' ? new TrackingRunner(spec, dpc, cfg, t)
+      : spec.kind === 'switch' ? new SwitchRunner(spec, dpc, cfg, t)
+      : new FlickRunner(spec, dpc, cfg, t);
     phase = 'running';
   };
 
-  /** A finished flick block flows straight into its round's tracking block; anything else rests. */
+  /** Within a round, flicks flow straight into switching and switching into tracking; a finished round rests. */
   const checkDone = (t: number): void => {
     if (!runner || !runner.state.done) return;
-    const wasFlick = runner instanceof FlickRunner && runner.log().spec.kind === 'flick';
+    const kind = runner.log().spec.kind;
     session = submitBlock(session, runner.log());
     settle();
-    if (wasFlick && phase === 'rest' && nextBlock(session)?.kind === 'tracking') start(t);
+    const next = nextBlock(session)?.kind;
+    const continues = (kind === 'flick' && next === 'switch') || (kind === 'switch' && next === 'tracking');
+    if (continues && phase === 'rest') start(t);
   };
 
   return {
@@ -93,8 +99,8 @@ export function createRunController(initial: SessionState, cfg: Config = initial
     },
     onClick(t) {
       if (phase !== 'running' || !runner) return;
-      if (runner instanceof FlickRunner) runner.onClick(t);
-      else runner.onPress(t);
+      if (runner instanceof TrackingRunner) runner.onPress(t);
+      else runner.onClick(t);
       checkDone(t);
     },
     onRelease(t) {

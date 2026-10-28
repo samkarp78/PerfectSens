@@ -47,6 +47,13 @@ export function validateSetup(input: Input):
   const mode = input.mode;
   if (mode !== 'default' && mode !== 'thorough' && mode !== 'quick') errors.mode = 'Mode must be default, thorough or quick.';
 
+  let padWidthCm: number | null = null;
+  if (input.padWidthCm !== null && input.padWidthCm !== undefined && input.padWidthCm !== '') {
+    const pw = toNumber(input.padWidthCm);
+    const lim = defaultConfig.setup.padWidthCm;
+    if (pw === null || pw < lim.min || pw > lim.max) errors.padWidthCm = `Play area must be ${lim.min}–${lim.max} cm, or left blank.`;
+    else padWidthCm = pw;
+  }
   if (Object.keys(errors).length > 0) return { ok: false, errors };
-  return { ok: true, setup: { dpi: dpi!, cm360: cm360!, inGameSens, fov: fov!, fovType: fovType as Setup['fovType'], mode: mode as Setup['mode'] } };
+  return { ok: true, setup: { dpi: dpi!, cm360: cm360!, inGameSens, fov: fov!, fovType: fovType as Setup['fovType'], mode: mode as Setup['mode'], padWidthCm } };
 }

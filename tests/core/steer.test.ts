@@ -20,6 +20,7 @@ function step(order: number, cm360: number, o: Over = {}): StepResult {
       bigGain: o.bigGain === undefined ? 0.95 : o.bigGain, corrections: o.corrections ?? 0.5, weDeg: 1,
       spreadRatio: o.spreadRatio ?? 0.5, timeoutFraction: 0, n: 30,
     },
+    switch: { tp: 3, logTpSe: 0.05, kills: 20, accuracy: 1, n: 18 },
     tracking: { tot: 0.5, logTotSe: 0.05, leadLagDeg: o.leadLagDeg ?? 0, n: 1 },
     score: { logS: o.logS ?? 0, se: 0.05 },
   };

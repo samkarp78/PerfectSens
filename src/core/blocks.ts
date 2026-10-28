@@ -122,3 +122,21 @@ export function trackingTargetAt(spec: BlockSpec, tMs: number, cfg: Config): Aim
   const dt = t - s.t0;
   return { yaw: fold(s.x0 + s.vx * dt, cfg.tracking.bounds.yaw), pitch: fold(s.y0 + s.vy * dt, cfg.tracking.bounds.pitch) };
 }
+
+/** Seeded switching targets: uniform in the forward region, each at least minSeparationDeg from the previous `active - 1`
+ *  targets (the ones that can be on screen with it). */
+export function makeSwitchTargets(spec: BlockSpec, cfg: Config): Aim[] {
+  const sc = cfg.switch;
+  const rng = createRng(spec.seed);
+  const out: Aim[] = [];
+  while (out.length < sc.maxTargets) {
+    const recent = out.slice(-(sc.active - 1));
+    let a: Aim = { yaw: 0, pitch: 0 };
+    for (let tries = 0; tries < 50; tries++) {
+      a = { yaw: uniform(rng, -sc.region.yaw, sc.region.yaw), pitch: uniform(rng, -sc.region.pitch, sc.region.pitch) };
+      if (recent.every((r) => Math.hypot(r.yaw - a.yaw, r.pitch - a.pitch) >= sc.minSeparationDeg)) break;
+    }
+    out.push(a);
+  }
+  return out;
+}

@@ -1,6 +1,6 @@
 import { defaultConfig, type Config } from '../core/config';
 import type { runSimSession } from '../core/sim/runSession';
-import type { BlockSpec, FlickBlockLog, TrackingBlockLog } from '../core/types';
+import type { BlockSpec, FlickBlockLog, SwitchBlockLog, TrackingBlockLog } from '../core/types';
 
 export interface DemoClip { caption: string; spec: BlockSpec; log: FlickBlockLog | TrackingBlockLog; fromT: number; toT: number; speed: number }
 
@@ -13,7 +13,7 @@ const MAX_CLIP_PLAYBACK_MS = 20000;
 const DIALIN_CLIP_STEPS = [0, 2];
 
 type Run = ReturnType<typeof runSimSession>;
-type Logged = { spec: BlockSpec; log: FlickBlockLog | TrackingBlockLog };
+type Logged = { spec: BlockSpec; log: FlickBlockLog | SwitchBlockLog | TrackingBlockLog };
 
 const isFlick = (b: Logged): b is { spec: BlockSpec; log: FlickBlockLog } => b.spec.kind === 'flick';
 const isTracking = (b: Logged): b is { spec: BlockSpec; log: TrackingBlockLog } => b.spec.kind === 'tracking';

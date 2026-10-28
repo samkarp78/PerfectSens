@@ -6,8 +6,9 @@ import { runSimSession } from '../../src/core/sim/runSession';
 import type { Setup } from '../../src/core/types';
 import { createRunController, hudText, ROUND_REST_TEXT } from '../../src/ui/runController';
 import { TrackingRunner } from '../../src/core/run/trackingRunner';
+import { SwitchRunner } from '../../src/core/run/switchRunner';
 import { minJerkMoves } from '../helpers/paths';
-import type { FlickRunner } from '../../src/core/run/flickRunner';
+import { FlickRunner } from '../../src/core/run/flickRunner';
 
 const CURRENT = 40;
 const setup: Setup = { dpi: 800, cm360: CURRENT, inGameSens: 33, fov: 103, fovType: 'horizontal', mode: 'default' };
@@ -37,21 +38,25 @@ describe('run controller', () => {
     expect(log.path).toHaveLength(0);
   });
 
-  it('a round runs flicks then tracking back to back, then rests before the next round', () => {
+  it('a round runs flicks, switching and tracking back to back, then rests before the next round', () => {
     const c = createRunController(createSession(setup, opts));
     c.begin(0);
     let t = 0;
-    for (let i = 0; i < 1000 && !(c.runner instanceof TrackingRunner); i++) {
-      const r = c.runner as FlickRunner;
-      const moves = minJerkMoves(r.state.aim, r.state.target!.aim, t, 150, 500, DPC);
+    const seen = new Set<string>();
+    for (let i = 0; i < 2000 && !(c.runner instanceof TrackingRunner); i++) {
+      const r = c.runner!;
+      seen.add(r.constructor.name);
+      const goal = r instanceof FlickRunner ? r.state.target!.aim : (r as SwitchRunner).state.targets[0]!;
+      const moves = minJerkMoves(r.state.aim, goal, t, 150, 500, DPC);
       for (const m of moves) c.onMove(m);
       t = moves[moves.length - 1]!.t + 10;
       c.onClick(t);
       t += 50;
     }
-    expect(c.phase).toBe('running'); // no rest card between the flick and tracking halves
+    expect([...seen]).toEqual(['FlickRunner', 'SwitchRunner']);
+    expect(c.phase).toBe('running'); // no rest card between the round's parts
     expect(c.runner).toBeInstanceOf(TrackingRunner);
-    expect(c.hud).toBe('Baseline · Tracking');
+    expect(c.hud).toBe('Calibration · Tracking');
     c.onClick(t + 1);
     c.tick(t + 1e6);
     expect(c.phase).toBe('rest'); // the round is over (here the idle tracking block is queued for one retry)
@@ -114,10 +119,11 @@ describe('hudText', () => {
       expect(h).not.toMatch(/cm/i);
       for (const v of cms) if (v.length > 2) expect(h).not.toContain(v);
     }
-    expect(huds).toContain('Step 3 of 5 · Flick');
-    expect(huds).toContain('Step 3 of 5 · Tracking');
-    expect(huds).toContain('Baseline · Flick');
-    expect(huds.some((h) => h.startsWith('Final check'))).toBe(true);
+    expect(huds).toContain('Dial-in 3 of 6 · Flicks');
+    expect(huds).toContain('Dial-in 3 of 6 · Switching');
+    expect(huds).toContain('Dial-in 3 of 6 · Tracking');
+    expect(huds).toContain('Calibration · Flicks');
+    expect(huds.some((h) => h.startsWith('Final Showdown'))).toBe(true);
   });
 });
 
@@ -131,8 +137,10 @@ describe('run controller: tracking needs the mouse button', () => {
     const { TrackingRunner } = await import('../../src/core/run/trackingRunner');
     const setup = { dpi: 800, cm360: 34, inGameSens: null, fov: 103, fovType: 'horizontal' as const, mode: 'default' as const };
     let s = createSession(setup, { seed: 1, warmup: false, quickAbCm360: null });
-    const spec = nextBlock(s)!;
-    s = submitBlock(s, simulateBlock(spec, setup, defaultSimPlayer(34), { adaptedCm360: 34, blocksDone: 0 }, createRng(1), defaultConfig, 0).log);
+    for (let i = 0; i < 2; i++) { // play the round's flick and switching parts with the simulated player
+      const spec = nextBlock(s)!;
+      s = submitBlock(s, simulateBlock(spec, setup, defaultSimPlayer(34), { adaptedCm360: 34, blocksDone: i }, createRng(1 + i), defaultConfig, 0).log);
+    }
     const c = createRunController(s);
     c.begin(0);
     expect(c.runner).toBeInstanceOf(TrackingRunner);
