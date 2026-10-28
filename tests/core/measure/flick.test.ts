@@ -32,6 +32,20 @@ describe('throughput', () => {
     expect(r.weDeg).toBeCloseTo(4.357, 2);
   });
 
+  it('a stray click far from the rest does not widen We', () => {
+    const clean = throughput(alternating(18), defaultConfig);
+    const stray = throughput([...alternating(18), metric({ index: 18, endAlong: -28 })], defaultConfig);
+    expect(stray.weDeg).toBeCloseTo(clean.weDeg, 9);
+    expect(stray.tp).toBeLessThan(clean.tp * 1.05);
+    expect(stray.tp).toBeGreaterThan(clean.tp * 0.85);
+  });
+
+  it('clicks within the stray cutoff still widen We', () => {
+    const clean = throughput(alternating(18), defaultConfig);
+    const wide = throughput([...alternating(18), metric({ index: 18, endAlong: 2.8 })], defaultConfig);
+    expect(wide.weDeg).toBeGreaterThan(clean.weDeg);
+  });
+
   it('floors We at minWeDeg when all end points are exact', () => {
     const r = throughput(Array.from({ length: 10 }, (_, i) => metric({ index: i })), defaultConfig);
     expect(r.weDeg).toBe(defaultConfig.score.minWeDeg);
@@ -174,6 +188,10 @@ describe('summarizeFlick click bias and class counts', () => {
   it('clickBias is the mean first-click along offset', () => {
     const trials = [metric({ index: 0, endAlong: 1 }), metric({ index: 1, endAlong: 2 }), metric({ index: 2, endAlong: null, timedOut: true, hit: false })];
     expect(summarizeFlick(trials, defaultConfig, createRng(1)).clickBias).toBeCloseTo(1.5, 9);
+  });
+  it('clickBias ignores a stray click', () => {
+    const trials = [...Array.from({ length: 10 }, (_, i) => metric({ index: i, endAlong: 0.5 })), metric({ index: 10, endAlong: -28 })];
+    expect(summarizeFlick(trials, defaultConfig, createRng(1)).clickBias).toBeCloseTo(0.5, 9);
   });
   it('clickBias is null without clicks', () => {
     expect(summarizeFlick([metric({ endAlong: null })], defaultConfig, createRng(1)).clickBias).toBeNull();

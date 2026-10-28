@@ -25,7 +25,9 @@ export const defaultConfig = {
   round: { cueMs: 1800, cueTickMs: 600 },
   submovement: { binMs: 5, smoothBins: 3, onsetDegPerSec: 30, endDegPerSec: 20, endHoldMs: 30, edgeBins: 1 },
   /** Composite score weights for the four round parts (sum to 1). */
-  score: { weights: { flick: 0.3, switch: 0.25, tracking: 0.25, trackswitch: 0.2 }, bootstrapSamples: 200, trackingSegmentMs: 1000, minWeDeg: 0.1, weFactor: 4.133, minTot: 0.01, minTp: 0.01 },
+  score: { weights: { flick: 0.3, switch: 0.25, tracking: 0.25, trackswitch: 0.2 }, bootstrapSamples: 200, trackingSegmentMs: 1000, minWeDeg: 0.1, weFactor: 4.133,
+    /** Stray first clicks (far outside the rest) are left out of the spread: beyond max(sds robust SDs, minDeg) of the median. */
+    stray: { sds: 3, minDeg: 3 }, minTot: 0.01, minTp: 0.01 },
   steer: { bracket: 0.15, finalStep: 0.04, limits: { min: 0.6, max: 1.6 },
     weights: { smallGain: 1, bigGain: 1, leadLag: 0.5, corrSpread: 0.5, clickBias: 0.5, speedMatch: 0.5 },
     leadLagScaleDeg: 1, clickBiasScaleDeg: 20, correctionsScale: 0.5, jumpScale: 0.15, deadband: 0.02, minSeparation: 0.01 },

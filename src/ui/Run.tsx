@@ -11,7 +11,7 @@ import { createScene } from '../scene/scene';
 import { offscreenArrow } from '../scene/camera';
 import { angleBetween, vfovDeg } from '../core/geometry';
 import type { Aim } from '../core/types';
-import { createRunController, cueText, type Runner, type RunController, type RunPhase } from './runController';
+import { countdownBeep, createRunController, cueText, type Runner, type RunController, type RunPhase } from './runController';
 import { createScoreKeeper, flickEvents, gradeFor, switchEvents, trackSwitchEvents, type ScoreState } from './scoreKeeper';
 import { createSounds } from './sound';
 import { AskCard, BreakCard, Countdown, type BreakStats } from './RunCards';
@@ -205,6 +205,16 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
 
     if (last.phase === 'finished') cbRef.current.onFinished(ctrl.session, keeper.state);
 
+    // End-of-part countdown: a beep at 5, 4, 3, 2 and 1 s left (sound only, so nothing covers the screen).
+    let beepRunner: Runner | null = null, prevLeft = Infinity;
+    const beep = (r: Runner | null, now: number) => {
+      if (r !== beepRunner) { beepRunner = r; prevLeft = Infinity; }
+      if (!r) return;
+      const left = r.state.endsAt - now;
+      if (countdownBeep(prevLeft, left) !== null) sounds.countdown(false);
+      prevLeft = left;
+    };
+
     let cueTick = -1;
     const drawCue = (now: number) => {
       const el = cueRef.current;
@@ -252,6 +262,7 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
         holdRef.current.style.display = needsHold ? 'block' : 'none';
       }
       drawTimer(r, now);
+      beep(r, now);
       drawCue(now);
       scene.setFlickTarget(r instanceof FlickRunner ? (r.state.target?.aim ?? null) : null);
       scene.setSwitchTargets(r instanceof SwitchRunner ? r.state.targets : []);

@@ -4,7 +4,7 @@ import { createSession, nextBlock, submitBlock } from '../../src/core/session';
 import { defaultSimPlayer } from '../../src/core/sim/player';
 import { runSimSession } from '../../src/core/sim/runSession';
 import type { Setup } from '../../src/core/types';
-import { createRunController, cueText, hudText, ROUND_REST_TEXT, type RunController } from '../../src/ui/runController';
+import { countdownBeep, createRunController, cueText, hudText, ROUND_REST_TEXT, type RunController } from '../../src/ui/runController';
 import { defaultConfig } from '../../src/core/config';
 import { TrackSwitchRunner } from '../../src/core/run/trackSwitchRunner';
 import { TrackingRunner } from '../../src/core/run/trackingRunner';
@@ -304,5 +304,17 @@ describe('mouse button held across a handover', () => {
     c.onRelease(cue.startedAt + 200);
     c.tick(cue.endsAt);
     expect((c.runner as TrackingRunner).state.held).toBe(false);
+  });
+});
+
+describe('countdownBeep', () => {
+  it('beeps as the time left crosses 5, 4, 3, 2 and 1 seconds, and not otherwise', () => {
+    expect(countdownBeep(5016, 4999)).toBe(5);
+    expect(countdownBeep(4999, 4983)).toBeNull();
+    expect(countdownBeep(2010, 1995)).toBe(2);
+    expect(countdownBeep(1016, 999)).toBe(1);
+    expect(countdownBeep(999, -5)).toBeNull();
+    expect(countdownBeep(6016, 5999)).toBeNull();
+    expect(countdownBeep(5500, 3500)).toBe(4); // a slow frame: one beep, for the latest second
   });
 });

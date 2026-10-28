@@ -407,3 +407,16 @@ These thresholds are provisional and live in config:
 - **Flick waves:** 1 target per class (waves of 3). With 14 s parts, 6-target waves lost too much to warm-in and unfinished waves.
 - **Edge flag:** the fit also flags an edge when its peak lies within one final step of a tested edge that performs the same as the best point. Short parts make the far side score at the floor, which bends the quadratic early.
 - **Click-bias scale:** click bias steers per 20°, which puts a 1° bias on a typical flick on the same footing as a 5% gain difference.
+
+### 17.10 After the first revision-3 play-test (2026-10-28)
+
+**Stray clicks:** one click far from the rest (e.g. clicking as a target appears, 28° short of a 30° flick) dominated the end-point SD. That single click cut a round's flick or switching throughput by half or more, and it skewed the calibration round that every later round is compared with.
+
+- The end-point spread (We) and the click bias now leave out *stray* first clicks: those further than max(3 robust SDs (1.4826·MAD), 3°) from the median along offset (`score.stray`).
+- Stray clicks still count as misses, in accuracy, in the misclick stats and in the time taken.
+- Re-scoring the play-test with this rule:
+  - switching throughput was steady across rounds (5.7–7.7 instead of 2.5–7.7);
+  - the false "slower is better" dial-in trend went away;
+  - the A/B stayed "no clear winner", with current about 4% ahead.
+
+**End-of-part countdown beeps:** a beep as each part's time left crosses 5, 4, 3, 2 and 1 s. It is sound only: the timer display is unchanged, and nothing is drawn near the centre of the screen.

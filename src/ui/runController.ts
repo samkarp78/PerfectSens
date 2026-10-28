@@ -64,6 +64,16 @@ export function hudText(p: Progress): string {
   }
 }
 
+/** Seconds counted down with a beep at the end of every part (sound only; nothing is drawn). */
+export const COUNTDOWN_BEEPS_FROM_S = 5;
+
+/** The second (5…1) whose mark the time left crossed between two frames, or null: one beep per mark, the latest if a
+ *  slow frame skipped some. */
+export function countdownBeep(prevLeftMs: number, leftMs: number): number | null {
+  const was = Math.ceil(prevLeftMs / 1000), now = Math.ceil(leftMs / 1000);
+  return now < was && now >= 1 && now <= COUNTDOWN_BEEPS_FROM_S ? now : null;
+}
+
 /** Where the run goes once no block is running: the end, the A/B question, a break after every
  *  session.breakEveryRounds-th completed round, or a normal rest. */
 export function restPhase(session: SessionState, completedRound: boolean): RunPhase {

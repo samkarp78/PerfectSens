@@ -57,8 +57,29 @@ export function measureFlickBlock(log: FlickBlockLog, cfg: Config): TrialMetrics
   });
 }
 
+const MAD_TO_SD = 1.4826;
+
+const median = (xs: number[]): number => {
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
+};
+
+/** Trials whose first click is not a stray: within max(score.stray.sds robust SDs (1.4826·MAD), score.stray.minDeg) of the
+ *  median along offset. A stray click (e.g. a click as the target appears) still counts as a miss and in the time; it is
+ *  only left out of the end-point spread, which one such click would otherwise dominate. */
+export function nonStray(trials: TrialMetrics[], cfg: Config): TrialMetrics[] {
+  const withClick = trials.filter((t) => t.endAlong !== null);
+  if (withClick.length < 3) return withClick;
+  const along = withClick.map((t) => t.endAlong!);
+  const m = median(along);
+  const robustSd = MAD_TO_SD * median(along.map((a) => Math.abs(a - m)));
+  const cut = Math.max(cfg.score.stray.sds * robustSd, cfg.score.stray.minDeg);
+  return withClick.filter((t) => Math.abs(t.endAlong! - m) <= cut);
+}
+
 function tpOf(scored: TrialMetrics[], cfg: Config): { tp: number; weDeg: number } {
-  const withClick = scored.filter((t) => t.endAlong !== null);
+  const withClick = nonStray(scored, cfg);
   if (scored.length === 0) return { tp: 0, weDeg: cfg.score.minWeDeg };
   const weDeg = withClick.length > 0
     ? Math.max(cfg.score.weFactor * sampleSd(withClick.map((t) => t.endAlong!)), cfg.score.minWeDeg)
@@ -89,7 +110,7 @@ export function summarizeFlick(trials: TrialMetrics[], cfg: Config, rng: Rng): F
     return g.length > 0 ? mean(g) : null;
   };
 
-  const withClick = scored.filter((t) => t.endAlong !== null);
+  const withClick = nonStray(scored, cfg); // a stray click would dominate the mean
   const countOf = (cls: FlickClass): number => scored.filter((t) => t.cls === cls).length;
 
   return {
