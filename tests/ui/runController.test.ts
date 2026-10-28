@@ -55,6 +55,16 @@ describe('run controller', () => {
     expect(c.hud).toBe('Baseline · Tracking');
   });
 
+  it('onLockLost outside running is a no-op', () => {
+    const c = createRunController(createSession(setup, opts));
+    c.onLockLost();
+    expect(c.phase).toBe('rest');
+    c.begin(0);
+    c.onLockLost();
+    c.onLockLost();
+    expect(c.phase).toBe('paused');
+  });
+
   it('warm-up has its own copy and skipWarmup advances', () => {
     const c = createRunController(createSession(setup, { ...opts, warmup: true }));
     expect(c.hud).toBe('Warm-up');

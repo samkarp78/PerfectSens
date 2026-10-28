@@ -44,8 +44,10 @@ export function Run({ session, onFinished, onUnsupported }: RunProps) {
     const sync = () => {
       const v = viewOf(ctrl);
       if (v.phase !== last.phase || v.hud !== last.hud || v.restText !== last.restText) {
+        const wasRunning = last.phase === 'running';
         last = v;
         setView(v);
+        if (wasRunning && v.phase !== 'running' && document.pointerLockElement) document.exitPointerLock();
         if (v.phase === 'finished') cbRef.current.onFinished(ctrl.session);
       }
     };
@@ -56,8 +58,12 @@ export function Run({ session, onFinished, onUnsupported }: RunProps) {
       () => { ctrl.onLockLost(); sync(); },
     );
 
+    if (last.phase === 'finished') cbRef.current.onFinished(ctrl.session);
+
     let raf = 0;
+    let disposed = false;
     const frame = () => {
+      if (disposed) return;
       ctrl.tick(performance.now());
       sync();
       const r = ctrl.runner;
@@ -81,6 +87,7 @@ export function Run({ session, onFinished, onUnsupported }: RunProps) {
     raf = requestAnimationFrame(frame);
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', fit);
       dispose();
@@ -116,7 +123,7 @@ export function Run({ session, onFinished, onUnsupported }: RunProps) {
       {card && (
         <div class="rest-overlay">
           <div class="rest-card" role="button" tabIndex={0} onClick={start}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void start(); }}>
+            onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) void start(); }}>
             <p class="rest-text">{view.phase === 'paused' ? PAUSED_TEXT : view.restText}</p>
             <p class="rest-cta">Click to start</p>
             {denied && <p class="rest-warn">{LOCK_DENIED_TEXT}</p>}
