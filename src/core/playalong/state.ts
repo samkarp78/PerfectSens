@@ -202,9 +202,13 @@ function plan(s: PaState, cfg: Config): PaState {
   if (last.role === 'h2h' && s.h2h) return decideH2h(s, cfg);
   const pairsPlayed = s.tests.some((t) => t.role === 'pair');
   if (!pairsPlayed) return queuePair(s, s.setup.defaultCm360, cfg.playAlong.firstStep, cfg) ?? startH2h(s, cfg);
-  if (s.step <= cfg.playAlong.minStep) return startH2h(s, cfg);
-  const step = nextStep(s.step, cfg);
-  const nudge = directionNudge(s, leader(s, cfg), step);
+  // Edge rule: if the best sens so far is the fastest or slowest tested, keep the step and walk on outward.
+  const lead = leader(s, cfg);
+  const tested = s.tests.map((t) => t.cm360);
+  const atEdge = same(s, lead, Math.min(...tested)) || same(s, lead, Math.max(...tested));
+  if (!atEdge && s.step <= cfg.playAlong.minStep) return startH2h(s, cfg);
+  const step = atEdge ? s.step : nextStep(s.step, cfg);
+  const nudge = directionNudge(s, lead, step);
   return queuePair(s, nudge.cm360, step, cfg, nudge.reason) ?? startH2h({ ...s, step }, cfg);
 }
 

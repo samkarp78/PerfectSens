@@ -38,7 +38,7 @@ describe('choosePair', () => {
   });
 
   it('low Finals sens never goes below 1 and exhausts', () => {
-    const d = choosePair(ctx({ defaultCm360: finals(2), centerCm360: finals(2), testedCm360: [finals(1), finals(2), finals(3)] }));
+    const d = choosePair(ctx({ defaultCm360: finals(2), centerCm360: finals(2), testedCm360: [finals(1), finals(2), finals(3), finals(4)] }));
     expect(d.exhausted).toBe(true);
     expect(d.targets).toEqual([]);
   });
@@ -56,5 +56,17 @@ describe('nextStep', () => {
     expect(nextStep(0.1)).toBeCloseTo(0.05, 12);
     expect(nextStep(0.05)).toBeCloseTo(0.04, 12);
     expect(nextStep(0.04)).toBeCloseTo(0.04, 12);
+  });
+});
+
+describe('Play-Along limits', () => {
+  it('tests down to half the starting cm/360 (twice as fast)', () => {
+    const d = choosePair(ctx({ game: 'other', defaultCm360: 30, centerCm360: 16, padWidthCm: 60, testedCm360: [30, 16] }));
+    expect(d.targets[0]).toBeCloseTo(15, 9);
+  });
+
+  it('tests up to double the starting cm/360 when the pad allows', () => {
+    const d = choosePair(ctx({ game: 'other', defaultCm360: 30, centerCm360: 55, padWidthCm: 60, testedCm360: [30, 55] }));
+    expect(d.targets[1]).toBeCloseTo(60, 9);
   });
 });

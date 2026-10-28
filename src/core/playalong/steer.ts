@@ -1,5 +1,4 @@
 import { defaultConfig, type Config } from '../config';
-import { maxTestCm360 } from '../steer';
 import { cm360ToFinals, finalsToCm360, sameSens, snapCm360, type GameId } from './gameSens';
 
 /** Inputs for one higher/lower pair. testedCm360: every sens tested so far (the centre included). */
@@ -19,9 +18,12 @@ export function choosePair(ctx: PairContext, cfg: Config = defaultConfig): PairD
   const { game, dpi, centerCm360: center, step } = ctx;
   const same = (a: number, b: number): boolean => sameSens(game, a, b);
   const used = (v: number): boolean => same(v, center) || ctx.testedCm360.some((t) => same(v, t));
-  const slowest = maxTestCm360(ctx.defaultCm360, ctx.padWidthCm, cfg);
-  const padCapped = 2 * cfg.pad.turnFraction * ctx.padWidthCm < cfg.steer.limits.max * ctx.defaultCm360;
-  const fastest = cfg.steer.limits.min * ctx.defaultCm360;
+  // Play-Along tests from half to double the starting cm/360 (playAlong.limits), never slower than the pad allows.
+  const limits = cfg.playAlong.limits;
+  const padMax = 2 * cfg.pad.turnFraction * ctx.padWidthCm;
+  const padCapped = padMax < limits.max * ctx.defaultCm360;
+  const slowest = Math.max(ctx.defaultCm360, Math.min(limits.max * ctx.defaultCm360, padMax));
+  const fastest = limits.min * ctx.defaultCm360;
   const notes: string[] = [];
 
   const pick = (side: Side): number | null => {

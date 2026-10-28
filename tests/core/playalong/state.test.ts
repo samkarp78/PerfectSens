@@ -316,3 +316,28 @@ describe('direction (overshoot and ahead/behind steer Play-Along pairs)', () => 
     expect(t40.parts.flick.n).toBe(20);
   });
 });
+
+describe('edge rule (keep walking toward a far-away best)', () => {
+  it('when the fastest sens tested is the best, the next pair keeps the same step and goes further', () => {
+    const { s, clock } = fresh();
+    // Faster is always better here: Finals 40 (the fastest tested) wins the first pair.
+    const better = (cm: number): number => -Math.log(cm);
+    let x = play(s, clock, better);
+    x = play(play(x, clock, better), clock, better);
+    expect(x.step).toBe(defaultConfig.playAlong.firstStep);
+    expect(Math.max(...x.queue.map((q) => num(q.cm360)!))).toBeGreaterThan(40);
+  });
+
+  it('a best sens in the middle narrows the step as before', () => {
+    const { s, clock } = fresh();
+    let x = play(s, clock, peaked(DEFAULT, 5));
+    x = play(play(x, clock, peaked(DEFAULT, 5)), clock, peaked(DEFAULT, 5));
+    expect(x.step).toBeCloseTo(defaultConfig.playAlong.firstStep / 2, 12);
+  });
+
+  it('can reach a best sens far from the start', () => {
+    const { s, clock } = fresh();
+    const out = playUntil(s, clock, peaked(finals(50), 2), (y) => y.queue[0]?.role === 'h2h');
+    expect(num(out.h2h!.leaderCm360)!).toBeGreaterThanOrEqual(48);
+  });
+});

@@ -653,3 +653,19 @@ These are for 2 rounds of 20 s parts, the spec-19 grade and direction, 1 final-c
 | Null false change | **1/300 (0.3%)**: keep 64, none 235 |
 | Convergence (optimum 0.75–1.3× the control) | 21/21 change answers within ±8%; kinds: change 21, none 73, keep 6 (up from 14 change with the §18 score) |
 | Effort | median 3 nights, median 4 tests per night |
+
+### 19.7 Reaching a far-away best (2026-10-28)
+
+Scenario runs showed the search stopping short (start 30 with best 50 ended at 45; start 50 with best 30 ended at 33). Two simple rules fix that:
+
+- **Edge rule:** if the best sens so far is the fastest or slowest one tested, the next pair keeps the same step instead of narrowing, so the search walks on outward.
+- **Wider limits:** Play-Along tests from **0.5× to 2×** the starting cm/360 (`playAlong.limits`), and never slower than the pad allows. Standard keeps 0.6×–1.6×.
+
+Re-run (5 simulated players each, up to 6 nights):
+
+| Start → best | Before | After |
+|---|---|---|
+| 30 → 50 | change to 45 (5/5) | change to 48–49 (5/5), in 4 nights |
+| 50 → 30 | change to 33–34 (5/5) | change to 31–33 (5/5) |
+| 33 → 40 | change 1/5, others none | change 2/5 (39–40), others none, range 34–48 |
+| 33 → 33 | keep 4/5, none 1/5 | unchanged |
