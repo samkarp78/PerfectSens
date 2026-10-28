@@ -158,11 +158,10 @@ function startH2h(s: PaState, cfg: Config): PaState {
 function decideH2h(s: PaState, cfg: Config): PaState {
   const h = s.h2h!;
   const def = s.setup.defaultCm360;
-  const blocks: AbBlock[] = [
-    ...testsAt(s, h.leaderCm360).map((t): AbBlock => ({ arm: 'P', logS: t.logS, se: t.se })),
-    ...testsAt(s, def).map((t): AbBlock => ({ arm: 'C', logS: t.logS, se: t.se })),
-  ];
+  // Only the head-to-head's own fresh, same-night tests decide: earlier tests of the leader are why it was chosen
+  // (selection bias), and tests from other nights carry that night's form.
   const own = s.tests.filter((t) => h.testIds.includes(t.id));
+  const blocks: AbBlock[] = own.map((t): AbBlock => ({ arm: same(s, t.cm360, def) ? 'C' : 'P', logS: t.logS, se: t.se }));
   const side = (cm: number): number => mean(own.filter((t) => same(s, t.cm360, cm)).map((t) => t.logS));
   const h2hDelta = side(h.leaderCm360) - side(def);
   const decision = decideAB(blocks, 2, { ...cfg, ab: { ...cfg.ab, z: cfg.playAlong.z } } as Config, h2hDelta);
@@ -242,7 +241,8 @@ export function startNight(s: PaState, now: number, cfg: Config = defaultConfig)
     const next = startH2h(opened, cfg);
     return next.phase === 'finished' ? next : { ...next, phase: 'waiting', waitingSince: now };
   }
-  if (opened.queue[0]?.role === 'h2h') return opened;
+  // A head-to-head must be played within one night (night form would otherwise look like a difference): replay it in full.
+  if (opened.queue[0]?.role === 'h2h') return startH2h({ ...opened, queue: [], h2hTonight: 0 }, cfg);
   return { ...opened, queue: [{ cm360: s.setup.defaultCm360, role: 'anchor' }, ...opened.queue] };
 }
 

@@ -4,7 +4,8 @@ export interface SimPlayer {
   optimalCm360: number; currentCm360: number; curvature: number; familiarityBonus: number;
   adaptationRate: number; gainExponent: number; motorNoise: number; driftPerBlock: number;
 }
-export interface SimState { adaptedCm360: number; blocksDone: number }
+/** form: a night-to-night performance multiplier (Play-Along sim); absent means 1. */
+export interface SimState { adaptedCm360: number; blocksDone: number; form?: number }
 
 export function defaultSimPlayer(currentCm360: number, overrides: Partial<SimPlayer> = {}): SimPlayer {
   const d = defaultConfig.sim.player;
@@ -15,11 +16,12 @@ export function defaultSimPlayer(currentCm360: number, overrides: Partial<SimPla
   };
 }
 
-/** Performance multiplier: log-quadratic peak at the optimum × familiarity at the current sens × slow drift over blocks. */
+/** Performance multiplier: log-quadratic peak at the optimum × familiarity at the current sens × slow drift over blocks
+ *  × night form. */
 export function performance(player: SimPlayer, cm360: number, state: SimState): number {
   const peak = Math.exp(-player.curvature * (Math.log(cm360) - Math.log(player.optimalCm360)) ** 2);
   const familiar = Math.abs(Math.log(cm360 / player.currentCm360)) < defaultConfig.sim.player.familiarityTolLn ? 1 + player.familiarityBonus : 1;
-  return peak * familiar * (1 + player.driftPerBlock * state.blocksDone);
+  return peak * familiar * (1 + player.driftPerBlock * state.blocksDone) * (state.form ?? 1);
 }
 
 /** First-move gain the player produces at `testCm360` while adapted to `adaptedCm360`. */

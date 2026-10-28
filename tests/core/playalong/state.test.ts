@@ -165,6 +165,21 @@ describe('Play-Along search', () => {
     expect(x.queue.every((q) => q.role === 'h2h')).toBe(true);
   });
 
+  it('a head-to-head split by the hour check is replayed in full the next night', () => {
+    const { s, clock } = fresh();
+    let x = playUntil(s, clock, peaked(finals(28), 5), (y) => y.queue[0]?.role === 'h2h');
+    const leader = x.h2h!.leaderCm360;
+    x = play(x, clock, peaked(finals(28), 5), 'right', 60 * MIN); // first h2h test, past the hour
+    expect(x.phase).toBe('hourCheck');
+    x = startNight(answerHourCheck(x, 'later', clock.now), clock.now + DAY);
+    expect(x.queue.filter((q) => q.role === 'h2h')).toHaveLength(2);
+    expect(x.h2h!.testIds).toEqual([]);
+    x = playUntil(x, clock, peaked(finals(28), 5));
+    const own = x.tests.filter((t) => x.result!.h2h && t.role === 'h2h' && t.night === 1);
+    expect(own).toHaveLength(2);
+    expect(Math.abs(num(leader)! - num(x.result!.recommendedCm360)!)).toBeLessThanOrEqual(1);
+  });
+
   it('abandonTest returns to waiting on the same target and records nothing', () => {
     const { s } = fresh();
     const testing = answerFeel(markBack(s, MIN), 'right');
