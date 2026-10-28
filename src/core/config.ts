@@ -2,8 +2,9 @@ export const defaultConfig = {
   flick: {
     distancesDeg: [6,8,10,12,14,15,17,18,20,21, 23,24,26,27,28,29,31,32,33,34, 37,40,43,46,49,52,55,58,62,66],
     // Flick blocks run for blockMs in waves: wavePerClass small + medium + big targets, roughly small→big (order jittered).
-    // Wave 0 is unscored warm-in; only complete waves are scored, so every scored wave has the same class mix.
-    blockMs: 14000, wavePerClass: 1, waveOrderJitter: 0.15, maxBlockTargets: 240,
+    // Wave 0 is unscored warm-in (unless warmWave is false); only complete waves are scored, so every scored wave has the
+    // same class mix.
+    blockMs: 14000, wavePerClass: 1, waveOrderJitter: 0.15, maxBlockTargets: 240, warmWave: true as boolean,
     warmupTargets: 300, targetRadiusDeg: 1.5, timeoutMs: 4000,
     smallMaxDeg: 22, bigMinDeg: 35, directionSpreadDeg: 30, bounds: { yaw: 75, pitch: 30 },
   },
@@ -43,7 +44,7 @@ export const defaultConfig = {
   pad: { turnFraction: 0.9 },
   store: { keepRawSessions: 5 },
   /** Play-Along mode (§18): real game matches between short tests. finalsK: The Finals cm/360 = finalsK / (sens × DPI). */
-  playAlong: { roundsPerTest: 3, leadInMs: 15000, firstStep: 0.2, minStep: 0.04, hourCheckMs: 3_000_000, staleDays: 14,
+  playAlong: { roundsPerTest: 2, partMs: 20000, leadInMs: 15000, firstStep: 0.2, minStep: 0.04, hourCheckMs: 3_000_000, staleDays: 14,
     maxH2hPerNight: 2, h2hBlocksPerSide: 1, z: 2.5, nightPriorSd: 0.03, finalsK: 914_400, holdMs: 1000, testTimeScale: 0.25, sameNightMs: 10_800_000,
     sim: { matchMs: 600_000, familiarityShrink: 0.5, nightSd: 0.03, maxNights: 4 } },
   demo: { player: { optimalRatio: 0.75 } },
@@ -76,10 +77,16 @@ export function partMs(kind: PartKind, cfg: Config): number {
   return cfg.tracking.leadInMs + cfg.tracking.durationMs;
 }
 
-/** The config a Play-Along test block runs with: the warm-up is the short lead-in, and there are no breaks. */
+/** The config a Play-Along test block runs with: the warm-up is the short lead-in, there are no breaks, every part is
+ *  playAlong.partMs long, and flicks score from the first wave (the match and the lead-in already warmed the player up). */
 export function configForPlayAlong(cfg: Config = defaultConfig): Config {
+  const ms = cfg.playAlong.partMs;
   return {
     ...cfg,
+    flick: { ...cfg.flick, blockMs: ms, warmWave: false },
+    switch: { ...cfg.switch, blockMs: ms },
+    tracking: { ...cfg.tracking, durationMs: ms - cfg.tracking.leadInMs },
+    trackswitch: { ...cfg.trackswitch, blockMs: ms },
     session: { ...cfg.session, warmupMs: cfg.playAlong.leadInMs, breakEveryRounds: Number.MAX_SAFE_INTEGER },
   } as unknown as Config;
 }

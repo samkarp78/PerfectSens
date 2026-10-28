@@ -63,7 +63,7 @@ export function makeFlickTargets(spec: BlockSpec, cfg: Config): FlickTarget[] {
       // Roughly small→big: sort by distance scaled by a little random jitter.
       const keyed = picks.map((d) => ({ d, key: d * (1 + uniform(rng, -fc.waveOrderJitter, fc.waveOrderJitter)) }));
       keyed.sort((a, b) => a.key - b.key);
-      for (const k of keyed) plan.push({ distance: k.d, scored: w > 0, wave: w });
+      for (const k of keyed) plan.push({ distance: k.d, scored: w > 0 || !fc.warmWave, wave: w });
     }
   }
   const out: FlickTarget[] = [];

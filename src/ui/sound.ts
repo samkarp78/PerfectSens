@@ -6,7 +6,8 @@ export interface Sounds {
   miss(): void;
   /** Quiet tick while the tracking target is held; rate-limited by the caller. */
   tick(): void;
-  countdown(final: boolean): void;
+  /** n: seconds left (5…1), so the beeps rise toward zero; omitted for an uncounted beep. */
+  countdown(final: boolean, n?: number | null): void;
   /** A short two-note chime that starts each part; one pitch per part kind. */
   chime(kind: PartKind): void;
   setEnabled(on: boolean): void;
@@ -15,6 +16,19 @@ export interface Sounds {
 }
 
 const VOLUME = 0.18;
+/** Countdown beeps rise two semitones per second toward zero; the last second is longer, the go beep an octave up. */
+const COUNT_BASE_HZ = 440;
+const COUNT_FROM = 5;
+const SEMITONE = 2 ** (1 / 12);
+const COUNT_STEP_SEMITONES = 2;
+
+/** The tone for a countdown beep: n = seconds left (5…1), or null for an uncounted beep; final = the "go" beep. */
+export function countdownTone(n: number | null, final: boolean): { hz: number; ms: number } {
+  if (final) return { hz: 2 * COUNT_BASE_HZ, ms: 220 };
+  if (n === null) return { hz: COUNT_BASE_HZ, ms: 120 };
+  const steps = Math.max(0, COUNT_FROM - n);
+  return { hz: COUNT_BASE_HZ * SEMITONE ** (COUNT_STEP_SEMITONES * steps), ms: n === 1 ? 200 : 110 };
+}
 const CHIME_HZ: Record<PartKind, number> = { flick: 523, switch: 659, tracking: 784, trackswitch: 988 };
 const CHIME_GAP_MS = 90;
 const FIFTH = 1.5;
@@ -53,7 +67,7 @@ export function createSounds(enabled: boolean): Sounds {
     },
     miss() { note(180, 120, 'sawtooth', 0.35, 120); },
     tick() { note(1800, 25, 'square', 0.12); },
-    countdown(final) { note(final ? 880 : 440, final ? 220 : 120, 'sine', 0.8); },
+    countdown(final, n = null) { const t = countdownTone(n, final); note(t.hz, t.ms, 'sine', 0.8); },
     chime(kind) {
       const f = CHIME_HZ[kind];
       note(f, 120, 'sine', 0.7);

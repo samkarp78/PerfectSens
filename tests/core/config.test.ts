@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { configForMode, defaultConfig, PART_KINDS, partMs } from '../../src/core/config';
+import { configForMode, configForPlayAlong, defaultConfig, PART_KINDS, partMs } from '../../src/core/config';
 
 test('30 flick distances, 10 per class', () => {
   const d = defaultConfig.flick.distancesDeg;
@@ -18,4 +18,14 @@ test('all parts are equal length (default and quick)', () => {
   expect(partMs('flick', configForMode('quick'))).toBe(8000);
   expect(defaultConfig.round.cueMs).toBe(1800);
   expect(defaultConfig.round.cueTickMs).toBe(600);
+});
+
+test('Play-Along: 2 rounds of equal 20 s parts, flicks scored from the first wave', () => {
+  const c = configForPlayAlong();
+  expect(c.playAlong.roundsPerTest).toBe(2);
+  for (const k of PART_KINDS) expect(partMs(k, c)).toBe(20000);
+  expect(c.tracking.leadInMs).toBe(2000);
+  expect(c.flick.warmWave).toBe(false);
+  expect(defaultConfig.flick.warmWave).toBe(true);
+  expect(partMs('flick', defaultConfig)).toBe(14000);
 });

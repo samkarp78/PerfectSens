@@ -575,3 +575,11 @@ Now:
 | Effort | median 3 nights, median 4 tests per night |
 
 Power is low. Most searches with a real optimum end with "no clear winner", because one 3-minute test per side is a small head-to-head.
+
+### 18.14 After the first Play-Along play-test (2026-10-28)
+
+- **Test block:** 2 rounds of **20 s parts** (tracking: 2 s lead-in + 18 s), replacing 3 rounds of 14 s parts. About the same total time, with fewer handovers.
+- **Flicks score from the first wave** in Play-Along (`flick.warmWave: false`), because the match and the 15 s lead-in already warm the player up. Switching's first 2 kills and the tracking lead-ins stay unscored, because those are about measurement, not warm-up.
+- **The lead-in (and the Standard warm-up)** now has hit sounds and pops, with no points.
+- **Countdown beeps rise** two semitones per second toward zero; the last second is longer, and the "go" beep is an octave up. This applies to every mode.
+- The §18.13 rates were measured with 3 × 14 s; they need re-measuring with 2 × 20 s.

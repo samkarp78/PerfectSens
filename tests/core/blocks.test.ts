@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { defaultConfig as cfg, defaultConfig } from '../../src/core/config';
+import { configForPlayAlong, defaultConfig as cfg, defaultConfig } from '../../src/core/config';
 import { classify, makeFlickTargets, makeTrackSwitchTargets, movingAimAt, trackingTargetAt } from '../../src/core/blocks';
 import type { BlockSpec } from '../../src/core/types';
 
@@ -112,5 +112,12 @@ describe('movingAimAt and tracking-switching targets', () => {
     for (let i = 0; i < first.length; i++) for (let j = i + 1; j < first.length; j++)
       expect(Math.hypot(first[i]!.origin.yaw - first[j]!.origin.yaw, first[i]!.origin.pitch - first[j]!.origin.pitch))
         .toBeGreaterThanOrEqual(defaultConfig.trackswitch.minSeparationDeg);
+  });
+});
+
+describe('makeFlickTargets without the warm-in wave (Play-Along)', () => {
+  it('scores from the first target', () => {
+    const t = makeFlickTargets(spec(), configForPlayAlong());
+    expect(t.every((x) => x.scored)).toBe(true);
   });
 });

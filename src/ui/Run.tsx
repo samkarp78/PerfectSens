@@ -84,10 +84,10 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit, hideSco
     if (view.phase !== 'rest' || !locked || !prefs.autoContinue) { setCountdown(null); return; }
     let left = COUNTDOWN_S;
     setCountdown(left);
-    sounds.countdown(false);
+    sounds.countdown(false, left);
     const id = setInterval(() => {
       left--;
-      if (left > 0) { setCountdown(left); sounds.countdown(false); return; }
+      if (left > 0) { setCountdown(left); sounds.countdown(false, left); return; }
       clearInterval(id);
       setCountdown(null);
       sounds.countdown(true);
@@ -159,13 +159,14 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit, hideSco
       for (const e of events) { if (e.hit) { keeper.hit(e.ms); sounds.hit(keeper.state.streak - 1); } else { keeper.miss(); sounds.miss(); } }
     };
     const read = (r: Runner, now: number) => {
-      if (r instanceof FlickRunner && r.log().spec.kind === 'warmup') return; // warm-up: no points
       if (r instanceof FlickRunner) {
         const trials = r.log().trials;
         const { events, next } = flickEvents(trials, flickAt);
         for (let i = flickAt.trial; i < next.trial; i++) if (trials[i]!.hitT !== null) scene.popAt(trials[i]!.target.aim);
         flickAt = next;
-        score(events);
+        // Warm-up / lead-in: the same hit sounds and pops, but no points or streaks.
+        if (r.log().spec.kind === 'warmup') for (const e of events) { if (e.hit) sounds.hit(0); else sounds.miss(); }
+        else score(events);
       } else if (r instanceof SwitchRunner) {
         const log = r.log();
         const { events, next } = switchEvents(log, cursor);
@@ -213,7 +214,8 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit, hideSco
       if (r !== beepRunner) { beepRunner = r; prevLeft = Infinity; }
       if (!r) return;
       const left = r.state.endsAt - now;
-      if (countdownBeep(prevLeft, left) !== null) sounds.countdown(false);
+      const beep = countdownBeep(prevLeft, left);
+      if (beep !== null) sounds.countdown(false, beep);
       prevLeft = left;
     };
 
@@ -226,7 +228,7 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit, hideSco
       el.style.display = 'flex';
       const ticks = Math.round(cfg.round.cueMs / cfg.round.cueTickMs);
       const i = Math.min(ticks - 1, Math.max(0, Math.floor((now - cue.startedAt) / cfg.round.cueTickMs)));
-      if (i !== cueTick) { cueTick = i; sounds.countdown(false); }
+      if (i !== cueTick) { cueTick = i; sounds.countdown(false, ticks - i); }
       if (cueTextRef.current) cueTextRef.current.textContent = cueText(cue.kind);
       if (cueNumRef.current) cueNumRef.current.textContent = String(ticks - i);
     };
