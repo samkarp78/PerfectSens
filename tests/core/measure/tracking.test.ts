@@ -67,3 +67,20 @@ describe('measureTracking', () => {
     expect(r.logTotSe).toBeGreaterThan(0);
   });
 });
+
+describe('measureTracking: mouse button', () => {
+  const start = T0 + cfg.tracking.leadInMs;
+  const mid = start + cfg.tracking.durationMs / 2;
+  const perfect = pathOf(target);
+  it('time on target is 0 when the button is never held', () => {
+    expect(measureTracking({ ...logOf(perfect), holds: [] }, cfg, rng()).tot).toBe(0);
+  });
+  it('counts only the held half', () => {
+    const tot = measureTracking({ ...logOf(perfect), holds: [{ t: T0, down: true }, { t: mid, down: false }] }, cfg, rng()).tot;
+    expect(tot).toBeGreaterThan(0.48);
+    expect(tot).toBeLessThan(0.52);
+  });
+  it('logs from before button tracking (no holds field) count as held', () => {
+    expect(measureTracking(logOf(perfect), cfg, rng()).tot).toBe(1);
+  });
+});

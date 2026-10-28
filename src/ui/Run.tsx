@@ -78,6 +78,7 @@ export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
       (s) => { ctrl.onMove(s); sync(); },
       (t) => { ctrl.onClick(t); sync(); },
       () => { ctrl.onLockLost(); sync(); },
+      (t) => { ctrl.onRelease(t); },
     );
 
     if (last.phase === 'finished') cbRef.current.onFinished(ctrl.session);

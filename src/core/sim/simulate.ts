@@ -116,6 +116,7 @@ function simulateTracking(spec: BlockSpec, setup: Setup, player: SimPlayer, stat
   const delayMs = sc.trackingDelayMs / perf;
   const endT = t0 + cfg.tracking.leadInMs + cfg.tracking.durationMs;
   const em = new CountEmitter(dpc, (s) => runner.onMove(s));
+  runner.onPress(t0); // the simulated player holds the mouse button for the whole block
   let adapted = state.adaptedCm360;
   let nextAdapt = t0 + sc.trackingAdaptMs;
 

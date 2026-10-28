@@ -36,6 +36,7 @@ export function startCapture(
   onMove: (s: MoveSample) => void,
   onClick: (t: number) => void,
   onLockLost: () => void,
+  onRelease: (t: number) => void = () => {},
 ): () => void {
   const moveType = 'onpointerrawupdate' in window ? 'pointerrawupdate' : 'pointermove';
   const onPointer = (e: Event) => {
@@ -44,15 +45,20 @@ export function startCapture(
   const onDown = (e: MouseEvent) => {
     if (e.button === 0) onClick(e.timeStamp);
   };
+  const onUp = (e: MouseEvent) => {
+    if (e.button === 0) onRelease(e.timeStamp);
+  };
   const onLockChange = () => {
     if (target.pointerLockElement === null) onLockLost();
   };
   target.addEventListener(moveType, onPointer);
   target.addEventListener('mousedown', onDown);
+  target.addEventListener('mouseup', onUp);
   target.addEventListener('pointerlockchange', onLockChange);
   return () => {
     target.removeEventListener(moveType, onPointer);
     target.removeEventListener('mousedown', onDown);
+    target.removeEventListener('mouseup', onUp);
     target.removeEventListener('pointerlockchange', onLockChange);
   };
 }

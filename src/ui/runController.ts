@@ -15,6 +15,7 @@ export interface RunController {
   begin(t: number): void;
   onMove(s: MoveSample): void;
   onClick(t: number): void;
+  onRelease(t: number): void;
   tick(t: number): void;
   onLockLost(): void;
   skipWarmup(): void;
@@ -25,7 +26,7 @@ type Progress = NonNullable<SessionState['progress']>;
 
 export const WARMUP_REST_TEXT = 'Warm-up — free targets at your current sens, not scored.';
 export const FLICK_REST_TEXT = 'Next: flicks — click each target as fast as you can.';
-export const TRACKING_REST_TEXT = 'Next: tracking — keep the crosshair on the moving target.';
+export const TRACKING_REST_TEXT = 'Next: tracking — hold the mouse button and keep the crosshair on the moving target.';
 
 const kindLabel = (p: Progress): string => (p.kind === 'tracking' ? 'Tracking' : 'Flick');
 
@@ -83,7 +84,12 @@ export function createRunController(initial: SessionState, cfg: Config = initial
     onClick(t) {
       if (phase !== 'running' || !runner) return;
       if (runner instanceof FlickRunner) runner.onClick(t);
+      else runner.onPress(t);
       checkDone();
+    },
+    onRelease(t) {
+      if (phase !== 'running' || !(runner instanceof TrackingRunner)) return;
+      runner.onRelease(t);
     },
     tick(t) {
       if (phase !== 'running' || !runner) return;

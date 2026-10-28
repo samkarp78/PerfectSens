@@ -51,7 +51,7 @@ describe('run controller', () => {
     expect(c.phase).toBe('rest');
     expect(c.runner).toBeNull();
     expect(nextBlock(c.session)!.kind).toBe('tracking');
-    expect(c.restText).toBe('Next: tracking — keep the crosshair on the moving target.');
+    expect(c.restText).toBe('Next: tracking — hold the mouse button and keep the crosshair on the moving target.');
     expect(c.hud).toBe('Baseline · Tracking');
   });
 
@@ -96,5 +96,29 @@ describe('hudText', () => {
     expect(huds).toContain('Step 4 of 7 · Tracking');
     expect(huds).toContain('Baseline · Flick');
     expect(huds.some((h) => h.startsWith('Final check'))).toBe(true);
+  });
+});
+
+describe('run controller: tracking needs the mouse button', () => {
+  it('a press during tracking holds, a release lets go', async () => {
+    const { createSession, nextBlock, submitBlock } = await import('../../src/core/session');
+    const { simulateBlock } = await import('../../src/core/sim/simulate');
+    const { defaultSimPlayer } = await import('../../src/core/sim/player');
+    const { createRng } = await import('../../src/core/rng');
+    const { defaultConfig } = await import('../../src/core/config');
+    const { TrackingRunner } = await import('../../src/core/run/trackingRunner');
+    const setup = { dpi: 800, cm360: 34, inGameSens: null, fov: 103, fovType: 'horizontal' as const, mode: 'default' as const };
+    let s = createSession(setup, { seed: 1, warmup: false, quickAbCm360: null });
+    const spec = nextBlock(s)!;
+    s = submitBlock(s, simulateBlock(spec, setup, defaultSimPlayer(34), { adaptedCm360: 34, blocksDone: 0 }, createRng(1), defaultConfig, 0).log);
+    const c = createRunController(s);
+    c.begin(0);
+    expect(c.runner).toBeInstanceOf(TrackingRunner);
+    const r = c.runner as InstanceType<typeof TrackingRunner>;
+    expect(r.state.held).toBe(false);
+    c.onClick(10);
+    expect(r.state.held).toBe(true);
+    c.onRelease(20);
+    expect(r.state.held).toBe(false);
   });
 });

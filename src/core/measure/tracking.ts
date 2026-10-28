@@ -37,13 +37,17 @@ export function measureTracking(log: TrackingBlockLog, cfg: Config, rng: Rng): T
   const onTarget: boolean[] = [];
   const lags: number[] = [];
   let idx = -1;
+  let hi = -1;
+  const holds = log.holds;
   for (let k = 0; ; k++) {
     const t = start + k * stepMs;
     if (t >= log.endT) break;
     while (idx + 1 < log.path.length && log.path[idx + 1]!.t <= t) idx++;
     const cross: Aim = idx >= 0 ? log.path[idx]! : startAim;
     const rel = t - log.t0;
-    onTarget.push(angleBetween(cross, trackingTargetAt(log.spec, rel, cfg)) <= cfg.tracking.targetRadiusDeg);
+    if (holds) while (hi + 1 < holds.length && holds[hi + 1]!.t <= t) hi++;
+    const held = !holds || (hi >= 0 && holds[hi]!.down);
+    onTarget.push(held && angleBetween(cross, trackingTargetAt(log.spec, rel, cfg)) <= cfg.tracking.targetRadiusDeg);
     const lag = leadLagAt(log, rel, cross, cfg);
     if (lag !== null) lags.push(lag);
   }

@@ -22,6 +22,7 @@ describe('TrackingRunner', () => {
 
   it('stays on target when the aim follows the target path', () => {
     const r = new TrackingRunner(spec, DPC, cfg, T0);
+    r.onPress(T0);
     let cx = 0, cy = 0;
     for (let ms = 8; ms <= 5000; ms += 8) {
       const tg = trackingTargetAt(spec, ms, cfg);
@@ -41,5 +42,25 @@ describe('TrackingRunner', () => {
     const n = r.log().path.length;
     r.onMove({ t: T0 + END + 5, dx: 5, dy: 5 });
     expect(r.log().path).toHaveLength(n);
+  });
+});
+
+describe('TrackingRunner: mouse button', () => {
+  it('counts as on target only while the button is held, and logs presses/releases', () => {
+    const r = new TrackingRunner(spec, DPC, cfg, T0);
+    expect(r.state.onTarget).toBe(false); // aim starts on the target, but nothing is held
+    r.onPress(T0 + 100);
+    expect(r.state.held).toBe(true);
+    expect(r.state.onTarget).toBe(true);
+    r.onRelease(T0 + 200);
+    expect(r.state.onTarget).toBe(false);
+    expect(r.log().holds).toEqual([{ t: T0 + 100, down: true }, { t: T0 + 200, down: false }]);
+  });
+
+  it('ignores presses after the block is done', () => {
+    const r = new TrackingRunner(spec, DPC, cfg, T0);
+    r.tick(T0 + END);
+    r.onPress(T0 + END + 1);
+    expect(r.log().holds).toEqual([]);
   });
 });
