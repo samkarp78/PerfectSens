@@ -643,3 +643,13 @@ Both Play-Along and Standard results get small charts, one per stat. Each chart 
 - tracking-switching ahead/behind.
 
 A user decision to keep in mind: the final check's 1% false-change guarantee must hold with the new grade (simulator re-check, run only when the user isn't gaming).
+
+### 19.6 Measured rates (2026-10-28)
+
+These are for 2 rounds of 20 s parts, the spec-19 grade and direction, 1 final-check test per side, z = 2.5 and up to 4 nights.
+
+| Check | Rate |
+|---|---|
+| Null false change | **1/300 (0.3%)**: keep 64, none 235 |
+| Convergence (optimum 0.75–1.3× the control) | 21/21 change answers within ±8%; kinds: change 21, none 73, keep 6 (up from 14 change with the §18 score) |
+| Effort | median 3 nights, median 4 tests per night |
