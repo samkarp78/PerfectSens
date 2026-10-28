@@ -82,6 +82,7 @@ Sens is handled as `x = ln(cm360)`; step sizes are relative.
    - tracking lag → faster; lead → slower
    - corrections or spread ↑ → follow the sign of the fit's slope
    Each signal has a config weight. Signals from a block are down-weighted in proportion to the size of the sens jump that preceded it, because over/undershoot right after a switch partly reflects adaptation to the previous sens.
+   Aim signals nudge direction only while the best guess is inside the tested range; at the tested edge, or when both neighbours are already tested, steering walks outward, past the better-scoring side first.
 4. **Step size shrinks** from ±15% to ±4% over the dial-in (config schedule).
 5. **Limits:** tests stay within 0.6×–1.6× current cm/360 (config).
 6. **Logging:** every steering decision records its inputs and reason in the block log.

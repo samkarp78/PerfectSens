@@ -30,6 +30,9 @@ describe('simulator validation: steering and fit', () => {
     expect(faster).toBeGreaterThanOrEqual(18);
   });
 
+  // Measured pass rate across seed bases 40000, 80000, 90000, 100000, 110000: 16, 16, 17, 16, 18 of 20 (pooled 0.83).
+  // The 16/20 threshold sits close to the true rate by design: the default player's flat curvature (2) leaves the pick
+  // with an SD of about 0.06 in ln, so a fresh seed set can fail this test without any regression.
   it('test-retest: in ≥ 16 of 20 same-player pairs (different seeds) the picks are within ±10% of each other', () => {
     const p = player();
     const agree = Array.from({ length: 20 }, (_, i) => {

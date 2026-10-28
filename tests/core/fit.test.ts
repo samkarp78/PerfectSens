@@ -68,6 +68,21 @@ describe('fitCurve', () => {
     expect(slow.edge).toBe('slower');
   });
 
+  it('upward curvature flags an edge when the extreme tested point is within the minimum effect of the best point', () => {
+    const tol = Math.log(1 + defaultConfig.ab.minEffect);
+    // Best point is next to the fast edge; the fast edge itself is a near-tie (noise), the slow edge is far below.
+    const ys = [1.6 - tol / 2, 1.6, 1.2, 0.6, 0.15, 0.05, 0.0];
+    const near = fit(us.map((u, i) => ({ x: x0 + u, y: ys[i]!, se: 0.01, t: i / 6, isCurrent: u === 0 })));
+    expect(near.coef!.c).toBeGreaterThanOrEqual(0);
+    expect(near.pickCm360).toBeCloseTo(Math.exp(x0 + us[1]!), 9);
+    expect(near.edge).toBe('faster');
+    // A clear drop at the fast edge is not a tie: no edge.
+    const ys2 = [1.6 - 3 * tol, 1.6, 1.2, 0.6, 0.15, 0.05, 0.0];
+    const far = fit(us.map((u, i) => ({ x: x0 + u, y: ys2[i]!, se: 0.01, t: i / 6, isCurrent: u === 0 })));
+    expect(far.coef!.c).toBeGreaterThanOrEqual(0);
+    expect(far.edge).toBeNull();
+  });
+
   it('upward curvature with an interior best point flags no edge', () => {
     const ys = [0.5, 0.2, 0.6, 0.0, 0.2, 0.3, 0.55];
     const r = fit(us.map((u, i) => ({ x: x0 + u, y: ys[i]!, se: 0.01, t: i / 6, isCurrent: u === 0 })));

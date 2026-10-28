@@ -44,10 +44,28 @@ function solveModel(points: readonly FitPoint[], ys: readonly number[], x0: numb
   return { a, b, c, d, f };
 }
 
-function bestPointCm360(points: readonly FitPoint[]): number {
+function bestPoint(points: readonly FitPoint[]): FitPoint {
   let best = points[0]!;
   for (const p of points) if (p.y > best.y) best = p;
-  return Math.exp(best.x);
+  return best;
+}
+
+/**
+ * Edge flag for an upward (c ≥ 0) fit: the tested edge whose best score is within the minimum effect of the best point
+ * (performs the same), when exactly one edge qualifies; if both do, the edge the best point sits on, if any.
+ */
+function upwardEdge(points: readonly FitPoint[], cfg: Config): FitResult['edge'] {
+  const tolerance = Math.log(1 + cfg.ab.minEffect);
+  const best = bestPoint(points);
+  const xs = points.map((p) => p.x);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const bestAt = (x: number): number => Math.max(...points.filter((p) => p.x === x).map((p) => p.y));
+  const fast = best.y - bestAt(minX) <= tolerance;
+  const slow = best.y - bestAt(maxX) <= tolerance;
+  if (fast && !slow) return 'faster';
+  if (slow && !fast) return 'slower';
+  if (fast && slow) return best.x === minX ? 'faster' : best.x === maxX ? 'slower' : null;
+  return null;
 }
 
 function bootstrapRange(points: readonly FitPoint[], x0: number, minU: number, maxU: number,
@@ -80,7 +98,7 @@ function bootstrapRange(points: readonly FitPoint[], x0: number, minU: number, m
 
 export function fitCurve(points: FitPoint[], x0: number, cfg: Config, rng: Rng): FitResult {
   const fallback = (usable: boolean, coef: Coef | null): FitResult => ({
-    usable, coef, pickCm360: bestPointCm360(points), range: null, edge: null, lowConfidence: true,
+    usable, coef, pickCm360: Math.exp(bestPoint(points).x), range: null, edge: null, lowConfidence: true,
   });
 
   const distinct = new Set(points.map((p) => Math.round(p.x * DISTINCT_X_RESOLUTION)));
@@ -88,14 +106,8 @@ export function fitCurve(points: FitPoint[], x0: number, cfg: Config, rng: Rng):
 
   const coef = solveModel(points, points.map((p) => p.y), x0, cfg);
   if (!coef) return fallback(false, null);
-  if (coef.c >= 0) {
-    // Upward curve: pick the best point; if it is the fastest or slowest tested, the peak is at or beyond that edge.
-    const best = fallback(true, coef);
-    const xs = points.map((p) => p.x);
-    const bx = Math.log(best.pickCm360);
-    const edge: FitResult['edge'] = bx <= Math.min(...xs) ? 'faster' : bx >= Math.max(...xs) ? 'slower' : null;
-    return { ...best, edge };
-  }
+  // Upward curve: pick the best point; flag an edge when a tested edge performs the same as it (peak at or beyond).
+  if (coef.c >= 0) return { ...fallback(true, coef), edge: upwardEdge(points, cfg) };
 
   const uValues = points.map((p) => p.x - x0);
   const minU = Math.min(...uValues), maxU = Math.max(...uValues);
