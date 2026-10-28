@@ -38,16 +38,18 @@ Input conversion: `degrees = counts × (2.54 / DPI) × (360 / cm360)`. Movement 
 
 | Stage | Content | Time |
 |---|---|---|
-| Warm-up (optional, recommended) | Free targets at current sens, unscored | 3 min |
-| Baseline | Current sens: flick block + tracking block | ~1¼ min |
-| Dial-in steps (6 / Thorough 10) | Hidden sens each: ~6 unscored adaptation targets, 30 scored flicks, 25 s scored tracking | ~1¼ min each |
-| Hidden re-check | Current sens again, disguised as a normal step, inserted at the midpoint of the dial-in | ~1¼ min |
-| A/B | Pick vs current, blind, adaptive ABBA → +BAAB | 4–9 min |
+| Warm-up (optional, recommended) | Free targets at current sens, unscored | 1 min |
+| Baseline | Current sens: one round | ~1 min |
+| Dial-in steps (4 / Thorough 8 / Quick 3) | Hidden sens each: one round | ~1 min each |
+| Hidden re-check | Current sens again, disguised as a normal step, inserted at the midpoint of the dial-in | ~1 min |
+| A/B | Pick vs current, blind, ABBA; if look 1 is borderline the player chooses whether to add BAAB | 4 min (+4) |
 | Results | Verdict, recommendation, diagnosis, logs | — |
 
-Typical total ~14–16 min, worst case ~19 min, plus warm-up. Thorough adds ~5 min.
+Typical total ~10 min plus warm-up; ~14 min if the player takes the extra A/B round. Thorough adds ~4 min.
 
-**Block content is standardized.** Every flick block uses the same fixed set of 30 target distances (a fixed mix of small <22°, medium, and big >35° flicks), shuffled in order and direction from a seeded RNG. Every tracking block draws from the same set of movement patterns. Differences between blocks then reflect the sens, not the layout.
+**Rounds (revised 2026-10-28 after the first play-test).** A round is a 40 s flick block followed immediately by a 15 s tracking block (2 s unscored lead-in, scored only while the mouse button is held). Between rounds the mouse stays locked and a 3-2-1 countdown starts the next one; Esc pauses.
+
+**Block content is standardized.** Flick targets come in waves of 4 small + 4 medium + 4 big flicks drawn from the fixed set of 30 distances, ordered roughly small→big (order jittered), each in a random direction from a seeded RNG. Wave 0 is unscored warm-in for the new sens, and only complete waves are scored, so every scored wave has the same class mix. Every tracking block draws from the same set of movement patterns. Differences between blocks then reflect the sens, not the layout.
 
 **Breaks and pausing.** A short rest screen appears between blocks. Esc (or losing pointer lock) pauses; the interrupted block restarts on resume.
 

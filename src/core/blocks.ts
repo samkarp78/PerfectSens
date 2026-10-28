@@ -47,22 +47,29 @@ export function makeFlickTargets(spec: BlockSpec, cfg: Config): FlickTarget[] {
   if (spec.kind === 'tracking') throw new Error('makeFlickTargets: tracking blocks have no flick targets');
   const rng = createRng(spec.seed);
   const dists = cfg.flick.distancesDeg;
-  const plan: { distance: number; scored: boolean }[] = [];
+  const plan: { distance: number; scored: boolean; wave: number }[] = [];
   if (spec.kind === 'warmup') {
     for (let i = 0; i < cfg.flick.warmupTargets; i++) {
-      plan.push({ distance: at(dists, rng.int(0, dists.length - 1)), scored: false });
+      plan.push({ distance: at(dists, rng.int(0, dists.length - 1)), scored: false, wave: 0 });
     }
   } else {
-    for (let i = 0; i < cfg.flick.adaptationTargets; i++) {
-      plan.push({ distance: at(dists, rng.int(0, dists.length - 1)), scored: false });
+    const fc = cfg.flick;
+    const pools = (['small', 'medium', 'big'] as const).map((c) => dists.filter((d) => classify(d, cfg) === c));
+    const waveSize = 3 * fc.wavePerClass;
+    const waves = Math.ceil(fc.maxBlockTargets / waveSize);
+    for (let w = 0; w < waves; w++) {
+      const picks = pools.flatMap((pool) => rng.shuffle(pool).slice(0, fc.wavePerClass));
+      // Roughly small→big: sort by distance scaled by a little random jitter.
+      const keyed = picks.map((d) => ({ d, key: d * (1 + uniform(rng, -fc.waveOrderJitter, fc.waveOrderJitter)) }));
+      keyed.sort((a, b) => a.key - b.key);
+      for (const k of keyed) plan.push({ distance: k.d, scored: w > 0, wave: w });
     }
-    for (const d of rng.shuffle(dists)) plan.push({ distance: d, scored: true });
   }
   const out: FlickTarget[] = [];
   let prev: Aim = { yaw: 0, pitch: 0 };
   plan.forEach((p, index) => {
     const aim = nextAim(prev, p.distance, rng, cfg);
-    out.push({ index, aim, distance: p.distance, cls: classify(p.distance, cfg), scored: p.scored });
+    out.push({ index, aim, distance: p.distance, cls: classify(p.distance, cfg), scored: p.scored, wave: p.wave });
     prev = aim;
   });
   return out;

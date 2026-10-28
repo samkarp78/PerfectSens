@@ -7,14 +7,21 @@ const spec = (over: Partial<BlockSpec> = {}): BlockSpec =>
   ({ id: 'b', stage: 'baseline', kind: 'flick', cm360: 30, seed: 7, stepIndex: 0, arm: null, ...over });
 
 describe('makeFlickTargets', () => {
-  it('flick: 6 unscored then all 30 distances scored', () => {
+  it('flick: waves of small→big with an equal class mix; wave 0 is unscored warm-in', () => {
     const t = makeFlickTargets(spec(), cfg);
-    expect(t).toHaveLength(36);
-    expect(t.slice(0, 6).every((x) => !x.scored)).toBe(true);
-    expect(t.slice(6).every((x) => x.scored)).toBe(true);
-    const d = t.slice(6).map((x) => x.distance).sort((a, b) => a - b);
-    expect(d).toEqual([...cfg.flick.distancesDeg].sort((a, b) => a - b));
+    const W = 3 * cfg.flick.wavePerClass;
+    expect(t.length).toBeGreaterThanOrEqual(cfg.flick.maxBlockTargets);
+    expect(t.length % W).toBe(0);
     expect(t.map((x) => x.index)).toEqual(t.map((_, i) => i));
+    for (let w = 0; w < t.length / W; w++) {
+      const wave = t.slice(w * W, (w + 1) * W);
+      expect(wave.every((x) => x.wave === w)).toBe(true);
+      expect(wave.every((x) => x.scored === (w > 0))).toBe(true);
+      for (const cls of ['small', 'medium', 'big'] as const) expect(wave.filter((x) => x.cls === cls)).toHaveLength(cfg.flick.wavePerClass);
+      const third = W / 3;
+      const mean = (a: { distance: number }[]) => a.reduce((s, x) => s + x.distance, 0) / a.length;
+      expect(mean(wave.slice(0, third))).toBeLessThan(mean(wave.slice(-third))); // builds from small to big
+    }
   });
   it('is deterministic and seed-sensitive', () => {
     expect(makeFlickTargets(spec(), cfg)).toEqual(makeFlickTargets(spec(), cfg));

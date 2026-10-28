@@ -2,7 +2,7 @@ import { AB_ROUND_LENGTH, abSequence, decideAB, extendSequence, type AbBlock, ty
 import { defaultConfig, type Config } from './config';
 import { diagnose } from './diagnose';
 import { fitCurve, type FitPoint, type FitResult } from './fit';
-import { measureTrial, summarizeFlick, type FlickSummary, type TrialMetrics } from './measure/flick';
+import { measureFlickBlock, summarizeFlick, type FlickSummary, type TrialMetrics } from './measure/flick';
 import { measureTracking } from './measure/tracking';
 import { buildResult, type SessionResult } from './result';
 import { createRng, type Rng } from './rng';
@@ -10,7 +10,7 @@ import { stepScore } from './score';
 import { chooseNext, type SteerDecision } from './steer';
 import type { Arm, BlockKind, BlockSpec, FlickBlockLog, Setup, Stage, StepResult, TrackingBlockLog } from './types';
 
-export interface SessionOptions { seed: number; warmup: boolean; quickAbCm360: number | null }
+export interface SessionOptions { seed: number; warmup: boolean; quickAbCm360: number | null; askBeforeExtending?: boolean }
 
 type StepStage = Exclude<Stage, 'warmup'>;
 
@@ -26,6 +26,8 @@ export interface SessionState {
   readonly setup: Setup; readonly mode: 'full' | 'quickab'; readonly steps: StepResult[];
   readonly fit: FitResult | null; readonly steerLog: SteerDecision[]; readonly abDecisions: AbDecision[];
   readonly logs: { flick: FlickBlockLog[]; tracking: TrackingBlockLog[] }; readonly result: SessionResult | null;
+  /** The first A/B round was too close to call and the player must choose (extendAb) whether to play the second. */
+  readonly awaitingExtension: boolean;
   /** blocksDone/blocksTotal count scored flick + tracking blocks (warm-up excluded); the total is an estimate
    *  that grows if the A/B adds its second round. */
   readonly progress: {
@@ -38,6 +40,7 @@ export interface SessionState {
   /** @internal retries already used on the current block */ readonly _retries: number;
   /** @internal */ readonly _arms: Arm[];
   /** @internal A/B pick (P arm); null until the dial-in is done */ readonly _pick: number | null;
+  /** @internal ask the player before the second A/B round instead of extending automatically */ readonly _ask: boolean;
 }
 
 /** Spec seeds are integers in [0, 2^31). */
@@ -53,7 +56,7 @@ export function createSession(setup: Setup, opts: SessionOptions, cfg: Config = 
   const quick = opts.quickAbCm360 !== null;
   const base: SessionState = {
     setup, mode: quick ? 'quickab' : 'full', steps: [], fit: null, steerLog: [], abDecisions: [],
-    logs: { flick: [], tracking: [] }, result: null, progress: null,
+    logs: { flick: [], tracking: [] }, result: null, progress: null, awaitingExtension: false, _ask: opts.askBeforeExtending ?? false,
     _cfg: cfg, _seed: opts.seed, _warmupPending: opts.warmup, _pending: null, _retries: 0,
     _arms: [], _pick: null,
   };
@@ -118,9 +121,10 @@ export function submitBlock(s: SessionState, log: FlickBlockLog | TrackingBlockL
   if (spec.kind === 'flick') {
     const fl = log as FlickBlockLog;
     const next: SessionState = { ...s, logs: { ...s.logs, flick: [...s.logs.flick, fl] } };
-    const trials = fl.trials.map((t) => measureTrial(t, fl.path, cfg));
+    const trials = measureFlickBlock(fl, cfg);
     const summary = summarizeFlick(trials, cfg, rng);
-    if (summary.timeoutFraction > cfg.session.invalidTimeoutFraction && canRetry) return withProgress({ ...next, _retries: s._retries + 1 });
+    const invalid = summary.n === 0 || summary.timeoutFraction > cfg.session.invalidTimeoutFraction; // n = 0: no complete scored wave
+    if (invalid && canRetry) return withProgress({ ...next, _retries: s._retries + 1 });
     return withProgress({ ...next, _retries: 0, _pending: { ...p, flick: { trials, summary } } });
   }
 
@@ -193,6 +197,7 @@ function planAb(s: SessionState): SessionState {
     const decision = decideAB(blocks, look, s._cfg);
     const decided = { ...s, abDecisions: [...s.abDecisions, decision] };
     if (decision.decision !== 'continue') return finish(decided, false);
+    if (s._ask) return { ...decided, _pending: null, awaitingExtension: true };
     return planAb({ ...decided, _arms: [...s._arms, ...extendSequence(s._arms)] });
   }
   const j = ab.length;
@@ -200,6 +205,15 @@ function planAb(s: SessionState): SessionState {
   return {
     ...s, _pending: { stage: 'ab', arm, cm360: arm === 'P' ? s._pick! : s.setup.cm360, idBase: `ab-${j}`, specIndex: j, flick: null },
   };
+}
+
+/** The player's answer to a borderline first A/B round: play the mirrored second round, or stop with no clear winner. */
+export function extendAb(s: SessionState, accept: boolean): SessionState {
+  if (!s.awaitingExtension) throw new Error('extendAb: the session is not waiting for an answer');
+  const waiting = { ...s, awaitingExtension: false };
+  if (accept) return withProgress(planAb({ ...waiting, _arms: [...s._arms, ...extendSequence(s._arms)] }));
+  const last = s.abDecisions[s.abDecisions.length - 1]!;
+  return withProgress(finish({ ...waiting, abDecisions: [...s.abDecisions, { ...last, decision: 'none' }] }, false));
 }
 
 function finish(s: SessionState, abSkipped: boolean): SessionState {

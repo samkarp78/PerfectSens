@@ -4,7 +4,8 @@ import { createSession, nextBlock, submitBlock } from '../../src/core/session';
 import { defaultSimPlayer } from '../../src/core/sim/player';
 import { runSimSession } from '../../src/core/sim/runSession';
 import type { Setup } from '../../src/core/types';
-import { createRunController, hudText } from '../../src/ui/runController';
+import { createRunController, hudText, ROUND_REST_TEXT } from '../../src/ui/runController';
+import { TrackingRunner } from '../../src/core/run/trackingRunner';
 import { minJerkMoves } from '../helpers/paths';
 import type { FlickRunner } from '../../src/core/run/flickRunner';
 
@@ -36,11 +37,11 @@ describe('run controller', () => {
     expect(log.path).toHaveLength(0);
   });
 
-  it('finishing the flick block returns to rest with the tracking block next', () => {
+  it('a round runs flicks then tracking back to back, then rests before the next round', () => {
     const c = createRunController(createSession(setup, opts));
     c.begin(0);
     let t = 0;
-    for (let i = 0; i < 1000 && c.phase === 'running'; i++) {
+    for (let i = 0; i < 1000 && !(c.runner instanceof TrackingRunner); i++) {
       const r = c.runner as FlickRunner;
       const moves = minJerkMoves(r.state.aim, r.state.target!.aim, t, 150, 500, DPC);
       for (const m of moves) c.onMove(m);
@@ -48,11 +49,32 @@ describe('run controller', () => {
       c.onClick(t);
       t += 50;
     }
-    expect(c.phase).toBe('rest');
-    expect(c.runner).toBeNull();
-    expect(nextBlock(c.session)!.kind).toBe('tracking');
-    expect(c.restText).toBe('Next: tracking — hold the mouse button and keep the crosshair on the moving target.');
+    expect(c.phase).toBe('running'); // no rest card between the flick and tracking halves
+    expect(c.runner).toBeInstanceOf(TrackingRunner);
     expect(c.hud).toBe('Baseline · Tracking');
+    c.onClick(t + 1);
+    c.tick(t + 1e6);
+    expect(c.phase).toBe('rest'); // the round is over (here the idle tracking block is queued for one retry)
+    expect(c.runner).toBeNull();
+    expect(createRunController(createSession(setup, opts)).restText).toBe(ROUND_REST_TEXT);
+  });
+
+  it('asks before the extra A/B round and resumes or finishes on the answer', () => {
+    let waiting = null as ReturnType<typeof runSimSession>['state'] | null;
+    for (let seed = 1; seed <= 40 && !waiting; seed++) {
+      const { state } = runSimSession(setup, defaultSimPlayer(CURRENT), { ...opts, seed, askBeforeExtending: true });
+      if (state.awaitingExtension) waiting = state;
+    }
+    expect(waiting).not.toBeNull();
+    const yes = createRunController(waiting!);
+    expect(yes.phase).toBe('asking');
+    yes.answerExtension(true);
+    expect(yes.phase).toBe('rest');
+    expect(nextBlock(yes.session)!.stage).toBe('ab');
+    const no = createRunController(waiting!);
+    no.answerExtension(false);
+    expect(no.phase).toBe('finished');
+    expect(no.session.result!.verdict).toBe('none');
   });
 
   it('onLockLost outside running is a no-op', () => {
@@ -72,7 +94,7 @@ describe('run controller', () => {
     c.skipWarmup();
     expect(c.phase).toBe('rest');
     expect(nextBlock(c.session)!.stage).toBe('baseline');
-    expect(c.restText).toBe('Next: flicks — click each target as fast as you can.');
+    expect(c.restText).toBe(ROUND_REST_TEXT);
   });
 });
 
@@ -92,8 +114,8 @@ describe('hudText', () => {
       expect(h).not.toMatch(/cm/i);
       for (const v of cms) if (v.length > 2) expect(h).not.toContain(v);
     }
-    expect(huds).toContain('Step 4 of 7 · Flick');
-    expect(huds).toContain('Step 4 of 7 · Tracking');
+    expect(huds).toContain('Step 3 of 5 · Flick');
+    expect(huds).toContain('Step 3 of 5 · Tracking');
     expect(huds).toContain('Baseline · Flick');
     expect(huds.some((h) => h.startsWith('Final check'))).toBe(true);
   });

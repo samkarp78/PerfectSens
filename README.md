@@ -10,13 +10,13 @@ At the end you get a recommended sensitivity (in cm per 360 degrees) with a rang
 
 1. **Setup.** Enter your mouse DPI and current cm/360 (optionally your in-game sens and FOV). These are saved on your computer for next time.
 2. **Warm-up (optional, recommended).** About 1 minute of free targets at your current sens. Not scored.
-3. **Baseline.** About 1 minute: a flicking block and a tracking block at your current sens.
-4. **Dial-in steps.** 6 steps (10 in Thorough mode). Each uses a hidden sensitivity and takes about 1 minute: a few practice targets, 30 scored flicks, then 25 seconds of tracking. The test picks the next sens from how you did.
+3. **Rounds.** Everything after the warm-up is played in rounds of about 1 minute: 40 seconds of flicks (targets come in waves that build from small to big flicks), then straight into 15 seconds of tracking with the mouse button held. A 3-2-1 countdown starts the next round; Esc pauses.
+4. **Baseline and dial-in.** One round at your current sens, then 4 rounds at hidden sensitivities (8 in Thorough mode). The test picks the next sens from how you did.
 5. **Hidden re-check.** At an unannounced point, your current sens comes back, disguised as a normal step. It lets the test separate warm-up and fatigue effects from real differences.
-6. **Blind A/B.** The test's pick versus your current sens, in a mirrored order (A B B A). If the result is unclear, it adds 4 more rounds. This is the final judge.
+6. **Blind A/B.** The test's pick versus your current sens, 4 rounds in a mirrored order (A B B A). If the result is too close to call, it asks whether you want to play 4 more rounds (about 4 minutes) for a firmer answer. This is the final judge.
 7. **Results.** Verdict (Change, Keep, or No clear winner), recommended sens and range, diagnosis, and a log of every block.
 
-A typical session takes 14 to 16 minutes, at most about 19, plus the 1-minute warm-up. Thorough mode adds about 5 minutes. Esc pauses; the block you interrupted restarts when you resume.
+A typical session takes about 10 minutes, plus the 1-minute warm-up, and about 14 if you choose the extra A/B rounds. Thorough mode adds about 4 minutes. Quick test mode (about 5 minutes) is for trying the tool out and isn't a reliable answer. Esc pauses; the block you interrupted restarts when you resume.
 
 ## Requirements
 

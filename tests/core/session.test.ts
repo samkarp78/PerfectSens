@@ -4,7 +4,7 @@ import { degPerCount } from '../../src/core/geometry';
 import { createRng } from '../../src/core/rng';
 import { FlickRunner } from '../../src/core/run/flickRunner';
 import { TrackingRunner } from '../../src/core/run/trackingRunner';
-import { createSession, nextBlock, submitBlock, type SessionOptions, type SessionState } from '../../src/core/session';
+import { createSession, extendAb, nextBlock, submitBlock, type SessionOptions, type SessionState } from '../../src/core/session';
 import { defaultSimPlayer, type SimState } from '../../src/core/sim/player';
 import { runSimSession } from '../../src/core/sim/runSession';
 import { simulateBlock } from '../../src/core/sim/simulate';
@@ -28,20 +28,19 @@ const defaultRun = (() => {
 })();
 
 describe('session sequence', () => {
-  it('default mode: baseline, dial-in 0–2, recheck, dial-in 3–5 (flick then tracking each)', () => {
+  it('default mode: baseline, dial-in 0–1, recheck, dial-in 2–3 (flick then tracking each)', () => {
     const { blocks } = defaultRun();
     const pre = blocks.filter((b) => b.spec.stage !== 'ab').map((b) => b.spec);
     const expected: string[] = [];
     const step = (stage: string) => expected.push(`${stage}:flick`, `${stage}:tracking`);
     step('baseline');
-    for (let i = 0; i < 3; i++) step('dialin');
+    for (let i = 0; i < 2; i++) step('dialin');
     step('recheck');
-    for (let i = 3; i < 6; i++) step('dialin');
+    for (let i = 2; i < 4; i++) step('dialin');
     expect(pre.map(label)).toEqual(expected);
     expect(pre.map((s) => s.id)).toEqual([
       'baseline-flick', 'baseline-tracking', 'dialin-0-flick', 'dialin-0-tracking', 'dialin-1-flick', 'dialin-1-tracking',
-      'dialin-2-flick', 'dialin-2-tracking', 'recheck-flick', 'recheck-tracking', 'dialin-3-flick', 'dialin-3-tracking',
-      'dialin-4-flick', 'dialin-4-tracking', 'dialin-5-flick', 'dialin-5-tracking',
+      'recheck-flick', 'recheck-tracking', 'dialin-2-flick', 'dialin-2-tracking', 'dialin-3-flick', 'dialin-3-tracking',
     ]);
     for (const s of pre.filter((p) => p.stage === 'baseline' || p.stage === 'recheck')) expect(s.cm360).toBe(CURRENT);
     // the A/B (if any) comes only after all of it
@@ -49,14 +48,14 @@ describe('session sequence', () => {
     if (firstAb >= 0) expect(firstAb).toBe(pre.length);
   });
 
-  it('thorough mode: 10 dial-in steps with the recheck after step 4', () => {
+  it('thorough mode: 8 dial-in steps with the recheck after step 3', () => {
     const { blocks, state } = runSimSession(setupFor('thorough'), defaultSimPlayer(CURRENT), opts({ seed: 3 }));
     const flicks = blocks.filter((b) => b.spec.kind === 'flick' && b.spec.stage !== 'ab').map((b) => b.spec.id);
     expect(flicks).toEqual([
-      'baseline-flick', 'dialin-0-flick', 'dialin-1-flick', 'dialin-2-flick', 'dialin-3-flick', 'dialin-4-flick',
-      'recheck-flick', 'dialin-5-flick', 'dialin-6-flick', 'dialin-7-flick', 'dialin-8-flick', 'dialin-9-flick',
+      'baseline-flick', 'dialin-0-flick', 'dialin-1-flick', 'dialin-2-flick', 'dialin-3-flick',
+      'recheck-flick', 'dialin-4-flick', 'dialin-5-flick', 'dialin-6-flick', 'dialin-7-flick',
     ]);
-    expect(state.steerLog).toHaveLength(10);
+    expect(state.steerLog).toHaveLength(8);
   });
 
   it('warmup on: the first spec is a warmup; submitting null advances to the baseline', () => {
@@ -114,37 +113,37 @@ describe('session sequence', () => {
     expect(s3).not.toBe(s2);
   });
 
-  it('progress: baseline at 0/7, recheck at position 3 of 7, null once finished', () => {
+  it('progress: baseline at 0/5, recheck at position 2 of 5, null once finished', () => {
     const setup = setupFor();
     const player = defaultSimPlayer(CURRENT);
     let s: SessionState = createSession(setup, opts(), cfg);
-    expect(s.progress).toMatchObject({ stage: 'baseline', stepIndex: 0, totalSteps: 7, kind: 'flick' });
+    expect(s.progress).toMatchObject({ stage: 'baseline', stepIndex: 0, totalSteps: 5, kind: 'flick' });
     let sim: SimState = { adaptedCm360: CURRENT, blocksDone: 0 };
     let t = 0;
     const seen: { stage: string; stepIndex: number }[] = [];
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 7; i++) {
       const spec = nextBlock(s)!;
       seen.push({ stage: s.progress!.stage, stepIndex: s.progress!.stepIndex });
       const r = simulateBlock(spec, setup, player, sim, createRng(100 + i), cfg, t);
       sim = r.state; t = r.endT + cfg.sim.blockGapMs;
       s = submitBlock(s, r.log);
     }
-    expect(s.progress).toMatchObject({ stage: 'recheck', stepIndex: 3, totalSteps: 7, kind: 'tracking' });
-    expect(seen.filter((p) => p.stage === 'dialin').map((p) => p.stepIndex)).toEqual([0, 0, 1, 1, 2, 2]);
+    expect(s.progress).toMatchObject({ stage: 'recheck', stepIndex: 2, totalSteps: 5, kind: 'tracking' });
+    expect(seen.filter((p) => p.stage === 'dialin').map((p) => p.stepIndex)).toEqual([0, 0, 1, 1]);
     expect(defaultRun().state.progress).toBeNull();
   });
 
   it('progress counts blocks done against an estimated total (baseline + dial-in + recheck + first A/B round)', () => {
     const setup = setupFor();
     let s: SessionState = createSession(setup, opts({ warmup: true }), cfg);
-    // 2 blocks per step: baseline 1 + dial-in 6 + recheck 1 + A/B 4 = 12 steps
-    expect(s.progress).toMatchObject({ kind: 'warmup', blocksDone: 0, blocksTotal: 24 });
+    // 2 blocks per step: baseline 1 + dial-in 4 + recheck 1 + A/B 4 = 10 steps
+    expect(s.progress).toMatchObject({ kind: 'warmup', blocksDone: 0, blocksTotal: 20 });
     s = submitBlock(s, null);
-    expect(s.progress).toMatchObject({ blocksDone: 0, blocksTotal: 24 });
+    expect(s.progress).toMatchObject({ blocksDone: 0, blocksTotal: 20 });
     const spec = nextBlock(s)!;
     const r = simulateBlock(spec, setup, defaultSimPlayer(CURRENT), { adaptedCm360: CURRENT, blocksDone: 0 }, createRng(1), cfg, 0);
     s = submitBlock(s, r.log);
-    expect(s.progress).toMatchObject({ blocksDone: 1, blocksTotal: 24 });
+    expect(s.progress).toMatchObject({ blocksDone: 1, blocksTotal: 20 });
   });
 
   it('progress in quick A/B mode totals only the A/B blocks', () => {
@@ -163,7 +162,7 @@ describe('runSimSession', () => {
     else expect([8, 16]).toContain(ab.length);
     expect(state.logs.flick).toHaveLength(blocks.filter((b) => b.spec.kind === 'flick').length);
     expect(state.logs.tracking).toHaveLength(blocks.filter((b) => b.spec.kind === 'tracking').length);
-    expect(state.steerLog).toHaveLength(6);
+    expect(state.steerLog).toHaveLength(4);
     expect(state.fit).not.toBeNull();
     // block timestamps never go backwards
     const t0s = blocks.map((b) => b.log!.t0);
@@ -199,5 +198,54 @@ describe('runSimSession', () => {
     expect(state.result).not.toBeNull();
     expect(state.result!.abSkipped).toBe(false);
     expect(state.result!.pickCm360).toBe(quick);
+  });
+});
+
+describe('asking before the extra A/B round', () => {
+  /** Plays simulated blocks until the session finishes or waits for the extension answer. */
+  function playUntilAsked(seed: number): SessionState {
+    const setup = setupFor();
+    const player = defaultSimPlayer(CURRENT);
+    let s = createSession(setup, opts({ seed, askBeforeExtending: true }), cfg);
+    let sim: SimState = { adaptedCm360: CURRENT, blocksDone: 0 };
+    let t = 0;
+    for (let i = 0, spec = nextBlock(s); spec; i++, spec = nextBlock(s)) {
+      const r = simulateBlock(spec, setup, player, sim, createRng(seed * 100 + i), cfg, t);
+      sim = r.state; t = r.endT + cfg.sim.blockGapMs;
+      s = submitBlock(s, r.log);
+    }
+    return s;
+  }
+  const asked = (() => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const s = playUntilAsked(seed);
+      if (s.awaitingExtension) return s;
+    }
+    throw new Error('no seed reached a borderline A/B');
+  })();
+
+  it('pauses with no next block and no result while waiting for the answer', () => {
+    expect(asked.result).toBeNull();
+    expect(nextBlock(asked)).toBeNull();
+    expect(asked.abDecisions.at(-1)!.decision).toBe('continue');
+  });
+
+  it('declining ends with no clear winner at look 1', () => {
+    const s = extendAb(asked, false);
+    expect(s.awaitingExtension).toBe(false);
+    expect(s.result!.verdict).toBe('none');
+    expect(s.result!.ab!.look).toBe(1);
+  });
+
+  it('accepting queues the mirrored round', () => {
+    const s = extendAb(asked, true);
+    expect(s.awaitingExtension).toBe(false);
+    expect(nextBlock(s)!.stage).toBe('ab');
+    expect(s.progress!.blocksTotal).toBe(2 * (1 + cfg.session.dialinSteps.default + 1 + 8));
+  });
+
+  it('without the option the session extends automatically, as before', () => {
+    const { state } = runSimSession(setupFor(), defaultSimPlayer(CURRENT), opts());
+    expect(state.awaitingExtension).toBe(false);
   });
 });

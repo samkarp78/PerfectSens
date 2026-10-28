@@ -13,7 +13,8 @@ export type BlockKind = 'warmup' | 'flick' | 'tracking';
 export type Arm = 'P' | 'C';                        // pick / current
 export type FlickClass = 'small' | 'medium' | 'big';
 export interface BlockSpec { id: string; stage: Stage; kind: BlockKind; cm360: number; seed: number; stepIndex: number; arm: Arm | null }
-export interface FlickTarget { index: number; aim: Aim; distance: number; cls: FlickClass; scored: boolean }
+/** `wave` groups flick targets into small→big waves (0 for warm-up targets). */
+export interface FlickTarget { index: number; aim: Aim; distance: number; cls: FlickClass; scored: boolean; wave: number }
 export interface FlickClick { t: number; aim: Aim; hit: boolean }
 export interface FlickTrial { target: FlickTarget; spawnT: number; spawnAim: Aim; clicks: FlickClick[]; hitT: number | null; timedOut: boolean }
 export interface FlickBlockLog { spec: BlockSpec; t0: number; trials: FlickTrial[]; path: AimSample[] }

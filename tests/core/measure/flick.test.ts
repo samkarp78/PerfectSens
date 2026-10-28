@@ -60,7 +60,7 @@ describe('throughput', () => {
 
 describe('measureTrial', () => {
   const trialBase = (over: Partial<FlickTrial>): FlickTrial => ({
-    target: { index: 3, aim: at(20), distance: 20, cls: 'medium', scored: true },
+    target: { index: 3, aim: at(20), distance: 20, cls: 'medium', scored: true, wave: 1 },
     spawnT: 0, spawnAim: O, clicks: [], hitT: null, timedOut: false, ...over,
   });
 
@@ -144,5 +144,28 @@ describe('summarizeFlick NaN guard', () => {
   it('stays finite when some trials have negative effective distance', () => {
     const trials = Array.from({ length: 6 }, (_, i) => metric({ index: i, distance: 1, endAlong: -5 }));
     expect(Number.isFinite(summarizeFlick(trials, defaultConfig, createRng(2)).logTpSe)).toBe(true);
+  });
+});
+
+describe('measureFlickBlock: only complete waves are scored', () => {
+  it('scores a wave only once every target in it is resolved', async () => {
+    const { FlickRunner } = await import('../../../src/core/run/flickRunner');
+    const { measureFlickBlock } = await import('../../../src/core/measure/flick');
+    const { minJerkMoves } = await import('../../helpers/paths');
+    const spec = { id: 'b', stage: 'baseline' as const, kind: 'flick' as const, cm360: 30, seed: 7, stepIndex: 0, arm: null };
+    const W = 3 * defaultConfig.flick.wavePerClass;
+    const play = (hits: number) => {
+      const r = new FlickRunner(spec, 0.02, defaultConfig, 0);
+      let t = 0;
+      for (let i = 0; i < hits; i++) {
+        const moves = minJerkMoves(r.state.aim, r.state.target!.aim, t, 200, 500, 0.02);
+        for (const m of moves) r.onMove(m);
+        t = moves[moves.length - 1]!.t + 10;
+        r.onClick(t);
+      }
+      return measureFlickBlock(r.log(), defaultConfig); // mid-block: the open wave is still unresolved
+    };
+    expect(play(W + 3).filter((m) => m.scored)).toHaveLength(0); // wave 0 is warm-in, wave 1 unfinished
+    expect(play(2 * W).filter((m) => m.scored)).toHaveLength(W);
   });
 });

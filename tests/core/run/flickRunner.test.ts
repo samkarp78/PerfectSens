@@ -52,15 +52,23 @@ describe('FlickRunner', () => {
     expect(r.state.trialIndex).toBe(1);
   });
 
-  it('a large time jump fires a chain of timeouts; all-timeout run finishes', () => {
+  it('a large time jump fires a chain of timeouts and the block ends at its time limit', () => {
     const r = new FlickRunner(spec(), DPC, cfg, T0);
-    r.tick(T0 + 4000 * 36);
+    r.tick(T0 + cfg.flick.blockMs);
     expect(r.state.done).toBe(true);
     expect(r.state.target).toBeNull();
     const trials = r.log().trials;
-    expect(trials).toHaveLength(36);
-    expect(trials.every((x) => x.timedOut)).toBe(true);
-    expect(trials[35]!.spawnT).toBe(T0 + 4000 * 35);
+    const n = Math.ceil(cfg.flick.blockMs / cfg.flick.timeoutMs) - 1; // the block ends as the last one would time out
+    expect(trials.filter((x) => x.timedOut)).toHaveLength(n);
+    expect(trials[n - 1]!.spawnT).toBe(T0 + cfg.flick.timeoutMs * (n - 1));
+  });
+
+  it('a flick block ends exactly at blockMs', () => {
+    const r = new FlickRunner(spec(), DPC, cfg, T0);
+    r.tick(T0 + cfg.flick.blockMs - 1);
+    expect(r.state.done).toBe(false);
+    r.tick(T0 + cfg.flick.blockMs);
+    expect(r.state.done).toBe(true);
   });
 
   it('timeouts fire before a move at a later time', () => {
@@ -70,15 +78,18 @@ describe('FlickRunner', () => {
     expect(r.log().trials[1]!.spawnT).toBe(T0 + 4000);
   });
 
-  it('36 hits finish the block; later input is ignored', () => {
+  it('hits keep spawning targets until the time limit; later input is ignored', () => {
     const r = new FlickRunner(spec(), DPC, cfg, T0);
     let t = T0;
-    for (let i = 0; i < 36; i++) {
+    for (let i = 0; i < 40; i++) {
       t = moveOnto(r, t) + 10;
       expect(r.onClick(t).hit).toBe(true);
     }
+    expect(r.state.done).toBe(false);
+    t = T0 + cfg.flick.blockMs;
+    r.tick(t);
     expect(r.state.done).toBe(true);
-    expect(r.log().trials).toHaveLength(36);
+    expect(r.log().trials.length).toBeGreaterThan(40);
     const n = r.log().path.length;
     r.onMove({ t: t + 5, dx: 10, dy: 10 });
     expect(r.log().path.length).toBe(n);

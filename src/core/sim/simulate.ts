@@ -97,13 +97,13 @@ function simulateFlick(spec: BlockSpec, setup: Setup, player: SimPlayer, state: 
   return { log, state: { adaptedCm360: adapted, blocksDone: state.blocksDone + 1 }, endT: Math.max(lastT, finishTime(log, cfg)) };
 }
 
-/** When the runner finished: the last hit, the last target's timeout, or (warmup) the time limit with a target still up. */
+/** When the runner finished: the last hit, the last target's timeout, or the block's time limit with a target still up. */
 function finishTime(log: FlickBlockLog, cfg: Config): number {
   const last = log.trials[log.trials.length - 1];
   if (!last) return log.t0;
   if (last.timedOut) return last.spawnT + cfg.flick.timeoutMs;
   if (last.hitT !== null) return last.hitT;
-  return log.t0 + cfg.session.warmupMs;
+  return log.t0 + (log.spec.kind === 'warmup' ? cfg.session.warmupMs : cfg.flick.blockMs);
 }
 
 function simulateTracking(spec: BlockSpec, setup: Setup, player: SimPlayer, state: SimState, rng: Rng, cfg: Config, t0: number): SimBlockResult {

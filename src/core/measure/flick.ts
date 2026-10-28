@@ -1,7 +1,7 @@
 import type { Config } from '../config';
 import { alongPerp, angleBetween } from '../geometry';
 import type { Rng } from '../rng';
-import type { AimSample, FlickClass, FlickTrial } from '../types';
+import type { AimSample, FlickBlockLog, FlickClass, FlickTrial } from '../types';
 import { segmentSubmovements } from './submovements';
 
 export interface TrialMetrics {
@@ -37,6 +37,20 @@ export function measureTrial(trial: FlickTrial, path: AimSample[], cfg: Config):
     endAlong: end ? end.along - distance : null, endPerp: end ? end.perp : null,
     hit: trial.hitT !== null && !trial.timedOut, timedOut: trial.timedOut, scored: target.scored,
   };
+}
+
+/** Per-trial metrics for a whole flick block. A trial counts as scored only if its target is scored and every
+ *  target in its wave was resolved (hit or timed out), so each scored wave has the full small/medium/big mix. */
+export function measureFlickBlock(log: FlickBlockLog, cfg: Config): TrialMetrics[] {
+  const waveSize = 3 * cfg.flick.wavePerClass;
+  const resolved = new Map<number, number>();
+  for (const t of log.trials) {
+    if (t.hitT !== null || t.timedOut) resolved.set(t.target.wave, (resolved.get(t.target.wave) ?? 0) + 1);
+  }
+  return log.trials.map((t) => {
+    const m = measureTrial(t, log.path, cfg);
+    return { ...m, scored: m.scored && resolved.get(t.target.wave) === waveSize };
+  });
 }
 
 function tpOf(scored: TrialMetrics[], cfg: Config): { tp: number; weDeg: number } {

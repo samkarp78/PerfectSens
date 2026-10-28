@@ -8,13 +8,14 @@ export class FlickRunner {
   private readonly targets: FlickTarget[];
   private readonly trials: FlickTrial[] = [];
   private readonly path: AimSample[] = [];
-  private readonly warmupEnd: number | null;
+  /** Blocks end at a time limit (warm-up: warmupMs, flick: blockMs) or when the targets run out. */
+  private readonly endAt: number;
   private resolved = 0;
   private finished = false;
 
   constructor(private readonly spec: BlockSpec, private readonly dpc: number, private readonly cfg: Config, private readonly t0: number) {
     this.targets = makeFlickTargets(spec, cfg);
-    this.warmupEnd = spec.kind === 'warmup' ? t0 + cfg.session.warmupMs : null;
+    this.endAt = t0 + (spec.kind === 'warmup' ? cfg.session.warmupMs : cfg.flick.blockMs);
     this.spawn(t0);
   }
 
@@ -44,12 +45,12 @@ export class FlickRunner {
     while (!this.finished) {
       const trial = this.current;
       const due = trial.spawnT + this.cfg.flick.timeoutMs;
-      if (this.warmupEnd !== null && this.warmupEnd <= due && this.warmupEnd <= t) { this.finished = true; return; }
+      if (this.endAt <= due && this.endAt <= t) { this.finished = true; return; }
       if (due > t) break;
       trial.timedOut = true;
       this.advance(due);
     }
-    if (!this.finished && this.warmupEnd !== null && t >= this.warmupEnd) this.finished = true;
+    if (!this.finished && t >= this.endAt) this.finished = true;
   }
 
   onMove(s: MoveSample): void {

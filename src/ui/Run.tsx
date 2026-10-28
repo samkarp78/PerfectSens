@@ -24,6 +24,9 @@ const LOCK_DENIED_TEXT = 'Click again to lock the mouse.';
 const PAUSED_TEXT = 'Paused — this block will restart.';
 /** How long the quit button stays armed waiting for the confirming click. */
 const QUIT_CONFIRM_MS = 3000;
+/** Seconds counted down before the next round starts on its own (while the mouse stays locked). */
+const COUNTDOWN_S = 3;
+const EXTEND_TEXT = 'Close result — play 4 more rounds (about 4 min) for a firmer answer?';
 const viewOf = (c: RunController): View => {
   const p = c.session.progress;
   return { phase: c.phase, hud: c.hud, restText: c.restText, done: p?.blocksDone ?? 0, total: p?.blocksTotal ?? 0 };
@@ -34,12 +37,30 @@ const ARROW_RING = 0.38;
 export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const arrowRef = useRef<HTMLDivElement>(null);
+  const holdRef = useRef<HTMLDivElement>(null);
   const ctrlRef = useRef<RunController | null>(null);
   if (!ctrlRef.current) ctrlRef.current = createRunController(session);
   const ctrl = ctrlRef.current;
   const [view, setView] = useState<View>(() => viewOf(ctrl));
   const [denied, setDenied] = useState(false);
   const [quitArmed, setQuitArmed] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  // While the mouse stays locked between rounds, count down and start the next round on its own.
+  useEffect(() => {
+    if (view.phase !== 'rest' || !locked) { setCountdown(null); return; }
+    let left = COUNTDOWN_S;
+    setCountdown(left);
+    const id = setInterval(() => {
+      left--;
+      if (left > 0) { setCountdown(left); return; }
+      clearInterval(id);
+      setCountdown(null);
+      ctrl.begin(performance.now());
+      setView(viewOf(ctrl));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [view.phase, view.done, locked]);
   useEffect(() => {
     if (!quitArmed) return;
     const id = setTimeout(() => setQuitArmed(false), QUIT_CONFIRM_MS);
@@ -77,7 +98,8 @@ export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
         const wasRunning = last.phase === 'running';
         last = v;
         setView(v);
-        if (wasRunning && v.phase !== 'running' && document.pointerLockElement) document.exitPointerLock();
+        // Between rounds the lock is kept so the countdown can carry on; it is released for questions and the end.
+        if (wasRunning && (v.phase === 'asking' || v.phase === 'finished') && document.pointerLockElement) document.exitPointerLock();
         if (v.phase === 'finished') cbRef.current.onFinished(ctrl.session);
       }
     };
@@ -85,7 +107,7 @@ export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
       document,
       (s) => { ctrl.onMove(s); sync(); },
       (t) => { ctrl.onClick(t); sync(); },
-      () => { ctrl.onLockLost(); sync(); },
+      () => { setLocked(false); ctrl.onLockLost(); sync(); },
       (t) => { ctrl.onRelease(t); },
     );
 
@@ -98,6 +120,7 @@ export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
       ctrl.tick(performance.now());
       sync();
       const r = ctrl.runner;
+      if (holdRef.current) holdRef.current.style.display = r instanceof TrackingRunner && !r.state.held ? 'block' : 'none';
       if (r instanceof FlickRunner) {
         const st = r.state;
         scene.setAim(st.aim);
@@ -136,6 +159,7 @@ export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
     if (result === 'unsupported') { cbRef.current.onUnsupported(); return; }
     if (result === 'denied') { setDenied(true); return; }
     setDenied(false);
+    setLocked(true);
     ctrl.begin(performance.now());
     setView(viewOf(ctrl));
   };
@@ -146,7 +170,8 @@ export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
     setView(viewOf(ctrl));
   };
 
-  const card = view.phase === 'rest' || view.phase === 'paused';
+  const card = (view.phase === 'rest' && !locked) || view.phase === 'paused';
+  const answer = (accept: boolean) => { ctrl.answerExtension(accept); setView(viewOf(ctrl)); };
   const warmup = view.phase === 'rest' && view.hud === 'Warm-up';
 
   return (
@@ -161,15 +186,34 @@ export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
         </div>
       )}
       {view.total > 0 && view.hud !== 'Warm-up' && (
-        <div class="progress-count">Block {Math.min(view.done + 1, view.total)} / ~{view.total}</div>
+        <div class="progress-count">Round {Math.min(Math.floor(view.done / 2) + 1, view.total / 2)} / ~{view.total / 2}</div>
       )}
       <div ref={arrowRef} class="offscreen-arrow" aria-hidden="true" />
+      <div ref={holdRef} class="hold-prompt" aria-live="polite">Hold the mouse button and track</div>
+      {countdown !== null && (
+        <div class="countdown" aria-live="assertive">
+          <p class="rest-text">{view.restText}</p>
+          <p class="countdown-num">{countdown}</p>
+          <p class="countdown-hint">Esc to pause</p>
+        </div>
+      )}
+      {view.phase === 'asking' && (
+        <div class="rest-overlay">
+          <div class="rest-card rest-ask">
+            <p class="rest-text">{EXTEND_TEXT}</p>
+            <div class="ask-buttons">
+              <button type="button" class="btn btn-primary" onClick={() => answer(true)}>Play 4 more</button>
+              <button type="button" class="btn" onClick={() => answer(false)}>Finish now</button>
+            </div>
+          </div>
+        </div>
+      )}
       {card && (
         <div class="rest-overlay">
           <div class="rest-card" role="button" tabIndex={0} onClick={start}
             onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) void start(); }}>
             {view.total > 0 && view.hud !== 'Warm-up' && (
-              <p class="rest-progress">{Math.round((100 * view.done) / view.total)}% done · block {Math.min(view.done + 1, view.total)} of about {view.total}</p>
+              <p class="rest-progress">{Math.round((100 * view.done) / view.total)}% done · round {Math.min(Math.floor(view.done / 2) + 1, view.total / 2)} of about {view.total / 2}</p>
             )}
             <p class="rest-text">{view.phase === 'paused' ? PAUSED_TEXT : view.restText}</p>
             <p class="rest-cta">Click to start</p>

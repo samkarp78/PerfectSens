@@ -36,10 +36,11 @@ describe('performance', () => {
 });
 
 describe('simulateBlock: flick', () => {
-  it('at test = adapted = optimal: ≥ 34 of 36 hits, no timeouts, first gain ≈ 1', () => {
+  it('at test = adapted = optimal: a full 40 s block, ≥ 95% hits, no timeouts, first gain ≈ 1', () => {
     const log = runFlick(OPT, OPT, 3);
-    expect(log.trials).toHaveLength(36);
-    expect(log.trials.filter((t) => t.hitT !== null).length).toBeGreaterThanOrEqual(34);
+    const done = log.trials.filter((t) => t.hitT !== null || t.timedOut);
+    expect(done.length).toBeGreaterThanOrEqual(40);
+    expect(done.filter((t) => t.hitT !== null).length / done.length).toBeGreaterThanOrEqual(0.95);
     expect(log.trials.filter((t) => t.timedOut)).toHaveLength(0);
     const gains = log.trials.filter((t) => t.target.scored).map((t) => measureTrial(t, log.path, cfg).firstGain).filter((g): g is number => g !== null);
     expect(gains.length).toBeGreaterThanOrEqual(28);
@@ -81,10 +82,10 @@ describe('simulateBlock: tracking', () => {
   it('ends at t0 + leadIn + duration', () => {
     const r = runTracking(OPT, 1);
     const log = r.log as TrackingBlockLog;
-    expect(r.endT).toBe(1000 + 28000);
-    expect(log.endT).toBe(1000 + 28000);
+    expect(r.endT).toBe(1000 + 17000);
+    expect(log.endT).toBe(1000 + 17000);
     expect(log.path.length).toBeGreaterThan(1000);
-    expect(log.path[log.path.length - 1]!.t).toBeLessThan(1000 + 28000);
+    expect(log.path[log.path.length - 1]!.t).toBeLessThan(1000 + 17000);
   });
 });
 

@@ -14,7 +14,8 @@ describe('quick test mode', () => {
     expect(d).toHaveLength(12);
     expect(d.filter((x) => x < c.flick.smallMaxDeg)).toHaveLength(4);
     expect(d.filter((x) => x > c.flick.bigMinDeg)).toHaveLength(4);
-    expect(c.flick.adaptationTargets).toBe(2);
+    expect(c.flick.blockMs).toBe(20000);
+    expect(c.flick.wavePerClass).toBe(2);
     expect(c.tracking.durationMs).toBe(8000);
     expect(c.tracking.leadInMs).toBe(1000);
     expect(c.session.dialinSteps.quick).toBe(3);
@@ -22,7 +23,7 @@ describe('quick test mode', () => {
 
   it('leaves the other modes on the full config', () => {
     expect(configForMode('default').flick.distancesDeg).toHaveLength(30);
-    expect(configForMode('thorough').tracking.durationMs).toBe(25000);
+    expect(configForMode('thorough').tracking.durationMs).toBe(15000);
   });
 
   it('accepts quick as a setup mode', () => {
@@ -34,6 +35,6 @@ describe('quick test mode', () => {
     expect(state.result).not.toBeNull();
     expect(blocks.filter((b) => b.spec.stage !== 'ab')).toHaveLength(10); // baseline + 3 dial-in + recheck, 2 blocks each
     const flick = blocks.find((b) => b.spec.kind === 'flick')!.log as { trials: unknown[] };
-    expect(flick.trials).toHaveLength(14);
+    expect(flick.trials.length).toBeGreaterThanOrEqual(24); // 20 s of flicks at sim speed: several 6-target waves
   });
 });

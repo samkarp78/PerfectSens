@@ -36,6 +36,17 @@ html, body { margin: 0; background: var(--bg); color: var(--text); font-family: 
 .quit:hover { opacity: 1; border-color: var(--line); }
 .quit-armed { color: var(--accent); border-color: var(--accent); opacity: 1; }
 
+/* 3-2-1 before the next round, shown over the scene while the mouse stays locked. */
+.countdown { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(7, 8, 11, 0.55); pointer-events: none; text-align: center; padding: 0 16px; }
+.countdown-num { margin: 8px 0; font-family: var(--mono); font-size: 72px; line-height: 1; color: var(--accent); }
+.countdown-hint { margin: 0; font-size: 12px; color: var(--muted); }
+/* Reminder during tracking while the button isn't held. */
+.hold-prompt { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); display: none; z-index: 1;
+  padding: 6px 12px; border-radius: 6px; background: rgba(7, 8, 11, 0.7); color: var(--text); font-size: 14px; pointer-events: none; }
+.rest-ask { cursor: default; }
+.ask-buttons { display: flex; gap: 10px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+
 .rest-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   background: rgba(7, 8, 11, 0.72); }
 .rest-card { width: min(420px, calc(100vw - 32px)); padding: 28px; box-sizing: border-box; text-align: center;
