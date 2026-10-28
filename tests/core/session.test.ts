@@ -118,7 +118,7 @@ describe('session sequence', () => {
     const setup = setupFor();
     const player = defaultSimPlayer(CURRENT);
     let s: SessionState = createSession(setup, opts(), cfg);
-    expect(s.progress).toEqual({ stage: 'baseline', stepIndex: 0, totalSteps: 7, kind: 'flick' });
+    expect(s.progress).toMatchObject({ stage: 'baseline', stepIndex: 0, totalSteps: 7, kind: 'flick' });
     let sim: SimState = { adaptedCm360: CURRENT, blocksDone: 0 };
     let t = 0;
     const seen: { stage: string; stepIndex: number }[] = [];
@@ -129,9 +129,27 @@ describe('session sequence', () => {
       sim = r.state; t = r.endT + cfg.sim.blockGapMs;
       s = submitBlock(s, r.log);
     }
-    expect(s.progress).toEqual({ stage: 'recheck', stepIndex: 3, totalSteps: 7, kind: 'tracking' });
+    expect(s.progress).toMatchObject({ stage: 'recheck', stepIndex: 3, totalSteps: 7, kind: 'tracking' });
     expect(seen.filter((p) => p.stage === 'dialin').map((p) => p.stepIndex)).toEqual([0, 0, 1, 1, 2, 2]);
     expect(defaultRun().state.progress).toBeNull();
+  });
+
+  it('progress counts blocks done against an estimated total (baseline + dial-in + recheck + first A/B round)', () => {
+    const setup = setupFor();
+    let s: SessionState = createSession(setup, opts({ warmup: true }), cfg);
+    // 2 blocks per step: baseline 1 + dial-in 6 + recheck 1 + A/B 4 = 12 steps
+    expect(s.progress).toMatchObject({ kind: 'warmup', blocksDone: 0, blocksTotal: 24 });
+    s = submitBlock(s, null);
+    expect(s.progress).toMatchObject({ blocksDone: 0, blocksTotal: 24 });
+    const spec = nextBlock(s)!;
+    const r = simulateBlock(spec, setup, defaultSimPlayer(CURRENT), { adaptedCm360: CURRENT, blocksDone: 0 }, createRng(1), cfg, 0);
+    s = submitBlock(s, r.log);
+    expect(s.progress).toMatchObject({ blocksDone: 1, blocksTotal: 24 });
+  });
+
+  it('progress in quick A/B mode totals only the A/B blocks', () => {
+    const s = createSession(setupFor(), opts({ quickAbCm360: 36 }), cfg);
+    expect(s.progress).toMatchObject({ blocksDone: 0, blocksTotal: 8 });
   });
 });
 

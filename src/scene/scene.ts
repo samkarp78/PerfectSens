@@ -55,7 +55,7 @@ function makeGridTexture(): THREE.CanvasTexture {
 
 export function createScene(
   canvas: HTMLCanvasElement,
-  opts: { fov: number; fovType: FovType; targetRadiusDeg: number },
+  opts: { fov: number; fovType: FovType; targetRadiusDeg: number; trackingRadiusDeg?: number },
 ): SceneApi {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   const scene = new THREE.Scene();
@@ -74,12 +74,12 @@ export function createScene(
   sun.position.set(5, 20, 10);
   scene.add(sun);
 
-  const radius = sphereRadiusFor(opts.targetRadiusDeg, TARGET_DISTANCE);
-  const targetGeo = new THREE.SphereGeometry(radius, 32, 24);
+  const targetGeo = new THREE.SphereGeometry(sphereRadiusFor(opts.targetRadiusDeg, TARGET_DISTANCE), 32, 24);
+  const trackGeo = new THREE.SphereGeometry(sphereRadiusFor(opts.trackingRadiusDeg ?? opts.targetRadiusDeg, TARGET_DISTANCE), 32, 24);
   const flickMat = new THREE.MeshStandardMaterial({ color: TARGET_COLOR, roughness: 0.4 });
   const trackMat = new THREE.MeshStandardMaterial({ color: TARGET_COLOR, roughness: 0.4 });
   const flickMesh = new THREE.Mesh(targetGeo, flickMat);
-  const trackMesh = new THREE.Mesh(targetGeo, trackMat);
+  const trackMesh = new THREE.Mesh(trackGeo, trackMat);
   flickMesh.visible = false;
   trackMesh.visible = false;
   scene.add(flickMesh, trackMesh);
@@ -112,7 +112,7 @@ export function createScene(
     render() { renderer.render(scene, camera); },
     dispose() {
       roomGeo.dispose(); roomMat.dispose(); gridTex.dispose();
-      targetGeo.dispose(); flickMat.dispose(); trackMat.dispose();
+      targetGeo.dispose(); trackGeo.dispose(); flickMat.dispose(); trackMat.dispose();
       renderer.dispose();
     },
   };

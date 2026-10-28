@@ -9,6 +9,9 @@ const COIN_HALF = 0.5;
 
 const swap = (a: Arm): Arm => (a === 'P' ? 'C' : 'P');
 
+/** Arms in one ABBA / BAAB round. */
+export const AB_ROUND_LENGTH = 4;
+
 export function abSequence(rng: Rng): Arm[] {
   return rng.next() < COIN_HALF ? ['P', 'C', 'C', 'P'] : ['C', 'P', 'P', 'C'];
 }

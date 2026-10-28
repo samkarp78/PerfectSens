@@ -3,7 +3,7 @@ import { validateSetup } from '../core/setup';
 import type { Setup as SetupValues } from '../core/types';
 import { loadSetup } from '../store/setupStore';
 
-export const DEFAULT_SETUP: SetupValues = { dpi: 800, cm360: 34.29, inGameSens: null, fov: 103, fovType: 'horizontal', mode: 'default' };
+export const DEFAULT_SETUP: SetupValues = { dpi: 800, cm360: 34.6364, inGameSens: 33, fov: 103, fovType: 'horizontal', mode: 'default' };
 export const UNSUPPORTED_TEXT = "Raw mouse input isn't supported in this browser. Use Chrome or Edge on desktop. The demo still works here.";
 
 export interface SetupProps {
@@ -77,7 +77,7 @@ export function Setup({ unsupported, onStart, onDemo, onHistory }: SetupProps) {
           <label class="radio"><input type="radio" name="mode" value="thorough" checked={f.mode === 'thorough'} onChange={set('mode')} /> Thorough (about 20 min)</label>
           {errors.mode && <span class="field-error" role="alert">{errors.mode}</span>}
         </fieldset>
-        <label class="radio"><input type="checkbox" checked={warmup} onChange={(e) => setWarmup((e.target as HTMLInputElement).checked)} /> Warm up first (recommended, 3 min)</label>
+        <label class="radio"><input type="checkbox" checked={warmup} onChange={(e) => setWarmup((e.target as HTMLInputElement).checked)} /> Warm up first (recommended, 1 min)</label>
         <div class="actions">
           <button type="submit" class="btn btn-primary">Start</button>
           <button type="button" class="btn" onClick={onHistory}>History</button>

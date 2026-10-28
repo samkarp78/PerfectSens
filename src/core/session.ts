@@ -1,4 +1,4 @@
-import { abSequence, decideAB, extendSequence, type AbBlock, type AbDecision } from './ab';
+import { AB_ROUND_LENGTH, abSequence, decideAB, extendSequence, type AbBlock, type AbDecision } from './ab';
 import { defaultConfig, type Config } from './config';
 import { diagnose } from './diagnose';
 import { fitCurve, type FitPoint, type FitResult } from './fit';
@@ -26,7 +26,11 @@ export interface SessionState {
   readonly setup: Setup; readonly mode: 'full' | 'quickab'; readonly steps: StepResult[];
   readonly fit: FitResult | null; readonly steerLog: SteerDecision[]; readonly abDecisions: AbDecision[];
   readonly logs: { flick: FlickBlockLog[]; tracking: TrackingBlockLog[] }; readonly result: SessionResult | null;
-  readonly progress: { stage: Stage; stepIndex: number; totalSteps: number; kind: BlockKind } | null;
+  /** blocksDone/blocksTotal count scored flick + tracking blocks (warm-up excluded); the total is an estimate
+   *  that grows if the A/B adds its second round. */
+  readonly progress: {
+    stage: Stage; stepIndex: number; totalSteps: number; kind: BlockKind; blocksDone: number; blocksTotal: number;
+  } | null;
   /** @internal */ readonly _cfg: Config;
   /** @internal */ readonly _seed: number;
   /** @internal */ readonly _warmupPending: boolean;
@@ -82,9 +86,22 @@ function withProgress(s: SessionState): SessionState {
   const spec = nextBlock(s);
   if (!spec) return { ...s, progress: null };
   const inSequence = spec.stage === 'dialin' || spec.stage === 'recheck';
+  const blocksDone = 2 * s.steps.length + (s._pending?.flick ? 1 : 0);
   return {
-    ...s, progress: { stage: spec.stage, stepIndex: inSequence ? spec.stepIndex : 0, totalSteps: dialinCount(s) + 1, kind: spec.kind },
+    ...s,
+    progress: {
+      stage: spec.stage, stepIndex: inSequence ? spec.stepIndex : 0, totalSteps: dialinCount(s) + 1, kind: spec.kind,
+      blocksDone, blocksTotal: 2 * plannedSteps(s),
+    },
   };
+}
+
+/** Steps the session expects to run: baseline + dial-in + recheck + the A/B arms planned so far
+ *  (one ABBA round until the A/B is planned); quick A/B runs only its arms. */
+function plannedSteps(s: SessionState): number {
+  if (s.mode === 'quickab') return s._arms.length;
+  const ab = s._pick === null ? AB_ROUND_LENGTH : s._arms.length;
+  return 1 + dialinCount(s) + 1 + ab;
 }
 
 export function submitBlock(s: SessionState, log: FlickBlockLog | TrackingBlockLog | null): SessionState {

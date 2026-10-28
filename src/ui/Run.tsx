@@ -6,6 +6,9 @@ import { FlickRunner } from '../core/run/flickRunner';
 import { TrackingRunner } from '../core/run/trackingRunner';
 import { requestRawPointerLock, startCapture } from '../input/rawInput';
 import { createScene } from '../scene/scene';
+import { offscreenArrow } from '../scene/camera';
+import { vfovDeg } from '../core/geometry';
+import type { Aim } from '../core/types';
 import { createRunController, type RunController, type RunPhase } from './runController';
 
 export interface RunProps {
@@ -15,14 +18,20 @@ export interface RunProps {
   onQuit(): void;
 }
 
-interface View { phase: RunPhase; hud: string; restText: string }
+interface View { phase: RunPhase; hud: string; restText: string; done: number; total: number }
 
 const LOCK_DENIED_TEXT = 'Click again to lock the mouse.';
 const PAUSED_TEXT = 'Paused — this block will restart.';
-const viewOf = (c: RunController): View => ({ phase: c.phase, hud: c.hud, restText: c.restText });
+const viewOf = (c: RunController): View => {
+  const p = c.session.progress;
+  return { phase: c.phase, hud: c.hud, restText: c.restText, done: p?.blocksDone ?? 0, total: p?.blocksTotal ?? 0 };
+};
+/** Arrow sits on an ellipse this fraction of the half-width/height from the centre. */
+const ARROW_RING = 0.38;
 
 export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const arrowRef = useRef<HTMLDivElement>(null);
   const ctrlRef = useRef<RunController | null>(null);
   if (!ctrlRef.current) ctrlRef.current = createRunController(session);
   const ctrl = ctrlRef.current;
@@ -36,7 +45,19 @@ export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
     const { setup } = ctrl.session;
     const scene = createScene(canvas, {
       fov: setup.fov, fovType: setup.fovType, targetRadiusDeg: defaultConfig.flick.targetRadiusDeg,
+      trackingRadiusDeg: defaultConfig.tracking.targetRadiusDeg,
     });
+    const showArrow = (aim: Aim, target: Aim | null) => {
+      const el = arrowRef.current;
+      if (!el) return;
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      const a = target && w > 0 && h > 0 ? offscreenArrow(aim, target, vfovDeg(setup.fov, setup.fovType, w / h), w / h) : null;
+      if (a === null) { el.style.display = 'none'; return; }
+      el.style.display = 'block';
+      el.style.left = `${w / 2 + Math.cos(a) * w * ARROW_RING}px`;
+      el.style.top = `${h / 2 - Math.sin(a) * h * ARROW_RING}px`;
+      el.style.transform = `translate(-50%, -50%) rotate(${-a}rad)`;
+    };
     const fit = () => scene.resize(canvas.clientWidth, canvas.clientHeight);
     fit();
     window.addEventListener('resize', fit);
@@ -44,7 +65,7 @@ export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
     let last: View = viewOf(ctrl);
     const sync = () => {
       const v = viewOf(ctrl);
-      if (v.phase !== last.phase || v.hud !== last.hud || v.restText !== last.restText) {
+      if (v.phase !== last.phase || v.hud !== last.hud || v.restText !== last.restText || v.done !== last.done) {
         const wasRunning = last.phase === 'running';
         last = v;
         setView(v);
@@ -73,12 +94,15 @@ export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
         scene.setAim(st.aim);
         scene.setFlickTarget(st.target?.aim ?? null);
         scene.setTrackingTarget(null, false);
+        showArrow(st.aim, st.target?.aim ?? null);
       } else if (r instanceof TrackingRunner) {
         const st = r.state;
         scene.setAim(st.aim);
         scene.setFlickTarget(null);
         scene.setTrackingTarget(st.targetAim, st.onTarget);
+        showArrow(st.aim, st.targetAim);
       } else {
+        showArrow({ yaw: 0, pitch: 0 }, null);
         scene.setFlickTarget(null);
         scene.setTrackingTarget(null, false);
       }
@@ -121,10 +145,20 @@ export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
       <canvas ref={canvasRef} class="run-canvas" />
       {view.phase === 'running' && <div class="crosshair" aria-hidden="true" />}
       <div class="hud">{view.hud}</div>
+      {view.total > 0 && (
+        <div class="progress" role="progressbar" aria-label="Session progress"
+          aria-valuemin={0} aria-valuemax={view.total} aria-valuenow={view.done}>
+          <div class="progress-fill" style={{ width: `${Math.min(100, (100 * view.done) / view.total)}%` }} />
+        </div>
+      )}
+      <div ref={arrowRef} class="offscreen-arrow" aria-hidden="true" />
       {card && (
         <div class="rest-overlay">
           <div class="rest-card" role="button" tabIndex={0} onClick={start}
             onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) void start(); }}>
+            {view.total > 0 && view.hud !== 'Warm-up' && (
+              <p class="rest-progress">{Math.round((100 * view.done) / view.total)}% done · block {Math.min(view.done + 1, view.total)} of about {view.total}</p>
+            )}
             <p class="rest-text">{view.phase === 'paused' ? PAUSED_TEXT : view.restText}</p>
             <p class="rest-cta">Click to start</p>
             {denied && <p class="rest-warn">{LOCK_DENIED_TEXT}</p>}
