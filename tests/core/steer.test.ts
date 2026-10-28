@@ -3,14 +3,14 @@ import { defaultConfig as cfg, defaultConfig } from '../../src/core/config';
 import { createRng } from '../../src/core/rng';
 import type { FitResult } from '../../src/core/fit';
 import type { StepResult } from '../../src/core/types';
-import { chooseNext, maxTestCm360, stepSize, type SteerContext } from '../../src/core/steer';
+import { chooseNext, maxTestCm360, pooledGain, stepSize, type SteerContext } from '../../src/core/steer';
 import { flickSummary, switchSummary } from '../helpers/summaries';
 
 const current = 30;
 
 interface Over {
   smallGain?: number | null; bigGain?: number | null; corrections?: number; spreadRatio?: number;
-  leadLagDeg?: number; logS?: number;
+  leadLagDeg?: number; logS?: number; clickBias?: number;
 }
 
 function step(order: number, cm360: number, o: Over = {}): StepResult {
@@ -19,7 +19,7 @@ function step(order: number, cm360: number, o: Over = {}): StepResult {
     flick: flickSummary({
       smallGain: o.smallGain === undefined ? 1 : o.smallGain,
       bigGain: o.bigGain === undefined ? 0.95 : o.bigGain, corrections: o.corrections ?? 0.5,
-      spreadRatio: o.spreadRatio ?? 0.5,
+      spreadRatio: o.spreadRatio ?? 0.5, clickBias: o.clickBias ?? 0,
     }),
     switch: switchSummary({ smallGain: null, mediumGain: null, bigGain: null, classN: { small: 0, medium: 0, big: 0 } }),
     tracking: { tot: 0.5, logTotSe: 0.05, leadLagDeg: o.leadLagDeg ?? 0, n: 1 },
@@ -103,6 +103,13 @@ describe('chooseNext after bracketing', () => {
     expect(d.cm360).toBeLessThan(center);
     expect(d.signal).toBeLessThan(0);
     expect(d.reason).toMatch(/big flicks/i);
+  });
+
+  it('clickBias driver steers slower when clicks overshoot more than baseline', () => {
+    const over = chooseNext(ctx({ steps: bracketSteps(step(3, 31, { clickBias: 1.5 })), fit }), cfg);
+    const under = chooseNext(ctx({ steps: bracketSteps(step(3, 31, { clickBias: -1.5 })), fit }), cfg);
+    expect(over.direction).toBe('slower');
+    expect(under.direction).toBe('faster');
   });
 
   it('tracking lead steers slower and lag steers faster', () => {
@@ -269,5 +276,20 @@ describe('play-area cap equal to the current sens', () => {
       expect(s1.cm360).toBeLessThan(current);
       expect(Math.abs(Math.log(s0.cm360 / s1.cm360))).toBeGreaterThan(Math.log(1 + defaultConfig.steer.minSeparation));
     }
+  });
+});
+
+describe('pooledGain', () => {
+  const withParts = (f: Partial<StepResult['flick']>, sw: Partial<StepResult['switch']>): StepResult =>
+    ({ ...step(1, current), flick: flickSummary(f), switch: switchSummary(sw) });
+  it('pooledGain weights flick and switch by classN', () => {
+    const st = withParts({ smallGain: 1.1, classN: { small: 4, medium: 0, big: 0 } }, { smallGain: 1.0, classN: { small: 6, medium: 0, big: 0 } });
+    expect(pooledGain(st, 'small')).toBeCloseTo(1.04, 9);
+  });
+  it('pooledGain falls back to the side with data', () => {
+    const onlySwitch = withParts({ smallGain: null, classN: { small: 0, medium: 0, big: 0 } }, { smallGain: 0.9, classN: { small: 5, medium: 0, big: 0 } });
+    expect(pooledGain(onlySwitch, 'small')).toBeCloseTo(0.9, 9);
+    const neither = withParts({ bigGain: null, classN: { small: 0, medium: 0, big: 0 } }, { bigGain: null, classN: { small: 0, medium: 0, big: 0 } });
+    expect(pooledGain(neither, 'big')).toBeNull();
   });
 });

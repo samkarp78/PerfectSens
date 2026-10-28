@@ -3,7 +3,7 @@ import { defaultConfig } from '../../src/core/config';
 import { diagnose } from '../../src/core/diagnose';
 import type { FlickSummary } from '../../src/core/measure/flick';
 import type { TrackingSummary } from '../../src/core/measure/tracking';
-import { flickSummary } from '../helpers/summaries';
+import { flickSummary, switchSummary } from '../helpers/summaries';
 
 const flick = (o: Partial<FlickSummary> = {}): FlickSummary =>
   flickSummary({ tp: defaultConfig.diagnose.refTp, logTpSe: 0.01, spreadRatio: 0.8, ...o });
@@ -47,5 +47,17 @@ describe('diagnose', () => {
     expect(diagnose([], [], cfg)).toEqual([]);
     expect(diagnose([], [track({ tot: 0.1 })], cfg)).toEqual([]);
     expect(diagnose([flick({ spreadRatio: 2 })], [], cfg).map((x) => x.id)).toEqual(['spread']);
+  });
+});
+
+describe('diagnose switching misclicks', () => {
+  it('switchMisclicks fires below 80% accuracy and names the overshoot direction', () => {
+    const over = diagnose([flick()], [track()], cfg, [switchSummary({ accuracy: 0.7, misclickAlong: 1.2 })]);
+    const f = over.find((x) => x.id === 'switchMisclicks')!;
+    expect(f.value).toBeCloseTo(0.7, 9);
+    expect(f.label).toContain('overshoot');
+    const under = diagnose([flick()], [track()], cfg, [switchSummary({ accuracy: 0.7, misclickAlong: -1 })]);
+    expect(under.find((x) => x.id === 'switchMisclicks')!.label).toContain('undershoot');
+    expect(diagnose([flick()], [track()], cfg, [switchSummary({ accuracy: 0.9 })]).some((x) => x.id === 'switchMisclicks')).toBe(false);
   });
 });

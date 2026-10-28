@@ -235,7 +235,8 @@ function finish(s: SessionState, abSkipped: boolean): SessionState {
   const atRecommended = abSkipped
     ? s.steps.filter((st) => st.stage === 'baseline' || st.stage === 'recheck')
     : s.steps.filter((st) => st.stage === 'ab' && st.arm === (ab?.decision === 'change' ? 'P' : 'C'));
-  const findings = diagnose(atRecommended.map((st) => st.flick), atRecommended.map((st) => st.tracking), s._cfg);
+  const findings = diagnose(atRecommended.map((st) => st.flick), atRecommended.map((st) => st.tracking), s._cfg,
+    atRecommended.map((st) => st.switch));
   const result = buildResult({ setup: s.setup, fit: s.fit, pickCm360: s._pick!, ab, abSkipped, findings });
   return { ...s, result, _pending: null };
 }

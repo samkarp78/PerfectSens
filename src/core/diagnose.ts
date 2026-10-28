@@ -1,8 +1,10 @@
 import type { Config } from './config';
 import type { FlickSummary } from './measure/flick';
+import type { SwitchSummary } from './measure/switch';
 import type { TrackingSummary } from './measure/tracking';
 
-export type FindingId = 'spread' | 'corrections' | 'smallOvershoot' | 'bigShort' | 'trackingWeaker' | 'flickingWeaker';
+export type FindingId = 'spread' | 'corrections' | 'smallOvershoot' | 'bigShort' | 'trackingWeaker' | 'flickingWeaker'
+  | 'switchMisclicks';
 export interface Finding { id: FindingId; label: string; value: number; threshold: number; severity: number }
 
 const LABELS: Record<FindingId, string> = {
@@ -12,6 +14,7 @@ const LABELS: Record<FindingId, string> = {
   bigShort: 'Big flicks fall short — train committing fully to long flicks.',
   trackingWeaker: 'Tracking is behind your flicking — train tracking.',
   flickingWeaker: 'Flicking is behind your tracking — train flicking.',
+  switchMisclicks: 'Switching misclicks — train clicking only when on target.',
 };
 
 const ONE = 1;
@@ -22,7 +25,7 @@ const make = (id: FindingId, value: number, threshold: number, severity: number)
   id, label: LABELS[id], value, threshold, severity: Math.max(0, severity),
 });
 
-export function diagnose(flick: FlickSummary[], tracking: TrackingSummary[], cfg: Config): Finding[] {
+export function diagnose(flick: FlickSummary[], tracking: TrackingSummary[], cfg: Config, sw: SwitchSummary[] = []): Finding[] {
   const d = cfg.diagnose;
   const out: Finding[] = [];
 
@@ -45,6 +48,16 @@ export function diagnose(flick: FlickSummary[], tracking: TrackingSummary[], cfg
     const hi = ONE + d.imbalance;
     if (rel < lo) out.push(make('trackingWeaker', rel, lo, lo / rel - ONE));
     else if (rel > hi) out.push(make('flickingWeaker', rel, hi, rel / hi - ONE));
+  }
+
+  if (sw.length > 0) {
+    const acc = avg(sw.map((x) => x.accuracy))!;
+    if (acc < d.minSwitchAccuracy) {
+      const along = avgGain(sw.map((x) => x.misclickAlong));
+      const f = make('switchMisclicks', acc, d.minSwitchAccuracy, d.minSwitchAccuracy / acc - ONE);
+      const dir = along === null ? '' : along >= 0 ? ' (misses mostly overshoot)' : ' (misses mostly undershoot)';
+      out.push({ ...f, label: f.label.replace(/.$/, `${dir}.`) });
+    }
   }
 
   return out.sort((a, b) => b.severity - a.severity);

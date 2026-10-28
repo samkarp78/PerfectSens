@@ -1,7 +1,7 @@
 import type { Config } from './config';
 import type { FitResult } from './fit';
 import type { Rng } from './rng';
-import type { StepResult } from './types';
+import type { FlickClass, StepResult } from './types';
 
 /** Steering inputs; `steps` holds all non-baseline steps so far, in order. */
 export interface SteerContext {
@@ -36,6 +36,26 @@ export function stepSize(stepIndex: number, totalSteps: number, cfg: Config): nu
   if (span <= 0) return finalStep;
   const frac = Math.min(1, (stepIndex - BRACKET_STEPS) / span);
   return bracket * (finalStep / bracket) ** frac;
+}
+
+/** Mean of flick and switch values weighted by sample counts; the side with data if only one has it; null if neither. */
+function pooled(a: number | null, na: number, b: number | null, nb: number): number | null {
+  const wa = a === null ? 0 : na, wb = b === null ? 0 : nb;
+  if (wa + wb === 0) return a ?? b;
+  return ((a ?? 0) * wa + (b ?? 0) * wb) / (wa + wb);
+}
+
+const classTotal = (n: Record<FlickClass, number>): number => n.small + n.medium + n.big;
+
+/** First-move gain for a distance class, pooled over the round's flicks and switches by classN. */
+export function pooledGain(step: StepResult, cls: FlickClass): number | null {
+  const gain = (x: StepResult['flick']): number | null => (cls === 'small' ? x.smallGain : cls === 'medium' ? x.mediumGain : x.bigGain);
+  return pooled(gain(step.flick), step.flick.classN[cls], gain(step.switch), step.switch.classN[cls]);
+}
+
+/** First-click along offset (deg), pooled over flicks and switches by their scored counts. */
+export function pooledClickBias(step: StepResult): number | null {
+  return pooled(step.flick.clickBias, classTotal(step.flick.classN), step.switch.clickBias, classTotal(step.switch.classN));
 }
 
 function bestTested(ctx: SteerContext): StepResult {
@@ -78,8 +98,9 @@ export function chooseNext(ctx: SteerContext, cfg: Config): SteerDecision {
   const base = ctx.baseline;
 
   const disc = Math.exp(-Math.abs(Math.log(last.cm360 / prev.cm360)) / sc.jumpScale);
-  const dSmall = (last.flick.smallGain ?? 0) - (base.flick.smallGain ?? 0);
-  const dBig = (last.flick.bigGain ?? 0) - (base.flick.bigGain ?? 0);
+  const dSmall = (pooledGain(last, 'small') ?? 0) - (pooledGain(base, 'small') ?? 0);
+  const dBig = (pooledGain(last, 'big') ?? 0) - (pooledGain(base, 'big') ?? 0);
+  const dBias = (pooledClickBias(last) ?? 0) - (pooledClickBias(base) ?? 0);
   const dLead = last.tracking.leadLagDeg - base.tracking.leadLagDeg;
   const dCorr = last.flick.corrections - base.flick.corrections;
   const dSpread = last.flick.spreadRatio - base.flick.spreadRatio;
@@ -87,11 +108,13 @@ export function chooseNext(ctx: SteerContext, cfg: Config): SteerDecision {
 
   const drivers: Driver[] = [
     { value: disc * sc.weights.smallGain * dSmall,
-      text: (p) => (p ? 'Small flicks overshot more than baseline' : 'Small flicks overshot less than baseline') },
+      text: (p) => (p ? 'Small flicks and switches overshot more than baseline' : 'Small flicks and switches overshot less than baseline') },
     { value: disc * sc.weights.bigGain * dBig,
-      text: (p) => (p ? 'Big flicks reached further than baseline' : 'Big flicks fell shorter than baseline') },
+      text: (p) => (p ? 'Big flicks and switches reached further than baseline' : 'Big flicks and switches fell shorter than baseline') },
     { value: disc * sc.weights.leadLag * dLead / sc.leadLagScaleDeg,
       text: (p) => (p ? 'Tracking led the target more than baseline' : 'Tracking lagged the target more than baseline') },
+    { value: disc * sc.weights.clickBias * dBias / sc.clickBiasScaleDeg,
+      text: (p) => (p ? 'Clicks landed further past targets than baseline' : 'Clicks landed shorter of targets than baseline') },
     { value: sc.weights.corrSpread * Math.sign(slope) * Math.max(0, dCorr / sc.correctionsScale + dSpread),
       text: () => 'More corrections or spread than baseline, following the fit slope' },
   ];
