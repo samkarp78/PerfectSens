@@ -1,0 +1,32 @@
+:root {
+  --bg: #07080b;
+  --panel: #0e1117;
+  --line: #1c212b;
+  --text: #d8dde6;
+  --muted: #7d8696;
+  --accent: #ff5a36;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+}
+
+html, body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; }
+
+.run { position: fixed; inset: 0; overflow: hidden; background: var(--bg); cursor: default; }
+.run-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+.crosshair { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px;
+  border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); pointer-events: none; }
+
+.hud { position: absolute; top: 16px; left: 16px; font-family: var(--mono); font-size: 14px; letter-spacing: 0.04em;
+  color: var(--muted); pointer-events: none; user-select: none; }
+
+.rest-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(7, 8, 11, 0.72); }
+.rest-card { width: min(420px, calc(100vw - 32px)); padding: 28px; box-sizing: border-box; text-align: center;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; outline: none; }
+.rest-card:hover, .rest-card:focus-visible { border-color: var(--accent); }
+.rest-text { margin: 0 0 18px; font-size: 17px; line-height: 1.45; }
+.rest-cta { margin: 0; font-family: var(--mono); font-size: 14px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; }
+.rest-warn { margin: 14px 0 0; font-size: 14px; color: var(--accent); }
+.rest-skip { margin-top: 18px; padding: 6px 12px; font: inherit; font-size: 13px; color: var(--muted);
+  background: transparent; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.rest-skip:hover { color: var(--text); border-color: var(--muted); }
