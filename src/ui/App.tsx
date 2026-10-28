@@ -32,6 +32,8 @@ export function App() {
   const [done, setDone] = useState<Done | null>(sim);
   const [unsupported, setUnsupported] = useState(false);
   const [history, setHistory] = useState<HistoryStore | null>(null);
+  const [historyReady, setHistoryReady] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const historyRef = useRef<Promise<HistoryStore | null> | null>(null);
   const handled = useRef<SessionState | null>(null);
 
@@ -39,6 +41,7 @@ export function App() {
     historyRef.current = openHistory().catch(() => null);
     void historyRef.current.then((h) => {
       setHistory(h);
+      setHistoryReady(true);
       if (sim && h) void h.save(sim.rec).catch(() => undefined);
     });
   }, []);
@@ -63,20 +66,21 @@ export function App() {
     if (handled.current === state || !state.result) return;
     handled.current = state;
     const rec = recordFromSession(state, new Date(), crypto.randomUUID());
+    setSaveFailed(false);
     setDone({ rec, fit: state.fit });
     setScreen('results');
-    void historyRef.current?.then((h) => h?.save(rec)).catch(() => undefined);
+    void historyRef.current?.then((h) => h?.save(rec)).catch(() => { if (handled.current === state) setSaveFailed(true); });
   };
 
   const onUnsupported = () => { setUnsupported(true); setScreen('setup'); };
 
   switch (screen) {
     case 'run':
-      return session ? <Run key={session._seed} session={session} onFinished={onFinished} onUnsupported={onUnsupported} /> : null;
+      return session ? <Run key={session._seed} session={session} onFinished={onFinished} onUnsupported={onUnsupported} onQuit={() => setScreen('setup')} /> : null;
     case 'results':
-      return done ? <Results rec={done.rec} fit={done.fit} onAgain={() => setScreen('setup')} onHistory={() => setScreen('history')} /> : null;
+      return done ? <Results rec={done.rec} fit={done.fit} saveFailed={saveFailed} onAgain={() => setScreen('setup')} onHistory={() => setScreen('history')} /> : null;
     case 'history':
-      return <History history={history} onBack={() => setScreen(done ? 'results' : 'setup')} onQuickAb={onQuickAb} />;
+      return <History history={history} loading={!historyReady} onBack={() => setScreen(done ? 'results' : 'setup')} onQuickAb={onQuickAb} />;
     case 'demo':
       return <Demo onExit={() => setScreen('setup')} onHistory={() => setScreen('history')} />;
     default:

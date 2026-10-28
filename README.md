@@ -4,7 +4,7 @@ A browser aim test that finds the mouse sensitivity that works best for you, usi
 
 It answers one question: **should I change my sens, or train something specific instead?**
 
-At the end you get a recommended sensitivity (in cm per 360 degrees) with a range of values that perform the same for you, a multiplier for your in-game sens (for example 0.90x turns 33 into 29.7), and a short "train this" diagnosis. The sensitivity values being tested are hidden from you until the results screen, so you cannot be biased by the numbers.
+At the end you get a recommended sensitivity (in cm per 360 degrees) with a range of values that scored about the same in the dial-in, a multiplier for your in-game sens (for example 0.90x turns 33 into 29.7), and a short "train this" diagnosis. The sensitivity values being tested are hidden from you until the results screen, so you cannot be biased by the numbers.
 
 ## How a session works
 
@@ -12,8 +12,8 @@ At the end you get a recommended sensitivity (in cm per 360 degrees) with a rang
 2. **Warm-up (optional, recommended).** About 3 minutes of free targets at your current sens. Not scored.
 3. **Baseline.** About 1 minute: a flicking block and a tracking block at your current sens.
 4. **Dial-in steps.** 6 steps (10 in Thorough mode). Each uses a hidden sensitivity and takes about 1 minute: a few practice targets, 30 scored flicks, then 25 seconds of tracking. The test picks the next sens from how you did.
-5. **Hidden re-check.** Halfway through, your current sens appears again, disguised as a normal step. It shows how much you improve simply from warming up.
-6. **Blind A/B.** The test's pick versus your current sens, in a mirrored order (A B B A). If the result is unclear, it adds 4 more blocks. This is the final judge.
+5. **Hidden re-check.** At an unannounced point, your current sens comes back, disguised as a normal step. It lets the test separate warm-up and fatigue effects from real differences.
+6. **Blind A/B.** The test's pick versus your current sens, in a mirrored order (A B B A). If the result is unclear, it adds 4 more rounds. This is the final judge.
 7. **Results.** Verdict (Change, Keep, or No clear winner), recommended sens and range, diagnosis, and a log of every block.
 
 A typical session takes 14 to 16 minutes, at most about 19, plus the 3-minute warm-up. Thorough mode adds about 5 minutes. Esc pauses; the block you interrupted restarts when you resume.
@@ -25,7 +25,7 @@ A typical session takes 14 to 16 minutes, at most about 19, plus the 3-minute wa
 
 ## Run it on your computer
 
-You need Node.js installed.
+You need Node.js 20.19 or newer (or 22.12+) installed.
 
 ```
 npm install

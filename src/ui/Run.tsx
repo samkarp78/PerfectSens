@@ -12,6 +12,7 @@ export interface RunProps {
   session: SessionState;
   onFinished(state: SessionState): void;
   onUnsupported(): void;
+  onQuit(): void;
 }
 
 interface View { phase: RunPhase; hud: string; restText: string }
@@ -20,7 +21,7 @@ const LOCK_DENIED_TEXT = 'Click again to lock the mouse.';
 const PAUSED_TEXT = 'Paused — this block will restart.';
 const viewOf = (c: RunController): View => ({ phase: c.phase, hud: c.hud, restText: c.restText });
 
-export function Run({ session, onFinished, onUnsupported }: RunProps) {
+export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctrlRef = useRef<RunController | null>(null);
   if (!ctrlRef.current) ctrlRef.current = createRunController(session);
@@ -128,6 +129,7 @@ export function Run({ session, onFinished, onUnsupported }: RunProps) {
             <p class="rest-cta">Click to start</p>
             {denied && <p class="rest-warn">{LOCK_DENIED_TEXT}</p>}
             {warmup && <button type="button" class="rest-skip" onClick={skip}>Skip warm-up</button>}
+            <button type="button" class="rest-skip" onClick={(e) => { e.stopPropagation(); onQuit(); }}>Quit test</button>
           </div>
         </div>
       )}

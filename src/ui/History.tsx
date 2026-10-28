@@ -9,6 +9,7 @@ const PCT = 100;
 
 export interface HistoryProps {
   history: HistoryStore | null;
+  loading?: boolean;
   onBack(): void;
   onQuickAb(s: SessionSummary): void;
 }
@@ -16,7 +17,7 @@ export interface HistoryProps {
 const VERDICT_TEXT = { change: 'Change', keep: 'Keep', none: 'No clear winner' } as const;
 const spanOf = (s: SessionSummary): [number, number] => s.result.range ?? [s.result.recommendedCm360, s.result.recommendedCm360];
 
-export function History({ history, onBack, onQuickAb }: HistoryProps) {
+export function History({ history, loading = false, onBack, onQuickAb }: HistoryProps) {
   const [rows, setRows] = useState<SessionSummary[] | null>(null);
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export function History({ history, onBack, onQuickAb }: HistoryProps) {
   const overlap = full.length >= 2 && full[0]!.result.range![0] <= full[1]!.result.range![1] && full[1]!.result.range![0] <= full[0]!.result.range![1];
 
   let body;
-  if (!history) body = <p class="note">{HISTORY_UNAVAILABLE}</p>;
+  if (!history) body = loading ? <p class="muted">Loading…</p> : <p class="note">{HISTORY_UNAVAILABLE}</p>;
   else if (rows === null) body = <p class="muted">Loading…</p>;
   else if (rows.length === 0) body = <p class="muted">No sessions yet.</p>;
   else {

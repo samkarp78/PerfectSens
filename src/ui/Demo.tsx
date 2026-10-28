@@ -112,7 +112,7 @@ function Player({ clips, onDone }: { clips: DemoClip[]; onDone(): void }) {
 
 export function Demo({ onExit, onHistory }: DemoProps) {
   const [data] = useState(() => {
-    const run = runSimSession(DEMO_SETUP, defaultSimPlayer(DEMO_SETUP.cm360), { seed: dateSeed(new Date()), warmup: false, quickAbCm360: null });
+    const run = runSimSession(DEMO_SETUP, defaultSimPlayer(DEMO_SETUP.cm360, { optimalCm360: DEMO_SETUP.cm360 * defaultConfig.demo.player.optimalRatio }), { seed: dateSeed(new Date()), warmup: false, quickAbCm360: null });
     return { run, clips: buildDemoScript(run), rec: recordFromSession(run.state, new Date(), 'demo') };
   });
   const [finished, setFinished] = useState(false);

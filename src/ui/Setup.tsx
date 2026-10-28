@@ -73,8 +73,8 @@ export function Setup({ unsupported, onStart, onDemo, onHistory }: SetupProps) {
         </div>
         <fieldset class="field fieldset">
           <legend class="field-label">Mode</legend>
-          <label class="radio"><input type="radio" name="mode" value="default" checked={f.mode === 'default'} onChange={set('mode')} /> Default (6 steps)</label>
-          <label class="radio"><input type="radio" name="mode" value="thorough" checked={f.mode === 'thorough'} onChange={set('mode')} /> Thorough (10 steps)</label>
+          <label class="radio"><input type="radio" name="mode" value="default" checked={f.mode === 'default'} onChange={set('mode')} /> Default (about 15 min)</label>
+          <label class="radio"><input type="radio" name="mode" value="thorough" checked={f.mode === 'thorough'} onChange={set('mode')} /> Thorough (about 20 min)</label>
           {errors.mode && <span class="field-error" role="alert">{errors.mode}</span>}
         </fieldset>
         <label class="radio"><input type="checkbox" checked={warmup} onChange={(e) => setWarmup((e.target as HTMLInputElement).checked)} /> Warm up first (recommended, 3 min)</label>
