@@ -37,7 +37,8 @@ export function History({ history, loading = false, onBack, onQuickAb }: History
     const spans = rows.map(spanOf);
     const lo = Math.log(Math.min(...spans.map((s) => s[0]))) - MARGIN;
     const hi = Math.log(Math.max(...spans.map((s) => s[1]))) + MARGIN;
-    const pos = (cm: number) => ((Math.log(cm) - lo) / (hi - lo || 1)) * PCT;
+    // Faster (fewer cm/360) on the right, matching the results chart.
+    const pos = (cm: number) => ((hi - Math.log(cm)) / (hi - lo || 1)) * PCT;
     body = (
       <>
         {full.length >= 2 && (
@@ -55,7 +56,7 @@ export function History({ history, loading = false, onBack, onQuickAb }: History
                   <span class="muted">{s.result.range ? `${fmt(a)} to ${fmt(b)}` : 'no range'}</span>
                 </div>
                 <div class="bar-track" aria-hidden="true">
-                  <div class="bar" style={{ left: `${pos(a)}%`, width: `${Math.max(MIN_BAR_PCT, pos(b) - pos(a))}%` }} />
+                  <div class="bar" style={{ left: `${pos(b)}%`, width: `${Math.max(MIN_BAR_PCT, pos(a) - pos(b))}%` }} />
                 </div>
                 {s.mode === 'full' && s.result.verdict === 'change' && (
                   <button type="button" class="btn btn-small" onClick={() => onQuickAb(s)}>Quick A/B re-check</button>
@@ -64,7 +65,7 @@ export function History({ history, loading = false, onBack, onQuickAb }: History
             );
           })}
         </ul>
-        <p class="legend">Bars share one cm/360 axis (log scale), so overlap shows whether sessions agree.</p>
+        <p class="legend">Bars share one sensitivity axis (slower on the left, faster on the right), so overlap shows whether sessions agree.</p>
       </>
     );
   }

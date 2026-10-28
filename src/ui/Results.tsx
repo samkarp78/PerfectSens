@@ -4,6 +4,7 @@ import type { SessionRecord } from '../store/history';
 import { toCsv, toJson } from '../store/export';
 import { BlockLog } from './BlockLog';
 import { CurveChart } from './CurveChart';
+import { SpreadChart } from './SpreadChart';
 import { download, fmt } from './format';
 import type { ScoreState } from './scoreKeeper';
 import { SessionStats } from './SessionStats';
@@ -117,7 +118,12 @@ export function Results({ rec, fit, stats = null, bests = null, saveFailed = fal
       <section class="panel">
         <h2>Score against sensitivity</h2>
         <CurveChart steps={rec.steps} fit={fit} result={r} />
-        <p class="legend"><span class="dot" /> tested · <span class="dot dot-ab" /> A/B · line = fitted curve · band = range · dashed = current</p>
+        <p class="legend">Higher is better. <span class="dot" /> sens you tested · <span class="dot dot-ab" /> A/B check · line = trend across all rounds</p>
+      </section>
+
+      <section class="panel">
+        <h2>Spread at each sensitivity</h2>
+        <SpreadChart steps={rec.steps} current={r.currentCm360} />
       </section>
 
       <BlockLog rec={rec} />
