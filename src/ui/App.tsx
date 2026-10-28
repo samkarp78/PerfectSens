@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { configForMode } from '../core/config';
 import './styles.css';
-import { createSession, type SessionState } from '../core/session';
+import { createSession, fitFromSteps, type SessionState } from '../core/session';
 import type { FitResult } from '../core/fit';
 import type { Setup as SetupValues } from '../core/types';
 import { defaultSimPlayer } from '../core/sim/player';
@@ -83,6 +83,15 @@ export function App() {
     void historyRef.current?.then((h) => h?.save(rec)).catch(() => { if (handled.current === state) setSaveFailed(true); });
   };
 
+  const onOpen = (s: SessionSummary) => {
+    void history?.get(s.id).then((rec) => {
+      if (!rec) return;
+      setSaveFailed(false);
+      setDone({ rec, fit: rec.mode === 'full' ? fitFromSteps(rec.setup, rec.steps) : null, stats: null, bests: null });
+      setScreen('results');
+    });
+  };
+
   const onUnsupported = () => { setUnsupported(true); setScreen('setup'); };
 
   switch (screen) {
@@ -91,7 +100,7 @@ export function App() {
     case 'results':
       return done ? <Results rec={done.rec} fit={done.fit} stats={done.stats} bests={done.bests} saveFailed={saveFailed} onAgain={() => setScreen('setup')} onHistory={() => setScreen('history')} /> : null;
     case 'history':
-      return <History history={history} loading={!historyReady} onBack={() => setScreen(done ? 'results' : 'setup')} onQuickAb={onQuickAb} />;
+      return <History history={history} loading={!historyReady} onBack={() => setScreen(done ? 'results' : 'setup')} onQuickAb={onQuickAb} onOpen={onOpen} />;
     case 'demo':
       return <Demo onExit={() => setScreen('setup')} onHistory={() => setScreen('history')} />;
     case 'calibrate':

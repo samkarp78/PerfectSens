@@ -168,3 +168,4 @@ p { line-height: 1.5; }
 .chart-mean { stroke: var(--accent); stroke-width: 2.5; }
 .chart-whisker { stroke: #4cc9f0; stroke-width: 2; opacity: 0.6; }
 .chart-col-current { fill: var(--muted); opacity: 0.08; }
+.history-actions { display: flex; gap: 8px; flex-wrap: wrap; }

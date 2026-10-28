@@ -5,7 +5,7 @@ import { createRng } from '../../src/core/rng';
 import { FlickRunner } from '../../src/core/run/flickRunner';
 import { TrackingRunner } from '../../src/core/run/trackingRunner';
 import { TrackSwitchRunner } from '../../src/core/run/trackSwitchRunner';
-import { createSession, extendAb, nextBlock, submitBlock, type SessionOptions, type SessionState } from '../../src/core/session';
+import { createSession, extendAb, fitFromSteps, nextBlock, submitBlock, type SessionOptions, type SessionState } from '../../src/core/session';
 import { defaultSimPlayer, type SimState } from '../../src/core/sim/player';
 import { runSimSession } from '../../src/core/sim/runSession';
 import { simulateBlock } from '../../src/core/sim/simulate';
@@ -298,5 +298,19 @@ describe('asking before the extra A/B round', () => {
   it('without the option the session extends automatically, as before', () => {
     const { state } = runSimSession(setupFor(), defaultSimPlayer(CURRENT), opts());
     expect(state.awaitingExtension).toBe(false);
+  });
+});
+
+describe('fitFromSteps', () => {
+  it('rebuilds the same curve and pick a finished session used', () => {
+    const setup = setupFor();
+    const { state } = runSimSession(setup, defaultSimPlayer(CURRENT), { seed: 1, warmup: false, quickAbCm360: null });
+    const rebuilt = fitFromSteps(setup, state.steps);
+    expect(rebuilt?.coef).toEqual(state.fit?.coef);
+    expect(rebuilt?.pickCm360).toBeCloseTo(state.fit!.pickCm360, 9);
+  });
+
+  it('returns null with no fit steps', () => {
+    expect(fitFromSteps(setupFor(), [])).toBeNull();
   });
 });

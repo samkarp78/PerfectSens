@@ -177,15 +177,26 @@ export function submitBlock(s: SessionState,
   return withProgress(planNext({ ...next, steps, fit, _retries: 0, _pending: null }));
 }
 
-function refit(s: SessionState, steps: StepResult[]): FitResult {
-  const fitSteps = steps.filter(isFitStep);
+function fitPoints(steps: StepResult[]): FitPoint[] {
   const span = Math.max(1, steps.length - 1);
-  const points: FitPoint[] = fitSteps.map((st) => ({
+  return steps.filter(isFitStep).map((st) => ({
     x: Math.log(st.cm360), y: st.score.logS, se: st.score.se, t: st.order / span,
     isCurrent: st.stage === 'baseline' || st.stage === 'recheck',
   }));
+}
+
+function refit(s: SessionState, steps: StepResult[]): FitResult {
   const order = steps[steps.length - 1]!.order;
-  return fitCurve(points, Math.log(s.setup.cm360), s._cfg, rootFork(s, `fit-${order}`));
+  return fitCurve(fitPoints(steps), Math.log(s.setup.cm360), s._cfg, rootFork(s, `fit-${order}`));
+}
+
+/** Rebuilds a saved full session's final fit (as of its last fit step) for redrawing the curve. The curve itself is
+ *  deterministic; the bootstrap range may differ slightly, so show the saved result's range rather than this one's. */
+export function fitFromSteps(setup: Setup, steps: StepResult[], cfg: Config = defaultConfig): FitResult | null {
+  let last = -1;
+  steps.forEach((st, i) => { if (isFitStep(st)) last = i; });
+  if (last < 0) return null;
+  return fitCurve(fitPoints(steps.slice(0, last + 1)), Math.log(setup.cm360), cfg, createRng(0));
 }
 
 /** Decides what the next step is (or finishes the session) once no step is pending. */
