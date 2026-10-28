@@ -142,3 +142,31 @@ describe('fitCurve', () => {
     expect(fit(dataset(0.1))).toEqual(fit(dataset(0.1)));
   });
 });
+
+describe('per-night offset', () => {
+  const cfg = defaultConfig;
+  const q = (u: number): number => -2 * u * u;
+  // Night 0 covers u ≤ 0, night 1 covers u ≥ 0 and plays 0.05 better overall; both nights test u = 0.
+  const split = (labelled: boolean): FitPoint[] => us.flatMap((u, i) => {
+    const pts: FitPoint[] = [];
+    if (u <= 0) pts.push({ x: x0 + u, y: q(u), se: 0.01, t: i / 6, isCurrent: u === 0, ...(labelled ? { night: 0 } : {}) });
+    if (u >= 0) pts.push({ x: x0 + u, y: q(u) + 0.05, se: 0.01, t: i / 6, isCurrent: u === 0, ...(labelled ? { night: 1 } : {}) });
+    return pts;
+  });
+
+  it('points without night fit exactly as before', () => {
+    const plain = dataset(0.05);
+    const zero = plain.map((p) => ({ ...p, night: 0 }));
+    const a = fitCurve(plain, x0, cfg, createRng(1));
+    const b = fitCurve(zero, x0, cfg, createRng(1));
+    expect(b.coef).toEqual(a.coef);
+    expect(b.pickCm360).toBe(a.pickCm360);
+  });
+
+  it('a night offset does not move the peak', () => {
+    const fit = fitCurve(split(true), x0, cfg, createRng(1));
+    expect(Math.abs(Math.log(fit.pickCm360 / 30))).toBeLessThan(0.01);
+    const unlabelled = fitCurve(split(false), x0, cfg, createRng(1));
+    expect(Math.abs(Math.log(unlabelled.pickCm360 / 30))).toBeGreaterThan(Math.abs(Math.log(fit.pickCm360 / 30)));
+  });
+});
