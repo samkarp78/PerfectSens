@@ -173,7 +173,7 @@ export function App() {
     case 'results':
       return done ? <Results rec={done.rec} fit={done.fit} stats={done.stats} bests={done.bests} saveFailed={saveFailed} onAgain={() => setScreen('setup')} onHistory={() => setScreen('history')} /> : null;
     case 'history':
-      return <History history={history} loading={!historyReady} onBack={() => setScreen(done ? 'results' : 'setup')} onQuickAb={onQuickAb} onOpen={onOpen} />;
+      return <History history={history} loading={!historyReady} onBack={() => setScreen(done ? (done.rec.mode === 'playalong' ? 'paResults' : 'results') : 'setup')} onQuickAb={onQuickAb} onOpen={onOpen} />;
     case 'demo':
       return <Demo onExit={() => setScreen('setup')} onHistory={() => setScreen('history')} />;
     case 'calibrate':

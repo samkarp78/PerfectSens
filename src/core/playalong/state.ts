@@ -22,12 +22,16 @@ export interface PaTest { id: string; night: number; indexInNight: number; cm360
 export interface PaResult { kind: 'change' | 'keep' | 'none' | 'bestGuess'; recommendedCm360: number; recommendedGameSens: number | null;
   rangeCm360: [number, number] | null; tieBrokenByFeel: boolean; feelFlags: { cm360: number; feel: 'fast' | 'slow' }[];
   h2h: AbDecision | null; findings: Finding[] }
-/** The whole search, saved between tests and nights. step: the step of the latest pair. logs: raw logs per test id. */
+/** A test that was started but not finished (the player quit or closed the app); nothing of it is scored. */
+export interface DiscardedTest { cm360: number; night: number; at: number; phase: 'feel' | 'testing' }
+/** The whole search, saved between tests and nights. step: the step of the latest pair. logs: raw logs per test id.
+ *  hourCheckedNight: the night whose hour check was already answered (searches saved before it existed lack the field,
+ *  as they lack discarded). */
 export interface PaState { version: 1; setup: PaSetup; seed: number; createdAt: number; phase: PaPhase;
   nights: { startedAt: number }[]; tests: PaTest[]; queue: QueueItem[]; step: number;
   h2h: { leaderCm360: number; testIds: string[] } | null; h2hTonight: number; waitingSince: number;
   pendingFeel: Feel | null; pendingAwayMs: number; steerLog: PairDecision[]; result: PaResult | null;
-  logs: Record<string, SessionState['logs']> }
+  logs: Record<string, SessionState['logs']>; hourCheckedNight?: number; discarded?: DiscardedTest[] }
 
 const SEED_RANGE = 2 ** 31;
 const DAY_MS = 86_400_000;
@@ -92,7 +96,9 @@ export function testSession(s: PaState, cfg: Config = defaultConfig): SessionSta
 
 export function abandonTest(s: PaState, now: number): PaState {
   if (s.phase !== 'testing' && s.phase !== 'feel') return s;
-  return { ...s, phase: 'waiting', pendingFeel: null, waitingSince: now };
+  const head = s.queue[0]!;
+  const discarded: DiscardedTest = { cm360: head.cm360, night: s.nights.length - 1, at: now, phase: s.phase };
+  return { ...s, phase: 'waiting', pendingFeel: null, waitingSince: now, discarded: [...(s.discarded ?? []), discarded] };
 }
 
 export function submitTest(s: PaState, done: SessionState, now: number, cfg: Config = defaultConfig): PaState {
@@ -111,7 +117,9 @@ export function submitTest(s: PaState, done: SessionState, now: number, cfg: Con
   const next = plan({ ...s, tests: [...s.tests, test], queue: s.queue.slice(1), h2h, pendingFeel: null,
     logs: { ...s.logs, [id]: done.logs } }, cfg);
   if (next.phase === 'finished') return next;
-  const hour = now - s.nights[s.nights.length - 1]!.startedAt >= cfg.playAlong.hourCheckMs;
+  // Once per night, and never between the two tests of a head-to-head.
+  const hour = now - s.nights[night]!.startedAt >= cfg.playAlong.hourCheckMs && s.hourCheckedNight !== night
+    && next.queue[0]?.role !== 'h2h';
   return { ...next, phase: hour ? 'hourCheck' : 'waiting', waitingSince: now };
 }
 
@@ -145,8 +153,9 @@ function queuePair(s: PaState, center: number, step: number, cfg: Config): PaSta
   return { ...s, step, queue, steerLog: [...s.steerLog, d] };
 }
 
-function startH2h(s: PaState, cfg: Config): PaState {
-  const lead = leader(s, cfg);
+/** leadCm360: the sens to confirm (a best guess's recommendation); the current leader when omitted. */
+function startH2h(s: PaState, cfg: Config, leadCm360?: number): PaState {
+  const lead = leadCm360 ?? leader(s, cfg);
   if (same(s, lead, s.setup.defaultCm360)) return finish(s, 'keep', null, cfg);
   const per = cfg.playAlong.h2hBlocksPerSide;
   const items: QueueItem[] = [];
@@ -227,8 +236,9 @@ function finish(s: PaState, kind: PaResult['kind'], h2h: AbDecision | null, cfg:
 
 export function answerHourCheck(s: PaState, choice: 'continue' | 'later' | 'done', now: number, cfg: Config = defaultConfig): PaState {
   if (s.phase !== 'hourCheck') throw new Error(`answerHourCheck: phase is ${s.phase}`);
-  if (choice === 'done') return finish(s, 'bestGuess', null, cfg);
-  return { ...s, phase: 'waiting', waitingSince: now };
+  const answered = { ...s, hourCheckedNight: s.nights.length - 1 };
+  if (choice === 'done') return finish(answered, 'bestGuess', null, cfg);
+  return { ...answered, phase: 'waiting', waitingSince: now };
 }
 
 /** Opens a new night: a pending head-to-head runs first; otherwise the default is re-tested first as the night's anchor.
@@ -238,11 +248,14 @@ export function startNight(s: PaState, now: number, cfg: Config = defaultConfig)
   const opened: PaState = { ...s, nights: [...s.nights, { startedAt: now }], h2hTonight: 0, phase: 'waiting', waitingSince: now,
     pendingFeel: null, result: null };
   if (s.result) {
-    const next = startH2h(opened, cfg);
+    // Confirm the sens the best guess named; if that is the default, the answer is simply keep.
+    const next = startH2h({ ...opened, queue: [] }, cfg, s.result.recommendedCm360);
     return next.phase === 'finished' ? next : { ...next, phase: 'waiting', waitingSince: now };
   }
   // A head-to-head must be played within one night (night form would otherwise look like a difference): replay it in full.
-  if (opened.queue[0]?.role === 'h2h') return startH2h({ ...opened, queue: [], h2hTonight: 0 }, cfg);
+  if (opened.queue[0]?.role === 'h2h') return startH2h({ ...opened, queue: [], h2hTonight: 0 }, cfg, s.h2h?.leaderCm360);
+  // A night opened but never played already starts with its anchor.
+  if (opened.queue[0]?.role === 'anchor') return opened;
   return { ...opened, queue: [{ cm360: s.setup.defaultCm360, role: 'anchor' }, ...opened.queue] };
 }
 

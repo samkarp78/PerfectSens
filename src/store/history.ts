@@ -5,14 +5,16 @@ import type { SessionState } from '../core/session';
 import type { SteerDecision } from '../core/steer';
 import type { Setup, StepResult } from '../core/types';
 import { gameSensOf } from '../core/playalong/gameSens';
-import type { PaResult, PaSetup, PaState, PaTest } from '../core/playalong/state';
+import type { DiscardedTest, PaResult, PaSetup, PaState, PaTest } from '../core/playalong/state';
+import type { PairDecision } from '../core/playalong/steer';
 
 export type RecordMode = 'full' | 'quickab' | 'playalong';
 /** playAlong: the search's own setup, tests and result (Play-Along records only). */
 export interface SessionRecord {
   id: string; createdAt: string; mode: RecordMode; setup: Setup; result: SessionResult;
   steps: StepResult[]; steerLog: SteerDecision[]; abDecisions: AbDecision[]; raw: SessionState['logs'] | null;
-  playAlong?: { setup: PaSetup; tests: PaTest[]; result: PaResult; nights: number };
+  playAlong?: { setup: PaSetup; tests: PaTest[]; result: PaResult; nights: { startedAt: number }[]; steerLog: PairDecision[];
+    discarded: DiscardedTest[] };
 }
 export interface SessionSummary { id: string; createdAt: string; mode: RecordMode; setup: Setup; result: SessionResult }
 export interface History {
@@ -52,7 +54,7 @@ export function recordFromPlayAlong(s: PaState, now: Date, id: string): SessionR
   return {
     id, createdAt: now.toISOString(), mode: 'playalong', setup, result, steps: s.tests.flatMap((t) => t.steps),
     steerLog: [], abDecisions: r.h2h ? [r.h2h] : [], raw,
-    playAlong: { setup: s.setup, tests: s.tests, result: r, nights: s.nights.length },
+    playAlong: { setup: s.setup, tests: s.tests, result: r, nights: s.nights, steerLog: s.steerLog, discarded: s.discarded ?? [] },
   };
 }
 

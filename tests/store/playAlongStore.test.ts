@@ -71,3 +71,13 @@ describe('history v2', () => {
     expect(rec.setup.inGameSens).toBe(33);
   });
 });
+
+describe('recordFromPlayAlong keeps the search record', () => {
+  it('keeps steering decisions, night start times and discarded tests', () => {
+    const s = bestGuessState();
+    const rec = recordFromPlayAlong({ ...s, discarded: [{ cm360: DEFAULT, night: 0, at: 5, phase: 'testing' }] }, new Date(), 'pa2');
+    expect(rec.playAlong!.steerLog).toEqual(s.steerLog);
+    expect(rec.playAlong!.nights).toEqual(s.nights);
+    expect(rec.playAlong!.discarded).toHaveLength(1);
+  });
+});

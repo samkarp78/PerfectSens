@@ -165,13 +165,13 @@ describe('Play-Along search', () => {
     expect(x.queue.every((q) => q.role === 'h2h')).toBe(true);
   });
 
-  it('a head-to-head split by the hour check is replayed in full the next night', () => {
+  it('a head-to-head split across nights is replayed in full the next night', () => {
     const { s, clock } = fresh();
     let x = playUntil(s, clock, peaked(finals(28), 5), (y) => y.queue[0]?.role === 'h2h');
     const leader = x.h2h!.leaderCm360;
-    x = play(x, clock, peaked(finals(28), 5), 'right', 60 * MIN); // first h2h test, past the hour
-    expect(x.phase).toBe('hourCheck');
-    x = startNight(answerHourCheck(x, 'later', clock.now), clock.now + DAY);
+    x = play(x, clock, peaked(finals(28), 5)); // first h2h test, then the player leaves until tomorrow
+    expect(x.queue).toHaveLength(1);
+    x = resume(x, clock.now + DAY);
     expect(x.queue.filter((q) => q.role === 'h2h')).toHaveLength(2);
     expect(x.h2h!.testIds).toEqual([]);
     x = playUntil(x, clock, peaked(finals(28), 5));
@@ -230,5 +230,49 @@ describe('Play-Along search', () => {
     expect(first.kind).toBe('warmup');
     expect(first.cm360).toBe(x.queue[0]!.cm360);
     expect(session._cfg.session.warmupMs).toBe(defaultConfig.playAlong.leadInMs);
+  });
+});
+
+describe('final review fixes', () => {
+  it('the hour check appears once per night', () => {
+    const { s, clock } = fresh();
+    let x = play(s, clock, peaked(finals(30)), 'right', 55 * MIN);
+    expect(x.phase).toBe('hourCheck');
+    x = answerHourCheck(x, 'continue', clock.now);
+    x = play(x, clock, peaked(finals(30)), 'right', 13 * MIN);
+    expect(x.phase).toBe('waiting');
+  });
+
+  it('no hour check between the two head-to-head tests', () => {
+    const { s, clock } = fresh();
+    let x = playUntil(s, clock, peaked(finals(28), 5), (y) => y.queue[0]?.role === 'h2h');
+    x = play(x, clock, peaked(finals(28), 5), 'right', 120 * MIN);
+    expect(x.queue[0]?.role).toBe('h2h');
+    expect(x.phase).toBe('waiting');
+  });
+
+  it('confirming a best guess runs the head-to-head on the recommended sens', () => {
+    const { s, clock } = fresh();
+    let x = s;
+    for (let i = 0; i < 3; i++) x = play(x, clock, peaked(finals(28), 5), 'right', 20 * MIN);
+    x = answerHourCheck(x, 'done', clock.now);
+    x = { ...x, result: { ...x.result!, recommendedCm360: finals(31), recommendedGameSens: 31 } };
+    x = startNight(x, clock.now + DAY);
+    expect(x.h2h!.leaderCm360).toBe(finals(31));
+    expect(x.queue.map((q) => num(q.cm360)).sort()).toEqual([31, 33]);
+  });
+
+  it('a night opened but not played does not add a second anchor', () => {
+    const { s, clock } = fresh();
+    let x = play(s, clock, () => 0, 'right', 55 * MIN);
+    x = startNight(answerHourCheck(x, 'later', clock.now), clock.now + DAY);
+    x = startNight(x, clock.now + 2 * DAY);
+    expect(x.queue.filter((q) => q.role === 'anchor')).toHaveLength(1);
+  });
+
+  it('an abandoned test is recorded as discarded', () => {
+    const { s } = fresh();
+    const back = abandonTest(answerFeel(markBack(s, MIN), 'right'), 2 * MIN);
+    expect(back.discarded).toEqual([{ cm360: DEFAULT, night: 0, at: 2 * MIN, phase: 'testing' }]);
   });
 });

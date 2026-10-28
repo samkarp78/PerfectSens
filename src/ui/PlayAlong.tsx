@@ -40,10 +40,25 @@ function HoldButton({ label, holdMs, onDone }: { label: string; holdMs: number; 
     if (p.done) { stop(); onDone(); return; }
     if (downAt.current !== null) frame.current = requestAnimationFrame(step);
   };
-  useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  // Alt-tabbing away mid-press can swallow the release, so losing focus cancels the hold.
+  useEffect(() => {
+    const cancel = () => stop();
+    window.addEventListener('blur', cancel);
+    document.addEventListener('visibilitychange', cancel);
+    return () => {
+      cancelAnimationFrame(frame.current);
+      window.removeEventListener('blur', cancel);
+      document.removeEventListener('visibilitychange', cancel);
+    };
+  }, []);
   return (
     <button type="button" class="btn btn-primary hold-btn"
-      onPointerDown={(e) => { if (e.button !== 0) return; downAt.current = performance.now(); frame.current = requestAnimationFrame(step); }}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        downAt.current = performance.now();
+        frame.current = requestAnimationFrame(step);
+      }}
       onPointerUp={stop} onPointerLeave={stop} onPointerCancel={stop}>
       <span class="hold-fill" style={{ width: `${fraction * 100}%` }} aria-hidden="true" />
       <span class="hold-label">{label}</span>

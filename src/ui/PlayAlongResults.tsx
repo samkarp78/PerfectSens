@@ -24,7 +24,7 @@ export function PlayAlongResults({ rec, onAgain, onHistory }: PlayAlongResultsPr
   }
   return (
     <main class="page">
-      <p class="pa-label">Play-Along · {pa.nights} night{pa.nights === 1 ? '' : 's'}</p>
+      <p class="pa-label">Play-Along · {pa.nights.length} night{pa.nights.length === 1 ? '' : 's'}</p>
       <h1 class="title">{verdictText(r, game, dpi)}</h1>
       <p class="lede">{rangeText(r.rangeCm360, game, dpi)}{game === 'finals' && <> · {fmt(r.recommendedCm360)} cm/360</>}</p>
       {r.kind === 'bestGuess' && (
