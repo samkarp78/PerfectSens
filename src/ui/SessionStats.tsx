@@ -1,10 +1,8 @@
-import { useState } from 'preact/hooks';
-import { recordBests } from '../store/bests';
+import type { Bests } from '../store/bests';
 import type { ScoreState } from './scoreKeeper';
 
 /** End-of-session game stats with personal bests (display only; not part of the recommendation). */
-export function SessionStats({ stats }: { stats: ScoreState }) {
-  const [bests] = useState(() => recordBests(stats));
+export function SessionStats({ stats, bests }: { stats: ScoreState; bests: Bests }) {
   const acc = stats.shots > 0 ? Math.round((100 * stats.hits) / stats.shots) : null;
   return (
     <section class="panel">

@@ -16,9 +16,11 @@ import { History } from './History';
 import { Results } from './Results';
 import { Run } from './Run';
 import { DEFAULT_SETUP, Setup, type Fields } from './Setup';
+import { recordBests, type Bests } from '../store/bests';
 
 type Screen = 'setup' | 'run' | 'results' | 'history' | 'demo' | 'calibrate';
-interface Done { rec: SessionRecord; fit: FitResult | null; stats: ScoreState | null }
+/** bests: personal bests merged once when the session finished, so a remount of Results keeps its "new best!" flags. */
+interface Done { rec: SessionRecord; fit: FitResult | null; stats: ScoreState | null; bests: Bests | null }
 
 const SEED_MASK = 0x7fffffff;
 const newSeed = (): number => Date.now() & SEED_MASK;
@@ -26,7 +28,7 @@ const newSeed = (): number => Date.now() & SEED_MASK;
 function simResult(): Done | null {
   if (!import.meta.env.DEV || new URLSearchParams(location.search).get('simresult') !== '1') return null;
   const { state } = runSimSession(DEFAULT_SETUP, defaultSimPlayer(DEFAULT_SETUP.cm360), { seed: 1, warmup: false, quickAbCm360: null });
-  return { rec: recordFromSession(state, new Date(), crypto.randomUUID()), fit: state.fit, stats: null };
+  return { rec: recordFromSession(state, new Date(), crypto.randomUUID()), fit: state.fit, stats: null, bests: null };
 }
 
 export function App() {
@@ -76,7 +78,7 @@ export function App() {
     handled.current = state;
     const rec = recordFromSession(state, new Date(), crypto.randomUUID());
     setSaveFailed(false);
-    setDone({ rec, fit: state.fit, stats });
+    setDone({ rec, fit: state.fit, stats, bests: recordBests(stats) });
     setScreen('results');
     void historyRef.current?.then((h) => h?.save(rec)).catch(() => { if (handled.current === state) setSaveFailed(true); });
   };
@@ -87,7 +89,7 @@ export function App() {
     case 'run':
       return session ? <Run key={session._seed} session={session} prefs={prefs} onFinished={onFinished} onUnsupported={onUnsupported} onQuit={() => setScreen('setup')} /> : null;
     case 'results':
-      return done ? <Results rec={done.rec} fit={done.fit} stats={done.stats} saveFailed={saveFailed} onAgain={() => setScreen('setup')} onHistory={() => setScreen('history')} /> : null;
+      return done ? <Results rec={done.rec} fit={done.fit} stats={done.stats} bests={done.bests} saveFailed={saveFailed} onAgain={() => setScreen('setup')} onHistory={() => setScreen('history')} /> : null;
     case 'history':
       return <History history={history} loading={!historyReady} onBack={() => setScreen(done ? 'results' : 'setup')} onQuickAb={onQuickAb} />;
     case 'demo':

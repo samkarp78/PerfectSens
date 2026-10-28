@@ -15,7 +15,7 @@ export const defaultConfig = {
   /** Target switching: `active` static targets up at once; hitting one replaces it at a seeded spot in the forward region.
    *  The first `warmKills` kills are unscored warm-in. */
   switch: { blockMs: 14000, active: 3, targetRadiusDeg: 1.5, region: { yaw: 35, pitch: 15 }, minSeparationDeg: 8, warmKills: 2,
-    maxTargets: 200 },
+    maxTargets: 200, placeTries: 50 },
   /** Tracking switching: `active` moving targets; holding the button on one deals damage until healthMs of damage kills it,
    *  then the next seeded target spawns. The first leadInMs is unscored. */
   trackswitch: { blockMs: 14000, leadInMs: 1500, active: 3, targetRadiusDeg: 2, healthMs: 700, region: { yaw: 35, pitch: 15 },

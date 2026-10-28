@@ -65,6 +65,21 @@ describe('SwitchRunner', () => {
     expect(clicks[1]!).toEqual({ t: T0 + 300, aim: here, hit: true });
   });
 
+  it('replacements keep minSeparationDeg from every active target', () => {
+    const r = new SwitchRunner(spec({ seed: 21 }), 0.001, { ...cfg, switch: { ...cfg.switch, blockMs: 1e9 } } as unknown as typeof cfg, T0);
+    let t = T0;
+    for (let k = 0; k < 150; k++) {
+      const ts = r.state.targets;
+      const goal = ts[0]!; // always the same slot: the other two stay up while new targets arrive
+      const a = r.state.aim;
+      r.onMove({ t: ++t, dx: Math.round((goal.yaw - a.yaw) / 0.001), dy: Math.round(-(goal.pitch - a.pitch) / 0.001) });
+      expect(r.onClick(++t).hit).toBe(true);
+      const now = r.state.targets;
+      for (let i = 0; i < now.length; i++) for (let j = i + 1; j < now.length; j++)
+        expect(Math.hypot(now[i]!.yaw - now[j]!.yaw, now[i]!.pitch - now[j]!.pitch)).toBeGreaterThanOrEqual(cfg.switch.minSeparationDeg);
+    }
+  });
+
   it('ends at blockMs and ignores input afterwards', () => {
     const r = new SwitchRunner(spec(), DPC, cfg, T0);
     r.tick(T0 + cfg.switch.blockMs - 1);

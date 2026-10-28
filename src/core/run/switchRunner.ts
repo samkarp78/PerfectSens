@@ -49,10 +49,24 @@ export class SwitchRunner {
       const target = this.active[i]!;
       this.kills.push({ t, target, from: this.lastKillAim });
       this.lastKillAim = { ...this.aim };
-      this.active[i] = this.queue[this.next % this.queue.length]!;
-      this.next++;
+      this.active[i] = this.nextTarget(i);
     }
     return { hit };
+  }
+
+  /** The next queued target at least minSeparationDeg from every other target on screen (skipped ones are passed over);
+   *  the plain next one if none within placeTries qualifies. Deterministic for a given order of kills. */
+  private nextTarget(slot: number): Aim {
+    const sc = this.cfg.switch;
+    const others = this.active.filter((_, j) => j !== slot);
+    for (let k = 0; k < sc.placeTries; k++) {
+      const cand = this.queue[(this.next + k) % this.queue.length]!;
+      if (others.every((o) => Math.hypot(o.yaw - cand.yaw, o.pitch - cand.pitch) >= sc.minSeparationDeg)) {
+        this.next += k + 1;
+        return cand;
+      }
+    }
+    return this.queue[this.next++ % this.queue.length]!;
   }
 
   tick(t: number): void { this.advanceTime(t); }

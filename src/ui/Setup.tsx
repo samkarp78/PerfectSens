@@ -4,6 +4,7 @@ import { validateSetup } from '../core/setup';
 import type { Prefs } from '../store/prefs';
 import type { Setup as SetupValues } from '../core/types';
 import { loadSetup } from '../store/setupStore';
+import { dpiEdit, dpiValid } from './setupFields';
 
 export const DEFAULT_SETUP: SetupValues = { dpi: 800, cm360: 34.6364, inGameSens: 33, fov: 103, fovType: 'horizontal', mode: 'default' };
 export const UNSUPPORTED_TEXT = "Raw mouse input isn't supported in this browser. Use Chrome or Edge on desktop. The demo still works here.";
@@ -44,7 +45,14 @@ export function Setup({ unsupported, prefs, draft, onPrefs, onCalibrate, onStart
   const [f, setF] = useState<Fields>(() => draft ?? initialFields());
   const [warmup, setWarmup] = useState(true);
   const [errors, setErrors] = useState<Partial<Record<keyof Fields, string>>>({});
-  const set = (k: keyof Fields) => (e: Event) => setF({ ...f, [k]: (e.target as HTMLInputElement).value });
+  const [dpiNote, setDpiNote] = useState<string | null>(null);
+  const set = (k: keyof Fields) => (e: Event) => {
+    const v = (e.target as HTMLInputElement).value;
+    if (k !== 'dpi') { setF({ ...f, [k]: v }); return; }
+    const r = dpiEdit(f, v);
+    setF(r.fields);
+    if (r.note) setDpiNote(r.note);
+  };
 
   const submit = (e: Event) => {
     e.preventDefault();
@@ -93,10 +101,12 @@ export function Setup({ unsupported, prefs, draft, onPrefs, onCalibrate, onStart
           <div class="row row-tight">
             <input class="input" type="text" inputMode="decimal" name="padWidthCm" value={f.padWidthCm} onInput={set('padWidthCm')}
               placeholder="cm" aria-invalid={errors.padWidthCm ? 'true' : undefined} />
-            <button type="button" class="btn" onClick={() => onCalibrate(f)}>Calibrate</button>
+            <button type="button" class="btn" disabled={!dpiValid(f.dpi)} title={dpiValid(f.dpi) ? undefined : 'Enter your DPI first'}
+              onClick={() => { setDpiNote(null); onCalibrate(f); }}>Calibrate</button>
           </div>
           <span class="field-hint">How far your mouse can travel on your pad. Calibrate measures it with a couple of slides.</span>
           {errors.padWidthCm && <span class="field-error" role="alert">{errors.padWidthCm}</span>}
+          {dpiNote && !f.padWidthCm && <span class="field-warn">{dpiNote}</span>}
           {fitWarning(f) && <span class="field-warn">{fitWarning(f)}</span>}
         </div>
         <fieldset class="field fieldset">

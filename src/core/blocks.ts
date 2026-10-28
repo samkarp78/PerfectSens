@@ -167,7 +167,7 @@ export function makeSwitchTargets(spec: BlockSpec, cfg: Config): Aim[] {
   while (out.length < sc.maxTargets) {
     const recent = out.slice(-(sc.active - 1));
     let a: Aim = { yaw: 0, pitch: 0 };
-    for (let tries = 0; tries < 50; tries++) {
+    for (let tries = 0; tries < sc.placeTries; tries++) {
       a = { yaw: uniform(rng, -sc.region.yaw, sc.region.yaw), pitch: uniform(rng, -sc.region.pitch, sc.region.pitch) };
       if (recent.every((r) => Math.hypot(r.yaw - a.yaw, r.pitch - a.pitch) >= sc.minSeparationDeg)) break;
     }

@@ -7,11 +7,12 @@ import { CurveChart } from './CurveChart';
 import { download, fmt } from './format';
 import type { ScoreState } from './scoreKeeper';
 import { SessionStats } from './SessionStats';
+import type { Bests } from '../store/bests';
 
 const TOP_FINDINGS = 2;
 const CAVEAT = 'Your current sens has a familiarity advantage in this test, and we have not shown that results here transfer to your in-game performance.';
 
-export interface ResultsProps { rec: SessionRecord; fit: FitResult | null; stats?: ScoreState | null; saveFailed?: boolean; onAgain(): void; onHistory(): void }
+export interface ResultsProps { rec: SessionRecord; fit: FitResult | null; stats?: ScoreState | null; bests?: Bests | null; saveFailed?: boolean; onAgain(): void; onHistory(): void }
 const SAVE_FAILED = "This session couldn't be saved to History.";
 const PCT = 100;
 const pct = (): number => Math.round(defaultConfig.ab.minEffect * PCT);
@@ -76,7 +77,7 @@ function padLine(rec: SessionRecord): string | null {
   return `A 180° turn at ${fmt(rec.result.recommendedCm360)} cm/360 uses ${fmt(half)} cm of your ${fmt(pad)} cm play area.`;
 }
 
-export function Results({ rec, fit, stats = null, saveFailed = false, onAgain, onHistory }: ResultsProps) {
+export function Results({ rec, fit, stats = null, bests = null, saveFailed = false, onAgain, onHistory }: ResultsProps) {
   const r = rec.result;
   const why = explainer(rec);
   const range = rangeLine(rec);
@@ -95,7 +96,7 @@ export function Results({ rec, fit, stats = null, saveFailed = false, onAgain, o
       {saveFailed && <p class="note">{SAVE_FAILED}</p>}
       {notes(rec).map((n) => <p key={n} class="note">{n}</p>)}
 
-      {stats && <SessionStats stats={stats} />}
+      {stats && bests && <SessionStats stats={stats} bests={bests} />}
 
       {r.findings.length > 0 && (
         <section class="panel">
