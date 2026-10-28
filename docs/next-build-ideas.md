@@ -1,5 +1,51 @@
 # Next build: ideas backlog
 
+## From the revision-2 play-test (in progress)
+
+- **Bigger part timer:** large and readable at a glance, for example big numerals at top centre with a draining bar, instead of the small mono text.
+- **Equal part lengths:** flicks, switching and tracking should feel the same length, about 17–18 s each, or 20 s each if the session can take the time. Tracking's lead-in should count as part of its slot, so all three slots match.
+- **Transitions between parts:** a short handover cue so the switch isn't jarring.
+  - A 1–2 s "Next: Switching" banner with a 3-2-1 tick, and a distinct chime for each part type.
+  - The handover gap is unscored and identical for every sens.
+- **Warm-up stays optional** (user decision 2026-10-28).
+- **TOP PRIORITY — use switching's movement and misclick data in the measurement.** Revision 2 scores switching only as kill throughput. That is a gap.
+  - Every switch (previous kill → next kill) should get the same analysis as a flick: target distance and class, first-move over/undershoot (gain) via submovement segmentation, corrections, time, and every click's position relative to the intended target. The intended target is the one killed next. Each click gives its along offset (over/undershoot) and its perp offset.
+  - Feed it into:
+    - The switching score: effective throughput with We from the click endpoint spread, so misclicks count.
+    - Steering's over/undershoot signals, pooled with the flick gains by distance class (about twice the data per round).
+    - Diagnosis: misclick rate, and overshoot or undershoot of misclicks.
+  - SwitchRunner must log the aim at each click. Revision-2 exports have only the path, so clicks can be reconstructed from raw logs.
+  - Also use the flick first-click along-offset mean (click over/undershoot bias), not only its spread.
+  - Past sessions don't need reprocessing; only future ones matter (user decision).
+- **Rule for every mode (user decision):** record all the data, then derive and use the full metric set. The spec lists each mode's data and metrics before it's built.
+- **Full tracking data (currently only time on target and mean lead/lag are used):**
+  - **Raw:** every mouse sample, every button press and release, the target position and velocity over time, and the target's direction-change times.
+  - **Error:** mean, RMS and median distance, split along the motion (lead/lag) and across it (above/below the path).
+  - **Speed matching:** crosshair speed ÷ target speed, the tracking version of over/undershoot. This is a steering signal.
+  - **Direction changes:** reaction time after the target reverses, overshoot past the turn, and time to settle.
+  - **Smoothness:** jitter and micro-corrections while on target.
+  - **Losses:** times the target was lost, and time to reacquire it.
+  - **Splits:**
+    - by target speed band,
+    - horizontal vs vertical (measure and diagnose only; never a separate vertical/horizontal sens output, since one sens in every direction is a fixed constraint),
+    - first half vs second half (fatigue).
+  - **Button:** held fraction, and releases while on target.
+- **New part idea: tracking switching.** 3 moving targets, each with a small health pool (for example 0.6–0.8 s of held, on-target time). Hold the button and track one until it dies, then swap to the next.
+  - Measures: acquisition onto a moving target (time, and first-move over/undershoot against where the target is), time on target while killing, lead/lag, kill time, and lost-target events.
+  - Placement options:
+    - **A fourth part** (all four equal, about 14 s each, round about 60 s, session about 12 min).
+    - **Replace plain tracking** (keeps 3 parts, but loses the clean continuous-tracking lead/lag signal).
+  - Must be identical in every round. Needs its own score term, sim model and stats re-check.
+- **Misclicks: no game penalty, but they are data** (user decision). Misclicks shouldn't cost points or break streaks; they are recorded and used in the measurement only.
+  - Flicks already use them, because the first click's position feeds the spread.
+  - Switching should start using them too, as accuracy or spread in the switching score or diagnosis.
+  - Open question: what breaks a streak (suggested: only a target that times out).
+- **"Change by luck" should be as close to zero as possible.** It can't be exactly zero, because there's always some noise. Options:
+  - A stricter A/B bar (z from 2.0 to about 2.5–3), at the cost of more "no clear winner" results.
+  - Require the win to repeat (look 1 and look 2 both favour it).
+  - Make the second A/B round mandatory before any "Change".
+  - Re-check with the simulator: false change was 4.5%; the target is ≤1%.
+
 Collected 2026-10-28 from the first real play-test. Nothing here is built yet.
 
 ## Make it feel like a game (top priority)
