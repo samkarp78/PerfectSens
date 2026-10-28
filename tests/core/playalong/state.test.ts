@@ -3,7 +3,7 @@ import { defaultConfig } from '../../../src/core/config';
 import { nextBlock } from '../../../src/core/session';
 import { finalsToCm360, gameSensOf } from '../../../src/core/playalong/gameSens';
 import {
-  abandonTest, answerFeel, answerHourCheck, createPlayAlong, currentTarget, feelFlagsOf, isStale, markBack, resume, startNight,
+  abandonTest, aimNudge, answerFeel, answerHourCheck, createPlayAlong, currentTarget, feelFlagsOf, isStale, markBack, resume, startNight,
   submitTest, testSession, type Feel, type PaSetup, type PaState, type TestRole,
 } from '../../../src/core/playalong/state';
 import { fakeDone } from '../../helpers/paSteps';
@@ -274,5 +274,35 @@ describe('final review fixes', () => {
     const { s } = fresh();
     const back = abandonTest(answerFeel(markBack(s, MIN), 'right'), 2 * MIN);
     expect(back.discarded).toEqual([{ cm360: DEFAULT, night: 0, at: 2 * MIN, phase: 'testing' }]);
+  });
+});
+
+describe('aim nudge (overshoot steers Play-Along pairs)', () => {
+  /** Default test, then both first-pair tests; the faster one (Finals 40) overshoots small flicks by `gain`. */
+  const withGain = (gain: number): PaState => {
+    let x = createPlayAlong(setup, 1, 0);
+    const now = { t: 0 };
+    const one = (y: PaState, g: number): PaState => {
+      const head = y.queue[0]!;
+      now.t += MIN;
+      return submitTest(answerFeel(markBack(y, now.t), 'right'), fakeDone(head.cm360, 0, 0.03, 2, { small: num(head.cm360) === 40 ? g : 1 }), now.t);
+    };
+    x = one(x, 1);
+    x = one(x, gain);
+    return one(x, gain);
+  };
+
+  it('overshooting on the centre sens moves the centre slower', () => {
+    const n = aimNudge(withGain(1.3), finals(40));
+    expect(n.cm360).toBeGreaterThan(finals(40));
+    expect(n.reason).toMatch(/overshot/);
+  });
+
+  it('no overshoot leaves the centre where it is', () => {
+    expect(aimNudge(withGain(1), finals(40)).cm360).toBe(finals(40));
+  });
+
+  it('the default sens is never nudged against itself', () => {
+    expect(aimNudge(withGain(1.3), DEFAULT).cm360).toBe(DEFAULT);
   });
 });

@@ -69,7 +69,35 @@ function fitSlope(fit: FitResult | null, center: number, current: number): numbe
   return fit.coef.b + 2 * fit.coef.c * Math.log(center / current);
 }
 
-interface Driver { value: number; text: (positive: boolean) => string }
+export interface Driver { value: number; text: (positive: boolean) => string }
+
+/**
+ * The aim signals of a round against a reference round (+ = steer slower): small-flick overshoot, big-flick reach,
+ * tracking lead/lag and speed match, and click bias, each scaled by `disc` (how much a sens jump just before may have
+ * skewed them).
+ */
+export function aimDrivers(last: StepResult, base: StepResult, cfg: Config, disc = 1): Driver[] {
+  const sc = cfg.steer;
+  const dSmall = (pooledGain(last, 'small') ?? 0) - (pooledGain(base, 'small') ?? 0);
+  const dBig = (pooledGain(last, 'big') ?? 0) - (pooledGain(base, 'big') ?? 0);
+  const ratio = (st: StepResult): number | null => st.tracking.detail?.speedRatio ?? null;
+  const lastRatio = ratio(last), baseRatio = ratio(base);
+  const dSpeed = lastRatio === null || baseRatio === null ? 0 : lastRatio - baseRatio;
+  const dBias = (pooledClickBias(last) ?? 0) - (pooledClickBias(base) ?? 0);
+  const dLead = last.tracking.leadLagDeg - base.tracking.leadLagDeg;
+  return [
+    { value: disc * sc.weights.smallGain * dSmall,
+      text: (p) => (p ? 'Small flicks and switches overshot more than baseline' : 'Small flicks and switches overshot less than baseline') },
+    { value: disc * sc.weights.bigGain * dBig,
+      text: (p) => (p ? 'Big flicks and switches reached further than baseline' : 'Big flicks and switches fell shorter than baseline') },
+    { value: disc * sc.weights.leadLag * dLead / sc.leadLagScaleDeg,
+      text: (p) => (p ? 'Tracking led the target more than baseline' : 'Tracking lagged the target more than baseline') },
+    { value: disc * sc.weights.speedMatch * dSpeed,
+      text: (p) => (p ? 'Tracking ran ahead of target speed more than baseline' : 'Tracking fell behind target speed more than baseline') },
+    { value: disc * sc.weights.clickBias * dBias / sc.clickBiasScaleDeg,
+      text: (p) => (p ? 'Clicks landed further past targets than baseline' : 'Clicks landed shorter of targets than baseline') },
+  ];
+}
 
 export function chooseNext(ctx: SteerContext, cfg: Config): SteerDecision {
   const sc = cfg.steer;
@@ -98,28 +126,12 @@ export function chooseNext(ctx: SteerContext, cfg: Config): SteerDecision {
   const base = ctx.baseline;
 
   const disc = Math.exp(-Math.abs(Math.log(last.cm360 / prev.cm360)) / sc.jumpScale);
-  const dSmall = (pooledGain(last, 'small') ?? 0) - (pooledGain(base, 'small') ?? 0);
-  const dBig = (pooledGain(last, 'big') ?? 0) - (pooledGain(base, 'big') ?? 0);
-  const ratio = (st: StepResult): number | null => st.tracking.detail?.speedRatio ?? null;
-  const lastRatio = ratio(last), baseRatio = ratio(base);
-  const dSpeed = lastRatio === null || baseRatio === null ? 0 : lastRatio - baseRatio;
-  const dBias = (pooledClickBias(last) ?? 0) - (pooledClickBias(base) ?? 0);
-  const dLead = last.tracking.leadLagDeg - base.tracking.leadLagDeg;
   const dCorr = last.flick.corrections - base.flick.corrections;
   const dSpread = last.flick.spreadRatio - base.flick.spreadRatio;
   const slope = fitSlope(fit, center, current);
 
   const drivers: Driver[] = [
-    { value: disc * sc.weights.smallGain * dSmall,
-      text: (p) => (p ? 'Small flicks and switches overshot more than baseline' : 'Small flicks and switches overshot less than baseline') },
-    { value: disc * sc.weights.bigGain * dBig,
-      text: (p) => (p ? 'Big flicks and switches reached further than baseline' : 'Big flicks and switches fell shorter than baseline') },
-    { value: disc * sc.weights.leadLag * dLead / sc.leadLagScaleDeg,
-      text: (p) => (p ? 'Tracking led the target more than baseline' : 'Tracking lagged the target more than baseline') },
-    { value: disc * sc.weights.speedMatch * dSpeed,
-      text: (p) => (p ? 'Tracking ran ahead of target speed more than baseline' : 'Tracking fell behind target speed more than baseline') },
-    { value: disc * sc.weights.clickBias * dBias / sc.clickBiasScaleDeg,
-      text: (p) => (p ? 'Clicks landed further past targets than baseline' : 'Clicks landed shorter of targets than baseline') },
+    ...aimDrivers(last, base, cfg, disc),
     { value: sc.weights.corrSpread * Math.sign(slope) * Math.max(0, dCorr / sc.correctionsScale + dSpread),
       text: () => 'More corrections or spread than baseline, following the fit slope' },
   ];

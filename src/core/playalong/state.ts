@@ -7,6 +7,7 @@ import type { ScoreBaseline } from '../score';
 import { createSession, type SessionState } from '../session';
 import type { FovType, Setup, StepResult } from '../types';
 import { gameSensOf, sameSens, snapCm360, type GameId } from './gameSens';
+import { aimDrivers } from '../steer';
 import { choosePair, nextStep, type PairDecision } from './steer';
 
 /** The player's answer to "How did that feel?". */
@@ -145,12 +146,31 @@ function shuffled<T>(s: PaState, items: T[], label: string): T[] {
   return rootFork(s, label).next() < COIN_HALF ? items : [...items].reverse();
 }
 
-function queuePair(s: PaState, center: number, step: number, cfg: Config): PaState | null {
+/**
+ * Overshoot steering (the §6 aim signals): the centre's latest test against the default's first test, each round
+ * compared and averaged. Both follow a match on that sens, so a clear signal is the sens, not adaptation: overshooting
+ * or clicking past moves the centre half a step slower, falling short half a step faster. The default is never nudged.
+ */
+export function aimNudge(s: PaState, center: number, step: number = s.step, cfg: Config = defaultConfig): { cm360: number; reason: string } {
+  const def = s.setup.defaultCm360;
+  const at = testsAt(s, center);
+  const base = testsAt(s, def)[0]?.steps[0];
+  if (same(s, center, def) || at.length === 0 || !base) return { cm360: center, reason: '' };
+  const rounds = at[at.length - 1]!.steps.map((st) => aimDrivers(st, base, cfg));
+  const signal = mean(rounds.map((ds) => ds.reduce((a, d) => a + d.value, 0)));
+  if (Math.abs(signal) < cfg.steer.deadband) return { cm360: center, reason: '' };
+  const summed = rounds[0]!.map((d, i) => ({ ...d, value: mean(rounds.map((ds) => ds[i]!.value)) }));
+  const main = summed.reduce((a, b) => (Math.abs(b.value) > Math.abs(a.value) ? b : a));
+  const dir = signal > 0 ? 1 : -1;
+  return { cm360: center * (1 + step / 2) ** dir, reason: `${main.text(main.value > 0)} → centre nudged ${dir > 0 ? 'slower' : 'faster'}` };
+}
+
+function queuePair(s: PaState, center: number, step: number, cfg: Config, note = ''): PaState | null {
   const d = choosePair({ game: s.setup.game, dpi: s.setup.dpi, defaultCm360: s.setup.defaultCm360, padWidthCm: s.setup.padWidthCm,
     centerCm360: center, step, testedCm360: s.tests.map((t) => t.cm360) }, cfg);
   if (d.exhausted) return null;
   const queue = shuffled(s, d.targets.map((cm360): QueueItem => ({ cm360, role: 'pair' })), `order-${s.tests.length}`);
-  return { ...s, step, queue, steerLog: [...s.steerLog, d] };
+  return { ...s, step, queue, steerLog: [...s.steerLog, note ? { ...d, reason: `${note}; ${d.reason}` } : d] };
 }
 
 /** leadCm360: the sens to confirm (a best guess's recommendation); the current leader when omitted. */
@@ -187,7 +207,9 @@ function plan(s: PaState, cfg: Config): PaState {
   const pairsPlayed = s.tests.some((t) => t.role === 'pair');
   if (!pairsPlayed) return queuePair(s, s.setup.defaultCm360, cfg.playAlong.firstStep, cfg) ?? startH2h(s, cfg);
   if (s.step <= cfg.playAlong.minStep) return startH2h(s, cfg);
-  return queuePair(s, leader(s, cfg), nextStep(s.step, cfg), cfg) ?? startH2h({ ...s, step: nextStep(s.step, cfg) }, cfg);
+  const step = nextStep(s.step, cfg);
+  const nudge = aimNudge(s, leader(s, cfg), step, cfg);
+  return queuePair(s, nudge.cm360, step, cfg, nudge.reason) ?? startH2h({ ...s, step }, cfg);
 }
 
 const allRight = (ts: PaTest[]): boolean => ts.length > 0 && ts.every((t) => t.feel === 'right');
