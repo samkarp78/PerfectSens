@@ -30,7 +30,14 @@ The first draft feels like a chore. All of these are safe for the measurement as
 ## Results and advice
 
 - **Re-tune the tracking-vs-flicking diagnosis.** Its reference value (refTot 0.5) was set for the old, harder tracking, so it now leans toward "train flicking". In the play-test the finding was 1.17 against a 1.15 threshold, which is essentially noise.
-- **Mousepad width in setup:** cap the slowest test sens so a 180° turn fits the pad.
+- **Play area calibration:** measure the mousepad instead of asking for it.
+  - With the mouse locked, the player slides from the far left of their pad to the far right (and optionally top to bottom). The raw counts ÷ DPI × 2.54 give the usable width in cm, with no ruler needed.
+  - Repeat 2–3 times and take the smallest.
+  - Uses:
+    - Cap the slowest test sens so a comfortable turn (e.g. 180°) fits the pad.
+    - Warn if the player's current sens already doesn't fit.
+    - Show it on results ("a 180° turn uses 17 cm of your 40 cm pad").
+  - It depends on the DPI being entered correctly. A mismatch would show up as an odd pad size, which is itself a useful check of the DPI.
 - **Gradual-change advice:** if the recommended change is more than about 10%, suggest moving halfway first, playing a week, then running Quick A/B from History. This follows the pros' "small steps, give it a week" habit.
 - **Sens variation as a training tip** under "What to train". Optional.
 
