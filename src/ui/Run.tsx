@@ -22,6 +22,8 @@ interface View { phase: RunPhase; hud: string; restText: string; done: number; t
 
 const LOCK_DENIED_TEXT = 'Click again to lock the mouse.';
 const PAUSED_TEXT = 'Paused — this block will restart.';
+/** How long the quit button stays armed waiting for the confirming click. */
+const QUIT_CONFIRM_MS = 3000;
 const viewOf = (c: RunController): View => {
   const p = c.session.progress;
   return { phase: c.phase, hud: c.hud, restText: c.restText, done: p?.blocksDone ?? 0, total: p?.blocksTotal ?? 0 };
@@ -37,6 +39,12 @@ export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
   const ctrl = ctrlRef.current;
   const [view, setView] = useState<View>(() => viewOf(ctrl));
   const [denied, setDenied] = useState(false);
+  const [quitArmed, setQuitArmed] = useState(false);
+  useEffect(() => {
+    if (!quitArmed) return;
+    const id = setTimeout(() => setQuitArmed(false), QUIT_CONFIRM_MS);
+    return () => clearTimeout(id);
+  }, [quitArmed]);
   const cbRef = useRef({ onFinished, onUnsupported });
   cbRef.current = { onFinished, onUnsupported };
 
@@ -167,8 +175,11 @@ export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
             <p class="rest-cta">Click to start</p>
             {denied && <p class="rest-warn">{LOCK_DENIED_TEXT}</p>}
             {warmup && <button type="button" class="rest-skip" onClick={skip}>Skip warm-up</button>}
-            <button type="button" class="rest-skip" onClick={(e) => { e.stopPropagation(); onQuit(); }}>Quit test</button>
           </div>
+          <button type="button" class={quitArmed ? 'quit quit-armed' : 'quit'}
+            onClick={(e) => { e.stopPropagation(); if (quitArmed) onQuit(); else setQuitArmed(true); }}>
+            {quitArmed ? 'Click again to quit (progress is lost)' : 'Quit test'}
+          </button>
         </div>
       )}
     </div>
