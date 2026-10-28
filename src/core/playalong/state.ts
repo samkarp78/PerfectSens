@@ -246,6 +246,14 @@ export function startNight(s: PaState, now: number, cfg: Config = defaultConfig)
   return { ...opened, queue: [{ cm360: s.setup.defaultCm360, role: 'anchor' }, ...opened.queue] };
 }
 
+/** Reopening a saved search: within playAlong.sameNightMs of the last activity it carries on the same night (an
+ *  interrupted test goes back to its waiting screen); after that, or from a best guess, a new night starts. */
+export function resume(s: PaState, now: number, cfg: Config = defaultConfig): PaState {
+  const lastActivity = Math.max(s.waitingSince, s.tests[s.tests.length - 1]?.finishedAt ?? s.createdAt);
+  if (s.result || now - lastActivity >= cfg.playAlong.sameNightMs) return startNight(s, now, cfg);
+  return s.phase === 'testing' || s.phase === 'feel' ? abandonTest(s, now) : s;
+}
+
 export function isStale(s: PaState, now: number, cfg: Config = defaultConfig): boolean {
   const last = s.tests[s.tests.length - 1]?.finishedAt ?? s.createdAt;
   return now - last > cfg.playAlong.staleDays * DAY_MS;

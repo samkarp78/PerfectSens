@@ -51,8 +51,8 @@ export function History({ history, loading = false, onBack, onQuickAb, onOpen }:
             return (
               <li key={s.id} class="history-row">
                 <div class="history-head">
-                  <span>{fmtDate(s.createdAt)}{s.mode === 'quickab' ? ' · quick A/B' : ''}</span>
-                  <strong>{VERDICT_TEXT[s.result.verdict]}</strong>
+                  <span>{fmtDate(s.createdAt)}{s.mode === 'quickab' ? ' · quick A/B' : s.mode === 'playalong' ? ' · Play-Along' : ''}</span>
+                  <strong>{s.mode === 'playalong' && s.result.lowConfidence ? 'Best guess' : VERDICT_TEXT[s.result.verdict]}</strong>
                   <span>{fmt(s.result.recommendedCm360)} cm/360</span>
                   <span class="muted">{s.result.range ? `${fmt(a)} to ${fmt(b)}` : 'no range'}</span>
                 </div>

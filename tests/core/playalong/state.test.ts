@@ -3,7 +3,7 @@ import { defaultConfig } from '../../../src/core/config';
 import { nextBlock } from '../../../src/core/session';
 import { finalsToCm360, gameSensOf } from '../../../src/core/playalong/gameSens';
 import {
-  abandonTest, answerFeel, answerHourCheck, createPlayAlong, currentTarget, feelFlagsOf, isStale, markBack, startNight,
+  abandonTest, answerFeel, answerHourCheck, createPlayAlong, currentTarget, feelFlagsOf, isStale, markBack, resume, startNight,
   submitTest, testSession, type Feel, type PaSetup, type PaState, type TestRole,
 } from '../../../src/core/playalong/state';
 import { fakeDone } from '../../helpers/paSteps';
@@ -196,6 +196,23 @@ describe('Play-Along search', () => {
     x = startNight(answerHourCheck(x, 'later', clock.now), clock.now + DAY);
     x = play(x, clock, () => 0, 'slow'); // the anchor, at the default again
     expect(feelFlagsOf(x.tests, 'finals')).toEqual([{ cm360: DEFAULT, feel: 'slow' }]);
+  });
+
+  it('resume within 3 hours continues the same night on the same sens', () => {
+    const { s } = fresh();
+    const testing = answerFeel(markBack(s, 10 * MIN), 'right'); // tab closed mid-test
+    const back = resume(testing, 40 * MIN);
+    expect(back.nights).toHaveLength(1);
+    expect(back.phase).toBe('waiting');
+    expect(currentTarget(back)!.cm360).toBe(DEFAULT);
+  });
+
+  it('resume after 3 hours starts a new night', () => {
+    const { s, clock } = fresh();
+    const x = play(s, clock, () => 0);
+    const back = resume(x, clock.now + 4 * 60 * MIN);
+    expect(back.nights).toHaveLength(2);
+    expect(back.queue[0]!.role).toBe('anchor');
   });
 
   it('isStale after 14 days', () => {

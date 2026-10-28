@@ -169,3 +169,16 @@ p { line-height: 1.5; }
 .chart-whisker { stroke: #4cc9f0; stroke-width: 2; opacity: 0.6; }
 .chart-col-current { fill: var(--muted); opacity: 0.08; }
 .history-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+/* Play-Along */
+.pa { text-align: center; }
+.pa-label { margin: 0 0 8px; color: var(--muted); font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; }
+.pa-number { margin: 0 0 8px; font-size: 26px; line-height: 1.3; }
+.pa-number strong { display: block; font-size: 64px; line-height: 1.1; color: var(--accent); }
+.pa-sub { margin: 0 0 16px; color: var(--muted); }
+.pa-saved { margin: 0 0 12px; color: var(--accent); }
+.pa-feel { justify-content: center; }
+.hold-btn { position: relative; overflow: hidden; min-width: 220px; margin-top: 12px; padding: 14px 20px; font-size: 17px; touch-action: none; user-select: none; }
+.hold-fill { position: absolute; inset: 0 auto 0 0; background: rgba(255, 255, 255, 0.25); pointer-events: none; }
+.hold-label { position: relative; }
+.pa-table { width: 100%; border-collapse: collapse; }
+.pa-table th, .pa-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--line); }

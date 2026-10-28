@@ -45,7 +45,8 @@ export function runPlayAlongSim(setup: PaSetup, player: SimPlayer, seed: number,
       session = submitBlock(session, spec.kind === 'warmup' ? null : r.log);
     }
     now = t;
-    s = submitTest(s, session, now, cfg);
+    // The raw logs are only needed for saving; dropping them keeps long simulator runs light on memory.
+    s = submitTest(s, { ...session, logs: { flick: [], switch: [], tracking: [], trackSwitch: [] } }, now, cfg);
     testsPerNight[testsPerNight.length - 1]! += 1;
   }
   return { state: s, nights: testsPerNight.length, testsPerNight };

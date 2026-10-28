@@ -23,6 +23,8 @@ export interface RunProps {
   onFinished(state: SessionState, stats: ScoreState): void;
   onUnsupported(): void;
   onQuit(): void;
+  /** Play-Along: no points, streaks or grades are shown (the player knows the sens being tested). */
+  hideScores?: boolean;
 }
 
 interface View { phase: RunPhase; hud: string; restText: string; done: number; total: number }
@@ -53,7 +55,7 @@ const clock = (ms: number): string => {
 const nearest = (aim: Aim, targets: readonly Aim[]): Aim | null =>
   [...targets].sort((a, b) => angleBetween(aim, a) - angleBetween(aim, b))[0] ?? null;
 
-export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunProps) {
+export function Run({ session, prefs, onFinished, onUnsupported, onQuit, hideScores = false }: RunProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const arrowRef = useRef<HTMLDivElement>(null);
   const holdRef = useRef<HTMLDivElement>(null);
@@ -192,7 +194,7 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
       if (r) read(r, now);
       const st = keeper.state;
       const text = `${st.points.toLocaleString()} pts${st.streak >= 2 ? ` · ×${st.streak} streak` : ''}`;
-      if (text !== scoreText && scoreRef.current) { scoreRef.current.textContent = text; scoreText = text; }
+      if (!hideScores && text !== scoreText && scoreRef.current) { scoreRef.current.textContent = text; scoreText = text; }
     };
 
     const dispose = startCapture(
@@ -315,6 +317,7 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
   const card = (view.phase === 'rest' && !locked) || view.phase === 'paused';
   const answer = (accept: boolean) => { ctrl.answerExtension(accept); setView(viewOf(ctrl)); };
   const warmup = view.phase === 'rest' && view.hud === 'Warm-up';
+  const lead = view.hud === 'Warm-up' || view.hud === 'Lead-in';
   const rounds = view.total / BLOCKS_PER_STEP;
   const round = Math.min(Math.floor(view.done / BLOCKS_PER_STEP) + 1, rounds);
   const quit = (
@@ -345,7 +348,7 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
           <div class="progress-fill" style={{ width: `${Math.max(1, Math.min(100, (100 * view.done) / view.total))}%` }} />
         </div>
       )}
-      {view.total > 0 && view.hud !== 'Warm-up' && <div class="progress-count">Round {round} / ~{rounds}</div>}
+      {view.total > 0 && !lead && <div class="progress-count">Round {round} / ~{rounds}</div>}
       <div ref={arrowRef} class="offscreen-arrow" aria-hidden="true" />
       <div ref={holdRef} class="hold-prompt" aria-live="polite">Hold the mouse button</div>
       {countdown !== null && <Countdown text={view.restText} n={countdown} />}
@@ -361,7 +364,7 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
         <div class="rest-overlay">
           <div class="rest-card" role="button" tabIndex={0} onClick={start}
             onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) void start(); }}>
-            {view.total > 0 && view.hud !== 'Warm-up' && (
+            {view.total > 0 && !lead && (
               <p class="rest-progress">{Math.round((100 * view.done) / view.total)}% done · round {round} of about {rounds}</p>
             )}
             <p class="rest-text">{view.phase === 'paused' ? PAUSED_TEXT : view.restText}</p>
