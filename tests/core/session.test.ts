@@ -247,6 +247,22 @@ describe('asking before the extra A/B round', () => {
     throw new Error('no seed reached a borderline A/B');
   })();
 
+  /** Quick A/B with the pick at a much better sens than current: look 1 favours the pick, so the session asks to confirm. */
+  function aheadAsk(): SessionState {
+    const setup = setupFor();
+    const player = defaultSimPlayer(CURRENT, { optimalCm360: 0.7 * CURRENT, curvature: 6 });
+    let s = createSession(setup, opts({ seed: 11, askBeforeExtending: true, quickAbCm360: 0.7 * CURRENT }), cfg);
+    let sim: SimState = { adaptedCm360: CURRENT, blocksDone: 0 };
+    let t = 0;
+    for (let i = 0, spec = nextBlock(s); spec; i++, spec = nextBlock(s)) {
+      const r = simulateBlock(spec, setup, player, sim, createRng(1100 + i), cfg, t);
+      sim = r.state; t = r.endT + cfg.sim.blockGapMs;
+      s = submitBlock(s, r.log);
+    }
+    if (!s.awaitingExtension) throw new Error('expected the session to ask');
+    return s;
+  }
+
   it('pauses with no next block and no result while waiting for the answer', () => {
     expect(asked.result).toBeNull();
     expect(nextBlock(asked)).toBeNull();
@@ -265,6 +281,18 @@ describe('asking before the extra A/B round', () => {
     expect(s.awaitingExtension).toBe(false);
     expect(nextBlock(s)!.stage).toBe('ab');
     expect(s.progress!.blocksTotal).toBe(4 * (1 + cfg.session.dialinSteps.default + 1 + 8));
+  });
+
+  it('extensionReason is ahead when look 1 favours the pick', () => {
+    expect(aheadAsk().extensionReason).toBe('ahead');
+    expect(['ahead', 'close']).toContain(asked.extensionReason);
+  });
+
+  it('declining the confirmation while ahead gives none', () => {
+    const s = extendAb(aheadAsk(), false);
+    expect(s.result!.verdict).toBe('none');
+    expect(s.abDecisions.every((d) => d.decision !== 'change')).toBe(true);
+    expect(s.extensionReason).toBeNull();
   });
 
   it('without the option the session extends automatically, as before', () => {

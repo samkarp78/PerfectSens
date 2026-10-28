@@ -29,7 +29,21 @@ describe('abSequence', () => {
 
 describe('decideAB', () => {
   const cfg = defaultConfig;
-  it('change when P clearly better', () => expect(decideAB(mk(0.08, 0, 0.01), 1, cfg).decision).toBe('change'));
+  it('change when P clearly better at look 2 and look 1 favoured it', () => expect(decideAB(mk(0.08, 0, 0.01), 2, cfg, 0.05).decision).toBe('change'));
+  it('look 1 never decides change', () => {
+    expect(decideAB(mk(0.3, 0, 0.001), 1, cfg).decision).toBe('continue');
+  });
+  it('look 2 change needs look-1 delta > 0', () => {
+    expect(decideAB(mk(0.08, 0, 0.01), 2, cfg, -0.01).decision).toBe('none');
+    expect(decideAB(mk(0.08, 0, 0.01), 2, cfg, null).decision).toBe('none');
+    expect(decideAB(mk(0.08, 0, 0.01), 2, cfg).decision).toBe('none');
+  });
+  it('z = 2.5 boundary', () => {
+    expect(cfg.ab.z).toBe(2.5);
+    // se of the difference equals the per-block se here (two blocks per arm)
+    expect(decideAB(mk(0.1, 0, 0.039), 2, cfg, 0.1).decision).toBe('change');
+    expect(decideAB(mk(0.1, 0, 0.041), 2, cfg, 0.1).decision).toBe('none');
+  });
   it('keep when P clearly worse', () => expect(decideAB(mk(-0.08, 0, 0.01), 1, cfg).decision).toBe('keep'));
   it('none when effect is tiny and precise', () => {
     const r = decideAB(mk(0.005, 0, 0.005), 1, cfg);

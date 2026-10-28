@@ -30,7 +30,8 @@ export const defaultConfig = {
     weights: { smallGain: 1, bigGain: 1, leadLag: 0.5, corrSpread: 0.5, clickBias: 0.5, speedMatch: 0.5 },
     leadLagScaleDeg: 1, clickBiasScaleDeg: 20, correctionsScale: 0.5, jumpScale: 0.15, deadband: 0.02, minSeparation: 0.01 },
   fit: { driftPriorSd: 0.03, familiarityPriorSd: 0.03, bootstrapSamples: 300, rangeFraction: 0.5, gridPoints: 101, minDistinctX: 4 },
-  ab: { minEffect: 0.03, z: 2.0 },
+  /** A/B: 'change' needs both rounds and delta > z·SE (target false change ≤ 1%). */
+  ab: { minEffect: 0.03, z: 2.5 },
   session: { dialinSteps: { default: 5, thorough: 8, quick: 3 }, warmupMs: 60000, maxRetries: 1, breakEveryRounds: 3,
     invalidTimeoutFraction: 0.3, invalidMinTot: 0.05, invalidMinDmg: 0.05 },
   diagnose: { spreadRatioMax: 1.0, correctionsMax: 1.0, smallGainMax: 1.08, bigGainMin: 0.8,

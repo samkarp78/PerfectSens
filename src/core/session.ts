@@ -33,6 +33,8 @@ export interface SessionState {
   readonly logs: { flick: FlickBlockLog[]; switch: SwitchBlockLog[]; tracking: TrackingBlockLog[]; trackSwitch: TrackSwitchBlockLog[] }; readonly result: SessionResult | null;
   /** The first A/B round was too close to call and the player must choose (extendAb) whether to play the second. */
   readonly awaitingExtension: boolean;
+  /** Why it is asking: 'ahead' when look 1 favoured the pick (confirming it), 'close' otherwise; null when not asking. */
+  readonly extensionReason: 'ahead' | 'close' | null;
   /** blocksDone/blocksTotal count scored part blocks (warm-up excluded); the total is an estimate
    *  that grows if the A/B adds its second round. */
   readonly progress: {
@@ -64,7 +66,7 @@ export function createSession(setup: Setup, opts: SessionOptions, cfg: Config = 
   const quick = opts.quickAbCm360 !== null;
   const base: SessionState = {
     setup, mode: quick ? 'quickab' : 'full', steps: [], fit: null, steerLog: [], abDecisions: [],
-    logs: { flick: [], switch: [], tracking: [], trackSwitch: [] }, result: null, progress: null, awaitingExtension: false, _ask: opts.askBeforeExtending ?? false,
+    logs: { flick: [], switch: [], tracking: [], trackSwitch: [] }, result: null, progress: null, awaitingExtension: false, extensionReason: null, _ask: opts.askBeforeExtending ?? false,
     _cfg: cfg, _seed: opts.seed, _warmupPending: opts.warmup, _pending: null, _retries: 0,
     _arms: [], _pick: null,
   };
@@ -224,10 +226,14 @@ function planAb(s: SessionState): SessionState {
   if (ab.length > 0 && ab.length === s._arms.length) {
     const look: 1 | 2 = s.abDecisions.length === 0 ? 1 : 2;
     const blocks: AbBlock[] = ab.map((st) => ({ arm: st.arm!, logS: st.score.logS, se: st.score.se }));
-    const decision = decideAB(blocks, look, s._cfg);
+    const decision = decideAB(blocks, look, s._cfg, s.abDecisions[0]?.delta ?? null);
     const decided = { ...s, abDecisions: [...s.abDecisions, decision] };
     if (decision.decision !== 'continue') return finish(decided, false);
-    if (s._ask) return { ...decided, _pending: null, awaitingExtension: true };
+    if (s._ask) {
+      const m = Math.log(1 + s._cfg.ab.minEffect);
+      const ahead = decision.delta > m && decision.delta > s._cfg.ab.z * decision.se;
+      return { ...decided, _pending: null, awaitingExtension: true, extensionReason: ahead ? 'ahead' : 'close' };
+    }
     return planAb({ ...decided, _arms: [...s._arms, ...extendSequence(s._arms)] });
   }
   const j = ab.length;
@@ -240,7 +246,7 @@ function planAb(s: SessionState): SessionState {
 /** The player's answer to a borderline first A/B round: play the mirrored second round, or stop with no clear winner. */
 export function extendAb(s: SessionState, accept: boolean): SessionState {
   if (!s.awaitingExtension) throw new Error('extendAb: the session is not waiting for an answer');
-  const waiting = { ...s, awaitingExtension: false };
+  const waiting = { ...s, awaitingExtension: false, extensionReason: null };
   if (accept) return withProgress(planAb({ ...waiting, _arms: [...s._arms, ...extendSequence(s._arms)] }));
   const last = s.abDecisions[s.abDecisions.length - 1]!;
   return withProgress(finish({ ...waiting, abDecisions: [...s.abDecisions, { ...last, decision: 'none' }] }, false));
