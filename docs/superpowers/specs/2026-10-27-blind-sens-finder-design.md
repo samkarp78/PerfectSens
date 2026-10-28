@@ -469,7 +469,7 @@ The waiting screen always shows the number to type in large text (with cm/360 un
 ### 18.4 Games and the sens number
 
 - **The Finals (built in):**
-  - Hip-fire yaw is 0.001° per count per sens point, so cm/360 = 914.4 ÷ (sens × DPI) and sens = 914.4 ÷ (cm/360 × DPI).
+  - Hip-fire yaw is 0.001° per count per sens point, so cm/360 = 914,400 ÷ (sens × DPI) and sens = 914,400 ÷ (cm/360 × DPI).
   - Source: three mouse-sensitivity.com lookups at 800 DPI (33 → 34.6364, 16.5 → 69.2727, 66 → 17.3182 cm/360), all exactly on this line. The constant ships as is, with no in-game ruler check (user decision).
   - **Whole numbers only.** The Finals has no decimal sens, so every test sens is a whole number, and the app uses that number's exact cm/360. Ranges are shown in whole numbers.
 - **Other game:** the player enters cm/360. The waiting screen shows the cm/360 plus a ruler check ("set your game sens so sliding the mouse 30.0 cm turns you exactly one full circle"). Steering is not limited to whole numbers.

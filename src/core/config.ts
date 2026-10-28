@@ -44,7 +44,7 @@ export const defaultConfig = {
   store: { keepRawSessions: 5 },
   /** Play-Along mode (§18): real game matches between short tests. finalsK: The Finals cm/360 = finalsK / (sens × DPI). */
   playAlong: { roundsPerTest: 3, leadInMs: 15000, firstStep: 0.2, minStep: 0.04, hourCheckMs: 3_000_000, staleDays: 14,
-    maxH2hPerNight: 2, h2hBlocksPerSide: 1, z: 2.5, nightPriorSd: 0.03, finalsK: 914.4, holdMs: 1000, testTimeScale: 0.25,
+    maxH2hPerNight: 2, h2hBlocksPerSide: 1, z: 2.5, nightPriorSd: 0.03, finalsK: 914_400, holdMs: 1000, testTimeScale: 0.25,
     sim: { matchMs: 600_000, familiarityShrink: 0.5, nightSd: 0.03, maxNights: 4 } },
   demo: { player: { optimalRatio: 0.75 } },
   /** Quick test mode (about 5 min, for trying the tool out): shorter blocks; too little data for a reliable answer. */

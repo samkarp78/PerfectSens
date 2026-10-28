@@ -15,7 +15,7 @@
 
 ## Global Constraints
 
-- **The Finals:** cm/360 = 914.4 ÷ (sens × DPI), and sens = 914.4 ÷ (cm/360 × DPI). Whole numbers only, minimum 1. There is no ruler check.
+- **The Finals:** cm/360 = 914,400 ÷ (sens × DPI), and sens = 914,400 ÷ (cm/360 × DPI). Whole numbers only, minimum 1. There is no ruler check.
 - **Other game:** cm/360 only, not snapped.
 - **Test block:** a 15 s unscored lead-in (free flick targets at the test sens), then 3 rounds of the §17 four-part round, with no breaks inside.
 - **Scores hidden:** no score, grade, streak or block total is shown during Play-Along. The block ends on "Test saved".
@@ -61,7 +61,7 @@ Config block, added to `defaultConfig`:
 ```ts
 /** Play-Along mode (§18). */
 playAlong: { roundsPerTest: 3, leadInMs: 15000, firstStep: 0.2, minStep: 0.04, hourCheckMs: 3_000_000, staleDays: 14,
-  maxH2hPerNight: 2, h2hBlocksPerSide: 1, z: 2.5, nightPriorSd: 0.03, finalsK: 914.4, holdMs: 1000, testTimeScale: 0.25,
+  maxH2hPerNight: 2, h2hBlocksPerSide: 1, z: 2.5, nightPriorSd: 0.03, finalsK: 914_400, holdMs: 1000, testTimeScale: 0.25,
   sim: { matchMs: 600_000, familiarityShrink: 0.5, nightSd: 0.03, maxNights: 4 } },
 ```
 
