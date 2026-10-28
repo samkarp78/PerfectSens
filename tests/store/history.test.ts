@@ -54,7 +54,7 @@ describe('history', () => {
     const h = (await openHistory())!;
     await h.save(make(1));
     const db = await new Promise<IDBDatabase>((res) => { const r = indexedDB.open('bsf'); r.onsuccess = () => res(r.result); });
-    expect([...db.objectStoreNames].sort()).toEqual(['raw', 'sessions']);
+    expect([...db.objectStoreNames].sort()).toEqual(['playalong', 'raw', 'sessions']);
     const read = (name: string, key: string) => new Promise<any>((res) => { const r = db.transaction(name).objectStore(name).get(key); r.onsuccess = () => res(r.result); });
     expect((await read('sessions', 's1')).raw).toBeNull();
     expect(await read('raw', 's1')).toBeTruthy();

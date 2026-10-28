@@ -4,12 +4,17 @@ import type { SessionResult } from '../core/result';
 import type { SessionState } from '../core/session';
 import type { SteerDecision } from '../core/steer';
 import type { Setup, StepResult } from '../core/types';
+import { gameSensOf } from '../core/playalong/gameSens';
+import type { PaResult, PaSetup, PaState, PaTest } from '../core/playalong/state';
 
+export type RecordMode = 'full' | 'quickab' | 'playalong';
+/** playAlong: the search's own setup, tests and result (Play-Along records only). */
 export interface SessionRecord {
-  id: string; createdAt: string; mode: 'full' | 'quickab'; setup: Setup; result: SessionResult;
+  id: string; createdAt: string; mode: RecordMode; setup: Setup; result: SessionResult;
   steps: StepResult[]; steerLog: SteerDecision[]; abDecisions: AbDecision[]; raw: SessionState['logs'] | null;
+  playAlong?: { setup: PaSetup; tests: PaTest[]; result: PaResult; nights: number };
 }
-export interface SessionSummary { id: string; createdAt: string; mode: 'full' | 'quickab'; setup: Setup; result: SessionResult }
+export interface SessionSummary { id: string; createdAt: string; mode: RecordMode; setup: Setup; result: SessionResult }
 export interface History {
   save(rec: SessionRecord): Promise<void>;
   /** Newest first. */
@@ -18,10 +23,38 @@ export interface History {
 }
 
 const DB_NAME = 'bsf';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = 'sessions';
 const RAW_STORE = 'raw';
+/** The saved, unfinished Play-Along search (added in DB version 2). */
+export const PLAYALONG_STORE = 'playalong';
 const BY_CREATED = 'createdAt';
+
+const VERDICT_OF = { change: 'change', keep: 'keep', none: 'none', bestGuess: 'none' } as const;
+
+/** A History record for a finished (or best-guess) Play-Along search; raw logs from every test are merged. */
+export function recordFromPlayAlong(s: PaState, now: Date, id: string): SessionRecord {
+  const r = s.result;
+  if (!r) throw new Error('The search has no result yet');
+  const { game, dpi, defaultCm360, fov, fovType, padWidthCm } = s.setup;
+  const setup: Setup = { dpi, cm360: defaultCm360, inGameSens: gameSensOf(game, defaultCm360, dpi), fov, fovType, mode: 'default', padWidthCm };
+  const ratio = defaultCm360 / r.recommendedCm360;
+  const result: SessionResult = {
+    verdict: VERDICT_OF[r.kind], currentCm360: defaultCm360, pickCm360: r.recommendedCm360, recommendedCm360: r.recommendedCm360,
+    range: r.rangeCm360, multiplier: Math.round(ratio * 100) / 100, newInGameSens: r.recommendedGameSens, edge: null,
+    lowConfidence: r.kind === 'bestGuess', abSkipped: r.h2h === null, ab: r.h2h, findings: r.findings,
+  };
+  const logs = Object.values(s.logs);
+  const raw: SessionState['logs'] = {
+    flick: logs.flatMap((l) => l.flick), switch: logs.flatMap((l) => l.switch),
+    tracking: logs.flatMap((l) => l.tracking), trackSwitch: logs.flatMap((l) => l.trackSwitch),
+  };
+  return {
+    id, createdAt: now.toISOString(), mode: 'playalong', setup, result, steps: s.tests.flatMap((t) => t.steps),
+    steerLog: [], abDecisions: r.h2h ? [r.h2h] : [], raw,
+    playAlong: { setup: s.setup, tests: s.tests, result: r, nights: s.nights.length },
+  };
+}
 
 export function recordFromSession(s: SessionState, now: Date, id: string): SessionRecord {
   if (!s.result) throw new Error('Session has no result yet');
@@ -42,14 +75,18 @@ const done = (tx: IDBTransaction): Promise<void> =>
     tx.onabort = () => reject(tx.error);
   });
 
-function openDb(): Promise<IDBDatabase | null> {
+/** The app's IndexedDB (history, raw logs and the saved Play-Along search), or null where it can't be opened. */
+export function openDb(): Promise<IDBDatabase | null> {
   return new Promise((resolve) => {
     try {
       const req = globalThis.indexedDB.open(DB_NAME, DB_VERSION);
-      req.onupgradeneeded = () => {
-        const store = req.result.createObjectStore(STORE, { keyPath: 'id' });
-        store.createIndex(BY_CREATED, 'createdAt');
-        req.result.createObjectStore(RAW_STORE);
+      req.onupgradeneeded = (e) => {
+        if (e.oldVersion < 1) {
+          const store = req.result.createObjectStore(STORE, { keyPath: 'id' });
+          store.createIndex(BY_CREATED, 'createdAt');
+          req.result.createObjectStore(RAW_STORE);
+        }
+        if (e.oldVersion < 2) req.result.createObjectStore(PLAYALONG_STORE);
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => resolve(null);
