@@ -1,3 +1,4 @@
 import { render } from 'preact';
+import { App } from './ui/App';
 
-render(<h1>Blind Sens Finder</h1>, document.getElementById('app')!);
+render(<App />, document.getElementById('app')!);
