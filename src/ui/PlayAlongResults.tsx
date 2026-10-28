@@ -5,6 +5,8 @@ import type { SessionRecord } from '../store/history';
 import { toJson } from '../store/export';
 import { download, fmt } from './format';
 import { feelFlagText, rangeText, sensText, verdictText } from './playAlongText';
+import { gameSensOf } from '../core/playalong/gameSens';
+import { StatCharts } from './StatCharts';
 
 const TOP_FINDINGS = 2;
 const FEEL_TEXT = { fast: 'too fast', slow: 'too slow', right: 'about right' } as const;
@@ -55,6 +57,8 @@ export function PlayAlongResults({ rec, onAgain, onHistory }: PlayAlongResultsPr
           </tbody>
         </table>
       </section>
+      <StatCharts steps={pa.tests.flatMap((t) => t.steps)} controlCm360={defaultCm360}
+        labelOf={(cm) => (game === 'finals' ? String(gameSensOf(game, cm, dpi)) : cm.toFixed(1))} />
       {r.findings.length > 0 && (
         <section class="panel">
           <h2>What to train</h2>

@@ -182,3 +182,14 @@ p { line-height: 1.5; }
 .hold-label { position: relative; }
 .pa-table { width: 100%; border-collapse: collapse; }
 .pa-table th, .pa-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--line); }
+/* Stat charts (every stat at every sens) */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.stat-chart { margin: 0; }
+.stat-chart figcaption { font-size: 13px; margin-bottom: 4px; }
+.stat-chart svg { width: 100%; height: auto; display: block; }
+.stat-zero { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 3; }
+.stat-line { fill: none; stroke: var(--muted); stroke-width: 1; opacity: 0.6; }
+.stat-dot { fill: var(--accent); }
+.stat-dot-control { fill: var(--panel); stroke: var(--accent); stroke-width: 2; }
+.stat-val { fill: var(--text); font-size: 10px; }
+.stat-axis { fill: var(--muted); font-size: 10px; }

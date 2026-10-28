@@ -8,6 +8,7 @@ import { SpreadChart } from './SpreadChart';
 import { download, fmt } from './format';
 import type { ScoreState } from './scoreKeeper';
 import { SessionStats } from './SessionStats';
+import { StatCharts } from './StatCharts';
 import type { Bests } from '../store/bests';
 
 const TOP_FINDINGS = 2;
@@ -120,6 +121,8 @@ export function Results({ rec, fit, stats = null, bests = null, saveFailed = fal
         <CurveChart steps={rec.steps} fit={fit} result={r} />
         <p class="legend">Higher is better. <span class="dot" /> sens you tested · <span class="dot dot-ab" /> A/B check · line = trend across all rounds</p>
       </section>
+
+      <StatCharts steps={rec.steps} controlCm360={r.currentCm360} labelOf={(cm) => fmt(cm)} />
 
       <section class="panel">
         <h2>Spread at each sensitivity</h2>
