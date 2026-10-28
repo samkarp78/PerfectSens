@@ -45,7 +45,7 @@ export function validateSetup(input: Input):
   }
 
   const mode = input.mode;
-  if (mode !== 'default' && mode !== 'thorough') errors.mode = 'Mode must be default or thorough.';
+  if (mode !== 'default' && mode !== 'thorough' && mode !== 'quick') errors.mode = 'Mode must be default, thorough or quick.';
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
   return { ok: true, setup: { dpi: dpi!, cm360: cm360!, inGameSens, fov: fov!, fovType: fovType as Setup['fovType'], mode: mode as Setup['mode'] } };

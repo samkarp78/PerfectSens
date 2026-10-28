@@ -1,4 +1,4 @@
-import { defaultConfig, type Config } from '../core/config';
+import type { Config } from '../core/config';
 import { degPerCount } from '../core/geometry';
 import { FlickRunner } from '../core/run/flickRunner';
 import { TrackingRunner } from '../core/run/trackingRunner';
@@ -40,7 +40,7 @@ export function hudText(p: Progress): string {
   }
 }
 
-export function createRunController(initial: SessionState, cfg: Config = defaultConfig): RunController {
+export function createRunController(initial: SessionState, cfg: Config = initial._cfg): RunController {
   let session = initial;
   let phase: RunPhase = session.result ? 'finished' : 'rest';
   let runner: FlickRunner | TrackingRunner | null = null;

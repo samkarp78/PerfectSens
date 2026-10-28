@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { configForMode } from '../core/config';
 import './styles.css';
 import { createSession, type SessionState } from '../core/session';
 import type { FitResult } from '../core/fit';
@@ -47,7 +48,7 @@ export function App() {
   }, []);
 
   const begin = (setup: SetupValues, warmup: boolean, quickAbCm360: number | null) => {
-    setSession(createSession(setup, { seed: newSeed(), warmup, quickAbCm360 }));
+    setSession(createSession(setup, { seed: newSeed(), warmup, quickAbCm360 }, configForMode(setup.mode)));
     setUnsupported(false);
     setScreen('run');
   };
