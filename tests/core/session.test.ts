@@ -1,0 +1,185 @@
+import { describe, expect, it } from 'vitest';
+import { defaultConfig as cfg } from '../../src/core/config';
+import { degPerCount } from '../../src/core/geometry';
+import { createRng } from '../../src/core/rng';
+import { FlickRunner } from '../../src/core/run/flickRunner';
+import { TrackingRunner } from '../../src/core/run/trackingRunner';
+import { createSession, nextBlock, submitBlock, type SessionOptions, type SessionState } from '../../src/core/session';
+import { defaultSimPlayer, type SimState } from '../../src/core/sim/player';
+import { runSimSession } from '../../src/core/sim/runSession';
+import { simulateBlock } from '../../src/core/sim/simulate';
+import type { BlockSpec, FlickBlockLog, Mode, Setup } from '../../src/core/types';
+
+const CURRENT = 40;
+const setupFor = (mode: Mode = 'default'): Setup => ({ dpi: 800, cm360: CURRENT, inGameSens: 33, fov: 103, fovType: 'horizontal', mode });
+const opts = (o: Partial<SessionOptions> = {}): SessionOptions => ({ seed: 7, warmup: false, quickAbCm360: null, ...o });
+const label = (b: BlockSpec): string => `${b.stage}:${b.kind}`;
+
+/** A flick log in which every target timed out. */
+function allTimeouts(spec: BlockSpec, setup: Setup): FlickBlockLog {
+  const runner = new FlickRunner(spec, degPerCount(setup.dpi, spec.cm360), cfg, 0);
+  runner.tick(1e9);
+  return runner.log();
+}
+
+const defaultRun = (() => {
+  let cached: ReturnType<typeof runSimSession> | null = null;
+  return () => (cached ??= runSimSession(setupFor(), defaultSimPlayer(CURRENT), opts()));
+})();
+
+describe('session sequence', () => {
+  it('default mode: baseline, dial-in 0–2, recheck, dial-in 3–5 (flick then tracking each)', () => {
+    const { blocks } = defaultRun();
+    const pre = blocks.filter((b) => b.spec.stage !== 'ab').map((b) => b.spec);
+    const expected: string[] = [];
+    const step = (stage: string) => expected.push(`${stage}:flick`, `${stage}:tracking`);
+    step('baseline');
+    for (let i = 0; i < 3; i++) step('dialin');
+    step('recheck');
+    for (let i = 3; i < 6; i++) step('dialin');
+    expect(pre.map(label)).toEqual(expected);
+    expect(pre.map((s) => s.id)).toEqual([
+      'baseline-flick', 'baseline-tracking', 'dialin-0-flick', 'dialin-0-tracking', 'dialin-1-flick', 'dialin-1-tracking',
+      'dialin-2-flick', 'dialin-2-tracking', 'recheck-flick', 'recheck-tracking', 'dialin-3-flick', 'dialin-3-tracking',
+      'dialin-4-flick', 'dialin-4-tracking', 'dialin-5-flick', 'dialin-5-tracking',
+    ]);
+    for (const s of pre.filter((p) => p.stage === 'baseline' || p.stage === 'recheck')) expect(s.cm360).toBe(CURRENT);
+    // the A/B (if any) comes only after all of it
+    const firstAb = blocks.findIndex((b) => b.spec.stage === 'ab');
+    if (firstAb >= 0) expect(firstAb).toBe(pre.length);
+  });
+
+  it('thorough mode: 10 dial-in steps with the recheck after step 4', () => {
+    const { blocks, state } = runSimSession(setupFor('thorough'), defaultSimPlayer(CURRENT), opts({ seed: 3 }));
+    const flicks = blocks.filter((b) => b.spec.kind === 'flick' && b.spec.stage !== 'ab').map((b) => b.spec.id);
+    expect(flicks).toEqual([
+      'baseline-flick', 'dialin-0-flick', 'dialin-1-flick', 'dialin-2-flick', 'dialin-3-flick', 'dialin-4-flick',
+      'recheck-flick', 'dialin-5-flick', 'dialin-6-flick', 'dialin-7-flick', 'dialin-8-flick', 'dialin-9-flick',
+    ]);
+    expect(state.steerLog).toHaveLength(10);
+  });
+
+  it('warmup on: the first spec is a warmup; submitting null advances to the baseline', () => {
+    const s = createSession(setupFor(), opts({ warmup: true }), cfg);
+    const first = nextBlock(s)!;
+    expect(first.kind).toBe('warmup');
+    expect(first.stage).toBe('warmup');
+    expect(first.cm360).toBe(CURRENT);
+    const s2 = submitBlock(s, null);
+    expect(nextBlock(s2)!.id).toBe('baseline-flick');
+  });
+
+  it('an all-timeout flick log is retried once with the same spec, then accepted', () => {
+    const setup = setupFor();
+    const s = createSession(setup, opts(), cfg);
+    const spec = nextBlock(s)!;
+    const bad = allTimeouts(spec, setup);
+    const s2 = submitBlock(s, bad);
+    expect(nextBlock(s2)).toEqual(spec);
+    const s3 = submitBlock(s2, bad);
+    expect(nextBlock(s3)!.id).toBe('baseline-tracking');
+    expect(s3.logs.flick).toHaveLength(2);
+  });
+
+  it('a tracking log with no movement (tot ≈ 0) is retried once, then accepted', () => {
+    const setup = setupFor();
+    let s = createSession(setup, opts(), cfg);
+    const flickSpec = nextBlock(s)!;
+    const sim = simulateBlock(flickSpec, setup, defaultSimPlayer(CURRENT), { adaptedCm360: CURRENT, blocksDone: 0 }, createRng(1), cfg, 0);
+    s = submitBlock(s, sim.log);
+    const spec = nextBlock(s)!;
+    expect(spec.id).toBe('baseline-tracking');
+    const runner = new TrackingRunner(spec, degPerCount(setup.dpi, spec.cm360), cfg, 0);
+    runner.tick(cfg.tracking.leadInMs + cfg.tracking.durationMs);
+    const idle = runner.log();
+    const s2 = submitBlock(s, idle);
+    expect(nextBlock(s2)).toEqual(spec);
+    expect(s2.steps).toHaveLength(0);
+    const s3 = submitBlock(s2, idle);
+    expect(s3.steps).toHaveLength(1);
+    expect(s3.steps[0]!.score.logS).toBe(0);
+    expect(nextBlock(s3)!.id).toBe('dialin-0-flick');
+  });
+
+  it('submitBlock does not mutate its input state', () => {
+    const setup = setupFor();
+    const s = createSession(setup, opts({ warmup: true }), cfg);
+    const before = structuredClone(s);
+    const s2 = submitBlock(s, null);
+    expect(s).toEqual(before);
+    const spec = nextBlock(s2)!;
+    const snap = structuredClone(s2);
+    const s3 = submitBlock(s2, allTimeouts(spec, setup));
+    expect(s2).toEqual(snap);
+    expect(s3).not.toBe(s2);
+  });
+
+  it('progress: baseline at 0/7, recheck at position 3 of 7, null once finished', () => {
+    const setup = setupFor();
+    const player = defaultSimPlayer(CURRENT);
+    let s: SessionState = createSession(setup, opts(), cfg);
+    expect(s.progress).toEqual({ stage: 'baseline', stepIndex: 0, totalSteps: 7, kind: 'flick' });
+    let sim: SimState = { adaptedCm360: CURRENT, blocksDone: 0 };
+    let t = 0;
+    const seen: { stage: string; stepIndex: number }[] = [];
+    for (let i = 0; i < 9; i++) {
+      const spec = nextBlock(s)!;
+      seen.push({ stage: s.progress!.stage, stepIndex: s.progress!.stepIndex });
+      const r = simulateBlock(spec, setup, player, sim, createRng(100 + i), cfg, t);
+      sim = r.state; t = r.endT + cfg.sim.blockGapMs;
+      s = submitBlock(s, r.log);
+    }
+    expect(s.progress).toEqual({ stage: 'recheck', stepIndex: 3, totalSteps: 7, kind: 'tracking' });
+    expect(seen.filter((p) => p.stage === 'dialin').map((p) => p.stepIndex)).toEqual([0, 0, 1, 1, 2, 2]);
+    expect(defaultRun().state.progress).toBeNull();
+  });
+});
+
+describe('runSimSession', () => {
+  it('default player: completes with a result, 0/8/16 A/B blocks, one flick log per flick spec', () => {
+    const { state, blocks } = defaultRun();
+    expect(state.result).not.toBeNull();
+    expect(nextBlock(state)).toBeNull();
+    const ab = blocks.filter((b) => b.spec.stage === 'ab');
+    if (state.result!.abSkipped) expect(ab).toHaveLength(0);
+    else expect([8, 16]).toContain(ab.length);
+    expect(state.logs.flick).toHaveLength(blocks.filter((b) => b.spec.kind === 'flick').length);
+    expect(state.logs.tracking).toHaveLength(blocks.filter((b) => b.spec.kind === 'tracking').length);
+    expect(state.steerLog).toHaveLength(6);
+    expect(state.fit).not.toBeNull();
+    // block timestamps never go backwards
+    const t0s = blocks.map((b) => b.log!.t0);
+    for (let i = 1; i < t0s.length; i++) expect(t0s[i]!).toBeGreaterThan(t0s[i - 1]!);
+  });
+
+  it('is deterministic for a seed', () => {
+    const a = runSimSession(setupFor(), defaultSimPlayer(CURRENT), opts({ seed: 11 }));
+    const b = runSimSession(setupFor(), defaultSimPlayer(CURRENT), opts({ seed: 11 }));
+    expect(b.state.result).toEqual(a.state.result);
+    expect(b.blocks.map((x) => x.spec)).toEqual(a.blocks.map((x) => x.spec));
+  });
+
+  it('optimal = current, curvature 6: A/B skipped and verdict keep in ≥ 8 of 10 seeds', () => {
+    const player = defaultSimPlayer(CURRENT, { optimalCm360: CURRENT, curvature: 6 });
+    let skipped = 0;
+    for (let seed = 1; seed <= 10; seed++) {
+      const r = runSimSession(setupFor(), player, opts({ seed })).state.result!;
+      if (r.abSkipped && r.verdict === 'keep') skipped++;
+    }
+    expect(skipped).toBeGreaterThanOrEqual(8);
+  });
+
+  it('quick A/B: only A/B steps, P = quickAbCm360 and C = current', () => {
+    const quick = 34;
+    const s = createSession(setupFor(), opts({ quickAbCm360: quick }), cfg);
+    expect(nextBlock(s)!.stage).toBe('ab');
+    expect(s.mode).toBe('quickab');
+    const { state, blocks } = runSimSession(setupFor(), defaultSimPlayer(CURRENT), opts({ quickAbCm360: quick }));
+    expect(blocks.every((b) => b.spec.stage === 'ab')).toBe(true);
+    expect([8, 16]).toContain(blocks.length);
+    for (const b of blocks) expect(b.spec.cm360).toBe(b.spec.arm === 'P' ? quick : CURRENT);
+    expect(state.result).not.toBeNull();
+    expect(state.result!.abSkipped).toBe(false);
+    expect(state.result!.pickCm360).toBe(quick);
+  });
+});

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { defaultConfig as cfg } from '../../../src/core/config';
+import { defaultConfig as cfg, type Config } from '../../../src/core/config';
 import { createRng } from '../../../src/core/rng';
 import { measureTrial, summarizeFlick } from '../../../src/core/measure/flick';
 import { measureTracking } from '../../../src/core/measure/tracking';
@@ -85,5 +85,22 @@ describe('simulateBlock: tracking', () => {
     expect(log.endT).toBe(1000 + 28000);
     expect(log.path.length).toBeGreaterThan(1000);
     expect(log.path[log.path.length - 1]!.t).toBeLessThan(1000 + 28000);
+  });
+});
+
+describe('simulateBlock: flick endT', () => {
+  it('when the last target times out, endT is that trial’s spawnT + timeoutMs', () => {
+    const fast = { ...cfg, flick: { ...cfg.flick, timeoutMs: 100 } } as unknown as Config; // shorter than the reaction-time floor: every target times out
+    const r = simulateBlock(spec('flick', OPT, 4), setup, player(), { adaptedCm360: OPT, blocksDone: 0 }, createRng(4), fast, 1000);
+    const trials = (r.log as FlickBlockLog).trials;
+    expect(trials.every((t) => t.timedOut)).toBe(true);
+    expect(r.endT).toBe(trials[trials.length - 1]!.spawnT + 100);
+  });
+
+  it('a warmup that ends by time ends at t0 + warmupMs', () => {
+    const short = { ...cfg, session: { ...cfg.session, warmupMs: 5000 } } as unknown as Config;
+    const w: BlockSpec = { id: 'warmup', stage: 'warmup', kind: 'warmup', cm360: OPT, seed: 6, stepIndex: 0, arm: null };
+    const r = simulateBlock(w, setup, player(), { adaptedCm360: OPT, blocksDone: 0 }, createRng(6), short, 1000);
+    expect(r.endT).toBe(1000 + 5000);
   });
 });
