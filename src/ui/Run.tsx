@@ -148,8 +148,11 @@ export function Run({ session, onFinished, onUnsupported, onQuit }: RunProps) {
       {view.total > 0 && (
         <div class="progress" role="progressbar" aria-label="Session progress"
           aria-valuemin={0} aria-valuemax={view.total} aria-valuenow={view.done}>
-          <div class="progress-fill" style={{ width: `${Math.min(100, (100 * view.done) / view.total)}%` }} />
+          <div class="progress-fill" style={{ width: `${Math.max(1, Math.min(100, (100 * view.done) / view.total))}%` }} />
         </div>
+      )}
+      {view.total > 0 && view.hud !== 'Warm-up' && (
+        <div class="progress-count">Block {Math.min(view.done + 1, view.total)} / ~{view.total}</div>
       )}
       <div ref={arrowRef} class="offscreen-arrow" aria-hidden="true" />
       {card && (
