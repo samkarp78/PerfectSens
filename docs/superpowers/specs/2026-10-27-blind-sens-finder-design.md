@@ -351,9 +351,9 @@ The first 2 kills are warm-in. A switch still in progress when the part ends is 
   - kill time;
   - lost-target events and reacquire time;
   - lead/lag while damaging.
-- **Summary:** kills, and the means of acquisition time, acquisition gain, kill time, losses, lead/lag and held fraction.
+- **Summary:** kills, and the means of acquisition time, acquisition gain, kill time, losses, reacquire time, lead/lag and held fraction.
 
-Acquisition gain is recorded and used in diagnosis, but not in steering, because moving targets confound it.
+Acquisition gain is recorded and shown in the block log, but not used in steering, because moving targets confound it.
 
 **Composite score:**
 
