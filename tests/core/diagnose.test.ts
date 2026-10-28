@@ -3,11 +3,11 @@ import { defaultConfig } from '../../src/core/config';
 import { diagnose } from '../../src/core/diagnose';
 import type { FlickSummary } from '../../src/core/measure/flick';
 import type { TrackingSummary } from '../../src/core/measure/tracking';
-import { flickSummary, switchSummary } from '../helpers/summaries';
+import { flickSummary, switchSummary, trackingDetail, trackingSummary } from '../helpers/summaries';
 
 const flick = (o: Partial<FlickSummary> = {}): FlickSummary =>
   flickSummary({ tp: defaultConfig.diagnose.refTp, logTpSe: 0.01, spreadRatio: 0.8, ...o });
-const track = (o: Partial<TrackingSummary> = {}): TrackingSummary => ({ tot: defaultConfig.diagnose.refTot, logTotSe: 0.01, leadLagDeg: 0, n: 1, ...o });
+const track = (o: Partial<TrackingSummary> = {}): TrackingSummary => trackingSummary({ tot: defaultConfig.diagnose.refTot, logTotSe: 0.01, ...o });
 const cfg = defaultConfig;
 
 describe('diagnose', () => {
@@ -59,5 +59,22 @@ describe('diagnose switching misclicks', () => {
     const under = diagnose([flick()], [track()], cfg, [switchSummary({ accuracy: 0.7, misclickAlong: -1 })]);
     expect(under.find((x) => x.id === 'switchMisclicks')!.label).toContain('undershoot');
     expect(diagnose([flick()], [track()], cfg, [switchSummary({ accuracy: 0.9 })]).some((x) => x.id === 'switchMisclicks')).toBe(false);
+  });
+});
+
+describe('diagnose tracking detail', () => {
+  it('verticalTracking above 1.5', () => {
+    const t = track({ detail: trackingDetail({ yawErrRms: 1, pitchErrRms: 1.6 }) });
+    expect(diagnose([flick()], [t], cfg).find((x) => x.id === 'verticalTracking')!.value).toBeCloseTo(1.6, 9);
+    expect(diagnose([flick()], [track({ detail: trackingDetail({ yawErrRms: 1, pitchErrRms: 1.4 }) })], cfg)
+      .some((x) => x.id === 'verticalTracking')).toBe(false);
+  });
+  it('slowTurns above 300 ms', () => {
+    expect(diagnose([flick()], [track({ detail: trackingDetail({ turnReactionMs: 350 }) })], cfg).some((x) => x.id === 'slowTurns')).toBe(true);
+    expect(diagnose([flick()], [track({ detail: trackingDetail({ turnReactionMs: 250 }) })], cfg).some((x) => x.id === 'slowTurns')).toBe(false);
+  });
+  it('old summaries without detail are skipped', () => {
+    const old = { tot: 0.7, logTotSe: 0.01, leadLagDeg: 0, n: 1 } as unknown as TrackingSummary;
+    expect(() => diagnose([flick()], [old], cfg)).not.toThrow();
   });
 });

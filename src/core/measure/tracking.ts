@@ -3,8 +3,10 @@ import type { Config } from '../config';
 import { angleBetween } from '../geometry';
 import type { Rng } from '../rng';
 import type { Aim, TrackingBlockLog } from '../types';
+import { measureTrackingDetail, walkGrid, type TrackingDetail } from './trackingDetail';
 
-export interface TrackingSummary { tot: number; logTotSe: number; leadLagDeg: number; n: number }
+/** detail: the full metric set (absent on summaries saved before revision 3). */
+export interface TrackingSummary { tot: number; logTotSe: number; leadLagDeg: number; n: number; detail: TrackingDetail }
 
 const MS_PER_S = 1000;
 const RAD = Math.PI / 180;
@@ -30,30 +32,17 @@ function leadLagAt(log: TrackingBlockLog, rel: number, cross: Aim, cfg: Config):
 }
 
 export function measureTracking(log: TrackingBlockLog, cfg: Config, rng: Rng): TrackingSummary {
-  const stepMs = MS_PER_S / cfg.tracking.gridHz;
-  const start = log.t0 + cfg.tracking.leadInMs;
-  const startAim = trackingTargetAt(log.spec, 0, cfg);
-
   const onTarget: boolean[] = [];
   const lags: number[] = [];
-  let idx = -1;
-  let hi = -1;
-  const holds = log.holds;
-  for (let k = 0; ; k++) {
-    const t = start + k * stepMs;
-    if (t >= log.endT) break;
-    while (idx + 1 < log.path.length && log.path[idx + 1]!.t <= t) idx++;
-    const cross: Aim = idx >= 0 ? log.path[idx]! : startAim;
-    const rel = t - log.t0;
-    if (holds) while (hi + 1 < holds.length && holds[hi + 1]!.t <= t) hi++;
-    const held = !holds || (hi >= 0 && holds[hi]!.down);
-    onTarget.push(held && angleBetween(cross, trackingTargetAt(log.spec, rel, cfg)) <= cfg.tracking.targetRadiusDeg);
-    const lag = leadLagAt(log, rel, cross, cfg);
+  for (const g of walkGrid(log, cfg)) {
+    onTarget.push(g.held && angleBetween(g.cross, trackingTargetAt(log.spec, g.rel, cfg)) <= cfg.tracking.targetRadiusDeg);
+    const lag = leadLagAt(log, g.rel, g.cross, cfg);
     if (lag !== null) lags.push(lag);
   }
 
   const n = onTarget.length;
-  if (n === 0) return { tot: 0, logTotSe: 0, leadLagDeg: 0, n: 0 };
+  const detail = measureTrackingDetail(log, cfg);
+  if (n === 0) return { tot: 0, logTotSe: 0, leadLagDeg: 0, n: 0, detail };
   const hits = onTarget.filter(Boolean).length;
   const tot = hits / n;
 
@@ -74,7 +63,7 @@ export function measureTracking(log: TrackingBlockLog, cfg: Config, rng: Rng): T
   }
 
   return {
-    tot, logTotSe: sampleSd(logs), n,
+    tot, logTotSe: sampleSd(logs), n, detail,
     leadLagDeg: lags.length > 0 ? lags.reduce((a, b) => a + b, 0) / lags.length : 0,
   };
 }

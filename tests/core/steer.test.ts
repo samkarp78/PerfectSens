@@ -4,13 +4,13 @@ import { createRng } from '../../src/core/rng';
 import type { FitResult } from '../../src/core/fit';
 import type { StepResult } from '../../src/core/types';
 import { chooseNext, maxTestCm360, pooledGain, stepSize, type SteerContext } from '../../src/core/steer';
-import { flickSummary, switchSummary } from '../helpers/summaries';
+import { flickSummary, switchSummary, trackingSummary } from '../helpers/summaries';
 
 const current = 30;
 
 interface Over {
   smallGain?: number | null; bigGain?: number | null; corrections?: number; spreadRatio?: number;
-  leadLagDeg?: number; logS?: number; clickBias?: number;
+  leadLagDeg?: number; logS?: number; clickBias?: number; speedRatio?: number | null;
 }
 
 function step(order: number, cm360: number, o: Over = {}): StepResult {
@@ -22,7 +22,7 @@ function step(order: number, cm360: number, o: Over = {}): StepResult {
       spreadRatio: o.spreadRatio ?? 0.5, clickBias: o.clickBias ?? 0,
     }),
     switch: switchSummary({ smallGain: null, mediumGain: null, bigGain: null, classN: { small: 0, medium: 0, big: 0 } }),
-    tracking: { tot: 0.5, logTotSe: 0.05, leadLagDeg: o.leadLagDeg ?? 0, n: 1 },
+    tracking: trackingSummary({ leadLagDeg: o.leadLagDeg ?? 0, speedRatio: o.speedRatio === undefined ? 1 : o.speedRatio }),
     score: { logS: o.logS ?? 0, se: 0.05 },
   };
 }
@@ -110,6 +110,15 @@ describe('chooseNext after bracketing', () => {
     const under = chooseNext(ctx({ steps: bracketSteps(step(3, 31, { clickBias: -1.5 })), fit }), cfg);
     expect(over.direction).toBe('slower');
     expect(under.direction).toBe('faster');
+  });
+
+  it('speedMatch steers slower when speedRatio rises', () => {
+    const fast = chooseNext(ctx({ steps: bracketSteps(step(3, 31, { speedRatio: 1.2 })), fit }), cfg);
+    const slow = chooseNext(ctx({ steps: bracketSteps(step(3, 31, { speedRatio: 0.8 })), fit }), cfg);
+    const none = chooseNext(ctx({ steps: bracketSteps(step(3, 31, { speedRatio: null })), fit }), cfg);
+    expect(fast.direction).toBe('slower');
+    expect(slow.direction).toBe('faster');
+    expect(none.signal).toBe(0);
   });
 
   it('tracking lead steers slower and lag steers faster', () => {

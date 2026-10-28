@@ -8,7 +8,10 @@ export const defaultConfig = {
     smallMaxDeg: 22, bigMinDeg: 35, directionSpreadDeg: 30, bounds: { yaw: 75, pitch: 30 },
   },
   tracking: { durationMs: 15000, leadInMs: 2000, directionSpreadDeg: 30, targetRadiusDeg: 2, segmentMs: { min: 700, max: 2000 },
-    speedDegPerSec: { min: 10, max: 25 }, bounds: { yaw: 40, pitch: 10 }, gridHz: 120, minSpeedForLeadLag: 5 },
+    speedDegPerSec: { min: 10, max: 25 }, bounds: { yaw: 40, pitch: 10 }, gridHz: 120, minSpeedForLeadLag: 5,
+    /** Turn metrics: a segment change of more than turnMinDeg; reaction = crosshair speed along the new direction reaching
+     *  turnReactFraction of target speed; settled = within the radius for settleMs. */
+    turnMinDeg: 90, turnReactFraction: 0.5, settleMs: 100 },
   /** Target switching: `active` static targets up at once; hitting one replaces it at a seeded spot in the forward region.
    *  The first `warmKills` kills are unscored warm-in. */
   switch: { blockMs: 15000, active: 3, targetRadiusDeg: 1.5, region: { yaw: 35, pitch: 15 }, minSeparationDeg: 8, warmKills: 2,
@@ -17,14 +20,15 @@ export const defaultConfig = {
   /** Composite score weights for the three round parts (sum to 1). */
   score: { weights: { flick: 0.4, switch: 0.3, tracking: 0.3 }, bootstrapSamples: 200, trackingSegmentMs: 1000, minWeDeg: 0.1, weFactor: 4.133, minTot: 0.01, minTp: 0.01 },
   steer: { bracket: 0.15, finalStep: 0.04, limits: { min: 0.6, max: 1.6 },
-    weights: { smallGain: 1, bigGain: 1, leadLag: 0.5, corrSpread: 0.5, clickBias: 0.5 },
+    weights: { smallGain: 1, bigGain: 1, leadLag: 0.5, corrSpread: 0.5, clickBias: 0.5, speedMatch: 0.5 },
     leadLagScaleDeg: 1, clickBiasScaleDeg: 1, correctionsScale: 0.5, jumpScale: 0.15, deadband: 0.02, minSeparation: 0.01 },
   fit: { driftPriorSd: 0.03, familiarityPriorSd: 0.03, bootstrapSamples: 300, rangeFraction: 0.5, gridPoints: 101, minDistinctX: 4 },
   ab: { minEffect: 0.03, z: 2.0 },
   session: { dialinSteps: { default: 5, thorough: 8, quick: 3 }, warmupMs: 60000, maxRetries: 1, breakEveryRounds: 3,
     invalidTimeoutFraction: 0.3, invalidMinTot: 0.05 },
   diagnose: { spreadRatioMax: 1.0, correctionsMax: 1.0, smallGainMax: 1.08, bigGainMin: 0.8,
-    refTp: 5, refTot: 0.7, imbalance: 0.15, minSwitchAccuracy: 0.8 }, // provisional, re-tuned from the play-tests (waves bias big flicks short)
+    refTp: 5, refTot: 0.7, imbalance: 0.15, minSwitchAccuracy: 0.8,
+    verticalRatioMax: 1.5, turnReactionMaxMs: 300 }, // provisional, re-tuned from the play-tests (waves bias big flicks short)
   /** Play area: the slowest test sens must let a 180° turn fit within this fraction of the measured pad width. */
   pad: { turnFraction: 0.9 },
   store: { keepRawSessions: 5 },

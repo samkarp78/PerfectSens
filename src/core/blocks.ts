@@ -123,6 +123,30 @@ export function trackingTargetAt(spec: BlockSpec, tMs: number, cfg: Config): Aim
   return { yaw: fold(s.x0 + s.vx * dt, cfg.tracking.bounds.yaw), pitch: fold(s.y0 + s.vy * dt, cfg.tracking.bounds.pitch) };
 }
 
+/** Target velocity (deg/s in yaw and pitch) at tMs: central difference over ±0.5 ms of the folded path. */
+export function trackingVelocityAt(spec: BlockSpec, tMs: number, cfg: Config): { yaw: number; pitch: number } {
+  const h = 0.5;
+  const a = trackingTargetAt(spec, tMs - h, cfg), b = trackingTargetAt(spec, tMs + h, cfg);
+  return { yaw: ((b.yaw - a.yaw) / (2 * h)) * MS_PER_S, pitch: ((b.pitch - a.pitch) / (2 * h)) * MS_PER_S };
+}
+
+/** Segment-change times (rel ms) in [fromMs, toMs) where the target turns by more than tracking.turnMinDeg. */
+export function trackingTurns(spec: BlockSpec, fromMs: number, toMs: number, cfg: Config): number[] {
+  const p = pathFor(spec.seed, cfg);
+  extend(p, toMs, cfg);
+  const probe = 5;
+  const out: number[] = [];
+  for (const seg of p.segs) {
+    const t = seg.t0;
+    if (t < Math.max(fromMs, probe) || t >= toMs) continue;
+    const u = trackingVelocityAt(spec, t - probe, cfg), w = trackingVelocityAt(spec, t + probe, cfg);
+    const k = Math.cos(trackingTargetAt(spec, t, cfg).pitch * RAD);
+    const cos = (u.yaw * w.yaw * k * k + u.pitch * w.pitch) / (Math.hypot(u.yaw * k, u.pitch) * Math.hypot(w.yaw * k, w.pitch));
+    if (cos < Math.cos(cfg.tracking.turnMinDeg * RAD)) out.push(t);
+  }
+  return out;
+}
+
 /** Seeded switching targets: uniform in the forward region, each at least minSeparationDeg from the previous `active - 1`
  *  targets (the ones that can be on screen with it). */
 export function makeSwitchTargets(spec: BlockSpec, cfg: Config): Aim[] {

@@ -4,7 +4,7 @@ import type { SwitchSummary } from './measure/switch';
 import type { TrackingSummary } from './measure/tracking';
 
 export type FindingId = 'spread' | 'corrections' | 'smallOvershoot' | 'bigShort' | 'trackingWeaker' | 'flickingWeaker'
-  | 'switchMisclicks';
+  | 'switchMisclicks' | 'verticalTracking' | 'slowTurns';
 export interface Finding { id: FindingId; label: string; value: number; threshold: number; severity: number }
 
 const LABELS: Record<FindingId, string> = {
@@ -15,6 +15,8 @@ const LABELS: Record<FindingId, string> = {
   trackingWeaker: 'Tracking is behind your flicking — train tracking.',
   flickingWeaker: 'Flicking is behind your tracking — train flicking.',
   switchMisclicks: 'Switching misclicks — train clicking only when on target.',
+  verticalTracking: 'Vertical tracking is weaker than horizontal — train vertical tracking.',
+  slowTurns: 'Slow reaction when targets change direction — train reacting to direction changes.',
 };
 
 const ONE = 1;
@@ -49,6 +51,15 @@ export function diagnose(flick: FlickSummary[], tracking: TrackingSummary[], cfg
     if (rel < lo) out.push(make('trackingWeaker', rel, lo, lo / rel - ONE));
     else if (rel > hi) out.push(make('flickingWeaker', rel, hi, rel / hi - ONE));
   }
+
+  // Tracking detail (absent on summaries saved before revision 3). Per-axis figures only ever give training advice.
+  const details = tracking.map((t) => t.detail).filter((x) => x !== undefined);
+  const yaw = avgGain(details.map((x) => x.yawErrRms)), pitch = avgGain(details.map((x) => x.pitchErrRms));
+  if (yaw !== null && pitch !== null && yaw > 0 && pitch / yaw > d.verticalRatioMax) {
+    out.push(make('verticalTracking', pitch / yaw, d.verticalRatioMax, pitch / yaw / d.verticalRatioMax - ONE));
+  }
+  const react = avgGain(details.map((x) => x.turnReactionMs));
+  if (react !== null && react > d.turnReactionMaxMs) out.push(make('slowTurns', react, d.turnReactionMaxMs, react / d.turnReactionMaxMs - ONE));
 
   if (sw.length > 0) {
     const acc = avg(sw.map((x) => x.accuracy))!;

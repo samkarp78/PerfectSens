@@ -100,6 +100,9 @@ export function chooseNext(ctx: SteerContext, cfg: Config): SteerDecision {
   const disc = Math.exp(-Math.abs(Math.log(last.cm360 / prev.cm360)) / sc.jumpScale);
   const dSmall = (pooledGain(last, 'small') ?? 0) - (pooledGain(base, 'small') ?? 0);
   const dBig = (pooledGain(last, 'big') ?? 0) - (pooledGain(base, 'big') ?? 0);
+  const ratio = (st: StepResult): number | null => st.tracking.detail?.speedRatio ?? null;
+  const lastRatio = ratio(last), baseRatio = ratio(base);
+  const dSpeed = lastRatio === null || baseRatio === null ? 0 : lastRatio - baseRatio;
   const dBias = (pooledClickBias(last) ?? 0) - (pooledClickBias(base) ?? 0);
   const dLead = last.tracking.leadLagDeg - base.tracking.leadLagDeg;
   const dCorr = last.flick.corrections - base.flick.corrections;
@@ -113,6 +116,8 @@ export function chooseNext(ctx: SteerContext, cfg: Config): SteerDecision {
       text: (p) => (p ? 'Big flicks and switches reached further than baseline' : 'Big flicks and switches fell shorter than baseline') },
     { value: disc * sc.weights.leadLag * dLead / sc.leadLagScaleDeg,
       text: (p) => (p ? 'Tracking led the target more than baseline' : 'Tracking lagged the target more than baseline') },
+    { value: disc * sc.weights.speedMatch * dSpeed,
+      text: (p) => (p ? 'Tracking ran ahead of target speed more than baseline' : 'Tracking fell behind target speed more than baseline') },
     { value: disc * sc.weights.clickBias * dBias / sc.clickBiasScaleDeg,
       text: (p) => (p ? 'Clicks landed further past targets than baseline' : 'Clicks landed shorter of targets than baseline') },
     { value: sc.weights.corrSpread * Math.sign(slope) * Math.max(0, dCorr / sc.correctionsScale + dSpread),

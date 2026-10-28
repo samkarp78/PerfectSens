@@ -1,6 +1,7 @@
 import type { FlickSummary } from '../../src/core/measure/flick';
 import type { SwitchSummary } from '../../src/core/measure/switch';
 import type { TrackingSummary } from '../../src/core/measure/tracking';
+import type { TrackingDetail } from '../../src/core/measure/trackingDetail';
 
 /** Neutral part summaries for tests; override only the fields a test is about. */
 export const flickSummary = (o: Partial<FlickSummary> = {}): FlickSummary => ({
@@ -11,6 +12,14 @@ export const switchSummary = (o: Partial<SwitchSummary> = {}): SwitchSummary => 
   ...flickSummary({ tp: 3, n: 18, classN: { small: 6, medium: 6, big: 6 } }),
   kills: 20, clicks: 20, accuracy: 1, misclickRate: 0, misclickAlong: null, ...o,
 });
-export const trackingSummary = (o: Partial<TrackingSummary> = {}): TrackingSummary => ({
-  tot: 0.5, logTotSe: 0.05, leadLagDeg: 0, n: 1, ...o,
+export const trackingDetail = (o: Partial<TrackingDetail> = {}): TrackingDetail => ({
+  errMean: 1, errRms: 1, errMedian: 1, alongRms: 0.5, perpMean: 0, perpRms: 0.5, speedRatio: 1,
+  turnReactionMs: 200, turnOvershootDeg: 1, turnSettleMs: 300, jitterDegPerSec: 5, losses: 0, reacquireMs: null,
+  totSlow: 0.5, totFast: 0.5, yawErrRms: 1, pitchErrRms: 1, totFirstHalf: 0.5, totSecondHalf: 0.5,
+  heldFraction: 1, releasesOnTarget: 0, ...o,
+});
+/** speedRatio is a shortcut for detail.speedRatio. */
+export const trackingSummary = ({ speedRatio, ...o }: Partial<TrackingSummary> & { speedRatio?: number | null } = {}): TrackingSummary => ({
+  tot: 0.5, logTotSe: 0.05, leadLagDeg: 0, n: 1,
+  detail: trackingDetail(speedRatio === undefined ? {} : { speedRatio }), ...o,
 });
