@@ -53,7 +53,7 @@ describe('event diffs', () => {
     expect(flickEvents(trials, r.next).events).toEqual([]);
   });
   it('switch: new clicks map to hits (with the interval since the previous kill) and misses', () => {
-    const log = { t0: 0, kills: [{ t: 400, target: { yaw: 0, pitch: 0 }, from: { yaw: 0, pitch: 0 } }], clicks: [{ t: 300, hit: false }, { t: 400, hit: true }] };
+    const log = { t0: 0, kills: [{ t: 400, target: { yaw: 0, pitch: 0 }, from: { yaw: 0, pitch: 0 } }], clicks: [{ t: 300, aim: { yaw: 0, pitch: 0 }, hit: false }, { t: 400, aim: { yaw: 0, pitch: 0 }, hit: true }] };
     expect(switchEvents(log, 0)).toEqual({ events: [{ hit: false, ms: 0 }, { hit: true, ms: 400 }], next: 2 });
   });
 });

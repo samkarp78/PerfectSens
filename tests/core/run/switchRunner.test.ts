@@ -47,8 +47,22 @@ describe('SwitchRunner', () => {
     const r = new SwitchRunner(spec(), DPC, cfg, T0);
     r.onMove({ t: T0 + 5, dx: 0, dy: Math.round(-40 / DPC) }); // look far up, away from the region
     expect(r.onClick(T0 + 10)).toEqual({ hit: false });
-    expect(r.log().clicks).toEqual([{ t: T0 + 10, hit: false }]);
+    expect(r.log().clicks).toEqual([{ t: T0 + 10, aim: r.state.aim, hit: false }]);
     expect(r.log().kills).toHaveLength(0);
+  });
+
+  it('logs the aim at every click', () => {
+    const r = new SwitchRunner(spec(), DPC, cfg, T0);
+    r.onMove({ t: T0 + 5, dx: 0, dy: Math.round(-40 / DPC) });
+    const away = r.state.aim;
+    r.onClick(T0 + 10);
+    const goal = r.state.targets[0]!;
+    for (const m of minJerkMoves(away, goal, T0 + 20, 200, 500, DPC)) r.onMove(m);
+    const here = r.state.aim;
+    expect(r.onClick(T0 + 300).hit).toBe(true);
+    const clicks = r.log().clicks;
+    expect(clicks[0]!.aim).toEqual(away);
+    expect(clicks[1]!).toEqual({ t: T0 + 300, aim: here, hit: true });
   });
 
   it('ends at blockMs and ignores input afterwards', () => {

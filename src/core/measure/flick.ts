@@ -11,6 +11,10 @@ export interface TrialMetrics {
 export interface FlickSummary {
   tp: number; logTpSe: number; smallGain: number | null; mediumGain: number | null; bigGain: number | null;
   corrections: number; weDeg: number; spreadRatio: number; timeoutFraction: number; n: number;
+  /** Mean first-click along offset (deg; + = overshoot at the click); null without clicks. */
+  clickBias: number | null;
+  /** Scored trials per distance class, for pooling gains across parts. */
+  classN: Record<FlickClass, number>;
 }
 
 const MS_PER_S = 1000;
@@ -85,6 +89,9 @@ export function summarizeFlick(trials: TrialMetrics[], cfg: Config, rng: Rng): F
     return g.length > 0 ? mean(g) : null;
   };
 
+  const withClick = scored.filter((t) => t.endAlong !== null);
+  const countOf = (cls: FlickClass): number => scored.filter((t) => t.cls === cls).length;
+
   return {
     tp, logTpSe: sampleSd(logs),
     smallGain: classGain('small'), mediumGain: classGain('medium'), bigGain: classGain('big'),
@@ -92,5 +99,7 @@ export function summarizeFlick(trials: TrialMetrics[], cfg: Config, rng: Rng): F
     weDeg, spreadRatio: weDeg / (2 * cfg.flick.targetRadiusDeg),
     timeoutFraction: scored.length > 0 ? scored.filter((t) => t.timedOut).length / scored.length : 0,
     n: scored.length,
+    clickBias: withClick.length > 0 ? mean(withClick.map((t) => t.endAlong!)) : null,
+    classN: { small: countOf('small'), medium: countOf('medium'), big: countOf('big') },
   };
 }

@@ -4,11 +4,10 @@ import type { FlickSummary } from '../../src/core/measure/flick';
 import type { SwitchSummary } from '../../src/core/measure/switch';
 import type { TrackingSummary } from '../../src/core/measure/tracking';
 import { stepScore } from '../../src/core/score';
+import { flickSummary, switchSummary } from '../helpers/summaries';
 
-const flick = (tp: number, logTpSe = 0): FlickSummary => ({
-  tp, logTpSe, smallGain: null, mediumGain: null, bigGain: null, corrections: 0, weDeg: 1, spreadRatio: 1, timeoutFraction: 0, n: 10,
-});
-const sw = (tp: number, logTpSe = 0): SwitchSummary => ({ tp, logTpSe, kills: 10, accuracy: 1, n: 8 });
+const flick = (tp: number, logTpSe = 0): FlickSummary => flickSummary({ tp, logTpSe });
+const sw = (tp: number, logTpSe = 0): SwitchSummary => switchSummary({ tp, logTpSe });
 const track = (tot: number, logTotSe = 0): TrackingSummary => ({ tot, logTotSe, leadLagDeg: 0, n: 100 });
 const base = { tp: 4, switchTp: 3, tot: 0.5 };
 const W = defaultConfig.score.weights;

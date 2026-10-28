@@ -1,7 +1,7 @@
 import { applyMove, angleBetween } from '../geometry';
 import { makeSwitchTargets } from '../blocks';
 import type { Config } from '../config';
-import type { Aim, AimSample, BlockSpec, MoveSample, SwitchBlockLog, SwitchKill } from '../types';
+import type { Aim, AimSample, BlockSpec, MoveSample, SwitchBlockLog, SwitchClick, SwitchKill } from '../types';
 
 /** Target switching: `active` static targets are up at once; hitting one replaces it with the next seeded target. */
 export class SwitchRunner {
@@ -11,7 +11,7 @@ export class SwitchRunner {
   private next: number;
   private readonly active: Aim[];
   private readonly kills: SwitchKill[] = [];
-  private readonly clicks: { t: number; hit: boolean }[] = [];
+  private readonly clicks: SwitchClick[] = [];
   private readonly path: AimSample[] = [];
   private readonly endT: number;
   private finished = false;
@@ -44,7 +44,7 @@ export class SwitchRunner {
     const r = this.cfg.switch.targetRadiusDeg;
     const i = this.active.findIndex((a) => angleBetween(this.aim, a) <= r);
     const hit = i >= 0;
-    this.clicks.push({ t, hit });
+    this.clicks.push({ t, aim: { ...this.aim }, hit });
     if (hit) {
       const target = this.active[i]!;
       this.kills.push({ t, target, from: this.lastKillAim });

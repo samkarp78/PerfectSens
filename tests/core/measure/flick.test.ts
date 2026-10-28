@@ -169,3 +169,17 @@ describe('measureFlickBlock: only complete waves are scored', () => {
     expect(play(2 * W).filter((m) => m.scored)).toHaveLength(W);
   });
 });
+
+describe('summarizeFlick click bias and class counts', () => {
+  it('clickBias is the mean first-click along offset', () => {
+    const trials = [metric({ index: 0, endAlong: 1 }), metric({ index: 1, endAlong: 2 }), metric({ index: 2, endAlong: null, timedOut: true, hit: false })];
+    expect(summarizeFlick(trials, defaultConfig, createRng(1)).clickBias).toBeCloseTo(1.5, 9);
+  });
+  it('clickBias is null without clicks', () => {
+    expect(summarizeFlick([metric({ endAlong: null })], defaultConfig, createRng(1)).clickBias).toBeNull();
+  });
+  it('classN counts scored trials per class', () => {
+    const trials = [metric({ cls: 'small' }), metric({ cls: 'small' }), metric({ cls: 'big' }), metric({ cls: 'big', scored: false })];
+    expect(summarizeFlick(trials, defaultConfig, createRng(1)).classN).toEqual({ small: 2, medium: 0, big: 1 });
+  });
+});

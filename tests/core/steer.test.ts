@@ -4,6 +4,7 @@ import { createRng } from '../../src/core/rng';
 import type { FitResult } from '../../src/core/fit';
 import type { StepResult } from '../../src/core/types';
 import { chooseNext, maxTestCm360, stepSize, type SteerContext } from '../../src/core/steer';
+import { flickSummary, switchSummary } from '../helpers/summaries';
 
 const current = 30;
 
@@ -15,12 +16,12 @@ interface Over {
 function step(order: number, cm360: number, o: Over = {}): StepResult {
   return {
     order, stage: order === 0 ? 'baseline' : 'dialin', arm: null, cm360, trials: [],
-    flick: {
-      tp: 4, logTpSe: 0.05, smallGain: o.smallGain === undefined ? 1 : o.smallGain, mediumGain: 1,
-      bigGain: o.bigGain === undefined ? 0.95 : o.bigGain, corrections: o.corrections ?? 0.5, weDeg: 1,
-      spreadRatio: o.spreadRatio ?? 0.5, timeoutFraction: 0, n: 30,
-    },
-    switch: { tp: 3, logTpSe: 0.05, kills: 20, accuracy: 1, n: 18 },
+    flick: flickSummary({
+      smallGain: o.smallGain === undefined ? 1 : o.smallGain,
+      bigGain: o.bigGain === undefined ? 0.95 : o.bigGain, corrections: o.corrections ?? 0.5,
+      spreadRatio: o.spreadRatio ?? 0.5,
+    }),
+    switch: switchSummary({ smallGain: null, mediumGain: null, bigGain: null, classN: { small: 0, medium: 0, big: 0 } }),
     tracking: { tot: 0.5, logTotSe: 0.05, leadLagDeg: o.leadLagDeg ?? 0, n: 1 },
     score: { logS: o.logS ?? 0, se: 0.05 },
   };

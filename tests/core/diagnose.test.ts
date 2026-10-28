@@ -3,11 +3,10 @@ import { defaultConfig } from '../../src/core/config';
 import { diagnose } from '../../src/core/diagnose';
 import type { FlickSummary } from '../../src/core/measure/flick';
 import type { TrackingSummary } from '../../src/core/measure/tracking';
+import { flickSummary } from '../helpers/summaries';
 
-const flick = (o: Partial<FlickSummary> = {}): FlickSummary => ({
-  tp: defaultConfig.diagnose.refTp, logTpSe: 0.01, smallGain: 1.0, mediumGain: 1.0, bigGain: 1.0, corrections: 0.5, weDeg: 1,
-  spreadRatio: 0.8, timeoutFraction: 0, n: 30, ...o,
-});
+const flick = (o: Partial<FlickSummary> = {}): FlickSummary =>
+  flickSummary({ tp: defaultConfig.diagnose.refTp, logTpSe: 0.01, spreadRatio: 0.8, ...o });
 const track = (o: Partial<TrackingSummary> = {}): TrackingSummary => ({ tot: defaultConfig.diagnose.refTot, logTotSe: 0.01, leadLagDeg: 0, n: 1, ...o });
 const cfg = defaultConfig;
 

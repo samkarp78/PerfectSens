@@ -22,9 +22,11 @@ export interface FlickTrial { target: FlickTarget; spawnT: number; spawnAim: Aim
 export interface FlickBlockLog { spec: BlockSpec; t0: number; trials: FlickTrial[]; path: AimSample[] }
 export interface HoldEvent { t: number; down: boolean }
 /** `holds` records mouse-button presses/releases; tracking only counts while held. Logs without it count as held throughout. */
+/** A switching click with the aim at that moment. */
+export interface SwitchClick { t: number; aim: Aim; hit: boolean }
 export interface SwitchKill { t: number; target: Aim; from: Aim }
 /** A switching block: kills (with the aim at the previous kill, or the start), every click, and the aim path. */
-export interface SwitchBlockLog { spec: BlockSpec; t0: number; endT: number; kills: SwitchKill[]; clicks: { t: number; hit: boolean }[]; path: AimSample[] }
+export interface SwitchBlockLog { spec: BlockSpec; t0: number; endT: number; kills: SwitchKill[]; clicks: SwitchClick[]; path: AimSample[] }
 export interface TrackingBlockLog { spec: BlockSpec; t0: number; endT: number; path: AimSample[]; holds?: HoldEvent[] }
 export interface StepResult { order: number; stage: Exclude<Stage, 'warmup'>; arm: Arm | null; cm360: number;
   trials: TrialMetrics[]; flick: FlickSummary; switch: SwitchSummary; tracking: TrackingSummary; score: StepScore }
