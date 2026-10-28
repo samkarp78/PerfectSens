@@ -205,3 +205,39 @@ Rule: `core/` never imports from the other folders. `session.ts` is a pure state
 ## 15. Out of scope
 
 Per-game sens conversion tables, per-axis tuning, accounts or cloud sync, leaderboards, and non-Chromium raw input.
+
+## 16. Revision 2 — game feel, variety, breaks, play area (2026-10-28)
+
+Driven by two play-tests: the 10-minute session "still feels like a chore", 10 minutes without breaks of the same two tasks is fatiguing, and there was no per-part timer.
+
+**Rounds are three parts, the same in every round** (fair across sens, since the A/B arms land on different rounds):
+1. **Flicks:** 20 s of waves of 2 small + 2 medium + 2 big flicks, jittered small→big. Wave 0 is unscored warm-in; only complete waves are scored.
+2. **Switching (new):** 15 s with 3 static targets up at once; hitting one replaces it with a new one at a seeded random spot in a forward region. The first 2 kills are unscored warm-in. Score: switch throughput = Σ log2(D/(2r)+1) / Σ kill interval over scored kills, where D is the angular distance from the aim at the previous kill to the killed target. The bootstrap is over kills.
+3. **Tracking:** 2 s lead-in, then 15 s, scored only while the button is held.
+
+**Composite score:** log S = 0.4·ln(flick tp ratio) + 0.3·ln(switch tp ratio) + 0.3·ln(tracking ratio), with ratios relative to the baseline round. The weights live in config.
+
+**Dial-in:** 5 hidden steps (Thorough 8, Quick 3). Session: baseline + 5 + re-check + 4 A/B rounds = 11 rounds of about 55 s, plus breaks: about 11 min.
+
+**Pacing:**
+- A timer shows the current part ("Switching · 0:12").
+- Every 3 rounds there's a break screen with that stretch's points, grade and best streak; the player clicks to continue.
+- Between other rounds a 3-2-1 countdown runs while the mouse stays locked. A setting can turn that off, so every round starts with a click.
+
+**Game feel (display only; never changes targets or difficulty):**
+- Synthesised sounds (hit, miss, streak, tracking tick, countdown) with an on/off setting.
+- A pop effect on hits.
+- Live points and a streak multiplier.
+- A grade per stretch.
+- Stage names: "Calibration" (baseline), "Round N of M" (dial-in and re-check), "Final Showdown" (A/B).
+- End-screen stats and personal bests in browser storage.
+- A brighter room.
+- Grades compare against the player's own baseline round, so they don't reveal which sens is being tested.
+
+**Play-area calibration:**
+- Optional, from setup. With raw lock, the player clicks at the far left of the pad and then at the far right, twice; the smaller span wins. That gives padWidthCm = counts / DPI × 2.54.
+- Stored on the setup (`padWidthCm`).
+- Steering caps the slowest test sens so a 180° turn fits within `pad.turnFraction` (0.9) of the pad: cm360 ≤ 2 · 0.9 · padWidthCm.
+- Setup warns if the current sens already doesn't fit, and Results shows how much of the pad a 180° turn uses.
+
+**Re-tuned diagnosis references (provisional, from one player):** refTp 5, refTot 0.7, bigGainMin 0.8 (waves bias big flicks short).
