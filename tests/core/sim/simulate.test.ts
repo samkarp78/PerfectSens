@@ -7,13 +7,15 @@ import { defaultSimPlayer, performance, type SimPlayer } from '../../../src/core
 import { simulateBlock } from '../../../src/core/sim/simulate';
 import type { BlockSpec, FlickBlockLog, Setup, SwitchBlockLog, TrackingBlockLog } from '../../../src/core/types';
 import { measureSwitch } from '../../../src/core/measure/switch';
+import { measureTrackSwitch } from '../../../src/core/measure/trackSwitch';
+import type { TrackSwitchBlockLog } from '../../../src/core/types';
 
 const CURRENT = 40;
 const setup: Setup = { dpi: 800, cm360: CURRENT, inGameSens: null, fov: 103, fovType: 'horizontal', mode: 'default' };
 const player = (over: Partial<SimPlayer> = {}): SimPlayer => defaultSimPlayer(CURRENT, over);
 const OPT = player().optimalCm360;
 
-const spec = (kind: 'flick' | 'switch' | 'tracking', cm360: number, seed: number): BlockSpec =>
+const spec = (kind: 'flick' | 'switch' | 'tracking' | 'trackswitch', cm360: number, seed: number): BlockSpec =>
   ({ id: `${kind}-${seed}`, stage: 'dialin', kind, cm360, seed, stepIndex: 0, arm: null });
 
 const runFlick = (cm360: number, adapted: number, seed: number, over: Partial<SimPlayer> = {}): FlickBlockLog =>
@@ -125,5 +127,23 @@ describe('simulateBlock: switch', () => {
       return s / 10;
     };
     expect(tp(OPT)).toBeGreaterThan(tp(1.4 * OPT));
+  });
+});
+
+describe('simulateBlock: tracking switching', () => {
+  const runTs = (cm360: number, seed: number) =>
+    simulateBlock(spec('trackswitch', cm360, seed), setup, player(), { adaptedCm360: cm360, blocksDone: 0 }, createRng(seed + 3000), cfg, 1000);
+  it('simulated trackswitch kills targets and is deterministic', () => {
+    const a = runTs(OPT, 1), b = runTs(OPT, 1);
+    const log = a.log as TrackSwitchBlockLog;
+    expect(log.kills.length).toBeGreaterThan(4);
+    expect(a.endT).toBe(1000 + cfg.trackswitch.blockMs);
+    expect(b.log).toEqual(a.log);
+    expect(measureTrackSwitch(log, cfg, createRng(1)).dmg).toBeGreaterThan(0.3);
+  });
+  it('better sens → higher dmg', () => {
+    const dmg = (cm: number) => mean([...Array(8).keys()].map((seed) =>
+      measureTrackSwitch(runTs(cm, 300 + seed).log as TrackSwitchBlockLog, cfg, createRng(seed)).dmg));
+    expect(dmg(OPT)).toBeGreaterThan(dmg(OPT * 0.6));
   });
 });

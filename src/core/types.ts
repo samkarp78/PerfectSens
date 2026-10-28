@@ -1,6 +1,7 @@
 import type { FlickSummary, TrialMetrics } from './measure/flick';
 import type { TrackingSummary } from './measure/tracking';
 import type { SwitchSummary } from './measure/switch';
+import type { TrackSwitchSummary } from './measure/trackSwitch';
 import type { StepScore } from './score';
 
 export interface Aim { yaw: number; pitch: number }                 // degrees; +yaw right, +pitch up; yaw unwrapped
@@ -35,4 +36,4 @@ export interface TrackSwitchBlockLog { spec: BlockSpec; t0: number; endT: number
   targets: TrackSwitchTarget[]; kills: TrackSwitchKill[] }
 export interface TrackingBlockLog { spec: BlockSpec; t0: number; endT: number; path: AimSample[]; holds?: HoldEvent[] }
 export interface StepResult { order: number; stage: Exclude<Stage, 'warmup'>; arm: Arm | null; cm360: number;
-  trials: TrialMetrics[]; flick: FlickSummary; switch: SwitchSummary; tracking: TrackingSummary; score: StepScore }
+  trials: TrialMetrics[]; flick: FlickSummary; switch: SwitchSummary; tracking: TrackingSummary; trackSwitch: TrackSwitchSummary; score: StepScore }

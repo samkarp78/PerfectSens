@@ -34,8 +34,8 @@ describe('quick test mode', () => {
   it('a simulated quick session completes with at most 9 non-A/B blocks before the A/B', () => {
     const { state, blocks } = runSimSession(setup, defaultSimPlayer(34.6), { seed: 5, warmup: false, quickAbCm360: null }, configForMode('quick'));
     expect(state.result).not.toBeNull();
-    expect(blocks.filter((b) => b.spec.stage !== 'ab')).toHaveLength(15); // baseline + 3 dial-in + recheck, 3 blocks each
+    expect(blocks.filter((b) => b.spec.stage !== 'ab')).toHaveLength(20); // baseline + 3 dial-in + recheck, 4 blocks each
     const flick = blocks.find((b) => b.spec.kind === 'flick')!.log as { trials: unknown[] };
-    expect(flick.trials.length).toBeGreaterThanOrEqual(12); // 10 s of flicks at sim speed: a few 6-target waves
+    expect(flick.trials.length).toBeGreaterThanOrEqual(12); // 8 s of flicks at sim speed: several 3-target waves
   });
 });

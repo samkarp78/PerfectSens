@@ -1,6 +1,7 @@
 import type { FlickSummary } from '../../src/core/measure/flick';
 import type { SwitchSummary } from '../../src/core/measure/switch';
 import type { TrackingSummary } from '../../src/core/measure/tracking';
+import type { TrackSwitchSummary } from '../../src/core/measure/trackSwitch';
 import type { TrackingDetail } from '../../src/core/measure/trackingDetail';
 
 /** Neutral part summaries for tests; override only the fields a test is about. */
@@ -22,4 +23,8 @@ export const trackingDetail = (o: Partial<TrackingDetail> = {}): TrackingDetail 
 export const trackingSummary = ({ speedRatio, ...o }: Partial<TrackingSummary> & { speedRatio?: number | null } = {}): TrackingSummary => ({
   tot: 0.5, logTotSe: 0.05, leadLagDeg: 0, n: 1,
   detail: trackingDetail(speedRatio === undefined ? {} : { speedRatio }), ...o,
+});
+export const trackSwitchSummary = (o: Partial<TrackSwitchSummary> = {}): TrackSwitchSummary => ({
+  dmg: 0.6, logDmgSe: 0.05, kills: 10, acquireMs: 300, acquireGain: 1, killMs: 750, losses: 2, reacquireMs: 150,
+  leadLagDeg: 0, heldFraction: 1, n: 1500, ...o,
 });

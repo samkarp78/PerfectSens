@@ -46,6 +46,14 @@ describe('fitCurve', () => {
     expect(r.pickCm360).toBeCloseTo(Math.exp(x0 - 0.2), 9);
   });
 
+  it('a peak within one final step of a tested edge that scores the same as the best flags that edge, pick unclamped', () => {
+    const fast = fit(dataset(-0.19));
+    expect(fast.edge).toBe('faster');
+    expect(Math.abs(fast.pickCm360 / Math.exp(x0 - 0.19) - 1)).toBeLessThan(0.005);
+    expect(fit(dataset(0.19)).edge).toBe('slower');
+    expect(fit(dataset(-0.15)).edge).toBeNull();
+  });
+
   it('upward curvature is low confidence with the pick at the best point', () => {
     const pts = us.map((u, i) => ({ x: x0 + u, y: 2 * u * u, se: 0.01, t: i / 6, isCurrent: u === 0 }));
     const r = fit(pts);

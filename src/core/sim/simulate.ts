@@ -1,17 +1,19 @@
-import { trackingTargetAt } from '../blocks';
+import { trackingTargetAt, trackSwitchTargetAim } from '../blocks';
 import type { Config } from '../config';
 import { angleBetween, degPerCount } from '../geometry';
 import type { Rng } from '../rng';
 import { FlickRunner } from '../run/flickRunner';
 import { SwitchRunner } from '../run/switchRunner';
 import { TrackingRunner } from '../run/trackingRunner';
-import type { Aim, BlockSpec, FlickBlockLog, MoveSample, Setup, SwitchBlockLog, TrackingBlockLog } from '../types';
+import { TrackSwitchRunner } from '../run/trackSwitchRunner';
+import type { Aim, BlockSpec, FlickBlockLog, MoveSample, Setup, SwitchBlockLog, TrackingBlockLog, TrackSwitchBlockLog,
+  TrackSwitchTarget } from '../types';
 import { adaptToward, moveGain, performance, type SimPlayer, type SimState } from './player';
 
 const MS_PER_S = 1000;
 const RAD = Math.PI / 180;
 
-export interface SimBlockResult { log: FlickBlockLog | SwitchBlockLog | TrackingBlockLog; state: SimState; endT: number }
+export interface SimBlockResult { log: FlickBlockLog | SwitchBlockLog | TrackingBlockLog | TrackSwitchBlockLog; state: SimState; endT: number }
 
 const minJerk = (tau: number): number => 10 * tau ** 3 - 15 * tau ** 4 + 6 * tau ** 5;
 
@@ -140,6 +142,78 @@ function finishTime(log: FlickBlockLog, cfg: Config): number {
   return log.t0 + (log.spec.kind === 'warmup' ? cfg.session.warmupMs : cfg.flick.blockMs);
 }
 
+/** One step of the tracking pursuit controller: follow the target velocity seen `delayMs` ago plus a correction toward
+ *  the target's last seen position, scaled by the movement gain, with motor noise. `at` gives the target at a time. */
+function pursuitStep(at: (t: number) => Aim, t: number, aim: Aim, gain: number, delayMs: number, stepMs: number, k: number,
+  rng: Rng, cfg: Config): { dYaw: number; dPitch: number } {
+  const sc = cfg.sim;
+  const seenA = at(t - delayMs - stepMs), seenB = at(t - delayMs);
+  const vYaw = ((seenB.yaw - seenA.yaw) / stepMs) * MS_PER_S, vPitch = ((seenB.pitch - seenA.pitch) / stepMs) * MS_PER_S;
+  const tgt = at(t - stepMs);
+  const noise = k * sc.trackingNoiseDegPerSec;
+  const wYaw = gain * (vYaw + sc.trackingErrorGain * (tgt.yaw - aim.yaw)) + noise * rng.normal();
+  const wPitch = gain * (vPitch + sc.trackingErrorGain * (tgt.pitch - aim.pitch)) + noise * rng.normal();
+  return { dYaw: (wYaw * stepMs) / MS_PER_S, dPitch: (wPitch * stepMs) / MS_PER_S };
+}
+
+/** Tracking switching: hold throughout; after a reaction, one min-jerk acquisition move (gain and noise as a strike's first
+ *  move) to where the nearest target will be on arrival, then pursue it until it dies; repeat. */
+function simulateTrackSwitch(spec: BlockSpec, setup: Setup, player: SimPlayer, state: SimState, rng: Rng, cfg: Config, t0: number): SimBlockResult {
+  const sc = cfg.sim;
+  const dpc = degPerCount(setup.dpi, spec.cm360);
+  const runner = new TrackSwitchRunner(spec, dpc, cfg, t0);
+  const perf = performance(player, spec.cm360, state);
+  const k = player.motorNoise / perf;
+  const stepMs = MS_PER_S / sc.sampleHz;
+  const delayMs = sc.trackingDelayMs / perf;
+  const radius = cfg.trackswitch.targetRadiusDeg;
+  const endT = t0 + cfg.trackswitch.blockMs;
+  const em = new CountEmitter(dpc, (m) => runner.onMove(m));
+  runner.onPress(t0);
+  let adapted = state.adaptedCm360;
+  let nextAdapt = t0 + sc.trackingAdaptMs;
+  const live = (): TrackSwitchTarget[] => runner.log().targets.filter((x) => x.killT === null);
+
+  let cur: TrackSwitchTarget | null = null;
+  let acquireAt = t0 + Math.max(sc.reactionMs.min, sc.switchReactionMs + sc.reactionMs.sd * rng.normal());
+  let move: { from: number; n: number; dYaw: number; dPitch: number; prev: number } | null = null;
+  for (let i = 1; ; i++) {
+    const ts = t0 + i * stepMs;
+    if (ts >= endT) break;
+    while (ts >= nextAdapt) { adapted = adaptToward(player, adapted, spec.cm360); nextAdapt += sc.trackingAdaptMs; }
+    const gain = moveGain(player, adapted, spec.cm360);
+    if (cur && cur.killT !== null) {
+      cur = null; move = null;
+      acquireAt = ts + Math.max(sc.reactionMs.min, sc.switchReactionMs + sc.reactionMs.sd * rng.normal());
+    }
+    if (!cur) {
+      if (ts < acquireAt) { runner.tick(ts); continue; }
+      const here = runner.state.aim;
+      const at = (x: TrackSwitchTarget) => trackSwitchTargetAim(x, ts, cfg);
+      cur = live().sort((a, b) => angleBetween(here, at(a)) - angleBetween(here, at(b)))[0] ?? null;
+      if (!cur) { runner.tick(ts); continue; }
+      const dist = angleBetween(here, at(cur));
+      const durMs = (sc.durationMs.base + sc.durationMs.slope * Math.log2(dist / (2 * radius) + 1)) / perf;
+      const d = plan(here, trackSwitchTargetAim(cur, ts + durMs, cfg), gain * (1 + sc.amplitudeNoise * k * rng.normal()),
+        sc.directionNoiseDeg * k * rng.normal());
+      move = { from: ts, n: Math.max(1, Math.round((durMs * sc.sampleHz) / MS_PER_S)), dYaw: d.dYaw, dPitch: d.dPitch, prev: 0 };
+    }
+    if (move) {
+      const step = Math.round((ts - move.from) / stepMs) + 1;
+      const sNow = minJerk(Math.min(1, step / move.n));
+      em.emit(ts, (sNow - move.prev) * move.dYaw, (sNow - move.prev) * move.dPitch);
+      move.prev = sNow;
+      if (step >= move.n) move = null;
+      continue;
+    }
+    const target = cur;
+    const d = pursuitStep((t) => trackSwitchTargetAim(target, t, cfg), ts, runner.state.aim, gain, delayMs, stepMs, k, rng, cfg);
+    em.emit(ts, d.dYaw, d.dPitch);
+  }
+  runner.tick(endT);
+  return { log: runner.log(), state: { adaptedCm360: adapted, blocksDone: state.blocksDone + 1 }, endT };
+}
+
 function simulateTracking(spec: BlockSpec, setup: Setup, player: SimPlayer, state: SimState, rng: Rng, cfg: Config, t0: number): SimBlockResult {
   const sc = cfg.sim;
   const dpc = degPerCount(setup.dpi, spec.cm360);
@@ -160,14 +234,8 @@ function simulateTracking(spec: BlockSpec, setup: Setup, player: SimPlayer, stat
     while (ts >= nextAdapt) { adapted = adaptToward(player, adapted, spec.cm360); nextAdapt += sc.trackingAdaptMs; }
     const gain = moveGain(player, adapted, spec.cm360);
     const rel = ts - t0;
-    const seenA = trackingTargetAt(spec, rel - delayMs - stepMs, cfg), seenB = trackingTargetAt(spec, rel - delayMs, cfg);
-    const vYaw = ((seenB.yaw - seenA.yaw) / stepMs) * MS_PER_S, vPitch = ((seenB.pitch - seenA.pitch) / stepMs) * MS_PER_S;
-    const tgt = trackingTargetAt(spec, rel - stepMs, cfg);
-    const aim = runner.state.aim;
-    const noise = k * sc.trackingNoiseDegPerSec;
-    const wYaw = gain * (vYaw + sc.trackingErrorGain * (tgt.yaw - aim.yaw)) + noise * rng.normal();
-    const wPitch = gain * (vPitch + sc.trackingErrorGain * (tgt.pitch - aim.pitch)) + noise * rng.normal();
-    em.emit(ts, (wYaw * stepMs) / MS_PER_S, (wPitch * stepMs) / MS_PER_S);
+    const d = pursuitStep((r) => trackingTargetAt(spec, r, cfg), rel, runner.state.aim, gain, delayMs, stepMs, k, rng, cfg);
+    em.emit(ts, d.dYaw, d.dPitch);
   }
   runner.tick(endT);
   return { log: runner.log(), state: { adaptedCm360: adapted, blocksDone: state.blocksDone + 1 }, endT };
@@ -177,5 +245,6 @@ function simulateTracking(spec: BlockSpec, setup: Setup, player: SimPlayer, stat
 export function simulateBlock(spec: BlockSpec, setup: Setup, player: SimPlayer, state: SimState, rng: Rng, cfg: Config, t0: number): SimBlockResult {
   if (spec.kind === 'tracking') return simulateTracking(spec, setup, player, state, rng, cfg, t0);
   if (spec.kind === 'switch') return simulateSwitch(spec, setup, player, state, rng, cfg, t0);
+  if (spec.kind === 'trackswitch') return simulateTrackSwitch(spec, setup, player, state, rng, cfg, t0);
   return simulateFlick(spec, setup, player, state, rng, cfg, t0);
 }

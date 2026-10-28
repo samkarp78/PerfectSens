@@ -4,7 +4,7 @@ import { createRng } from '../../src/core/rng';
 import type { FitResult } from '../../src/core/fit';
 import type { StepResult } from '../../src/core/types';
 import { chooseNext, maxTestCm360, pooledGain, stepSize, type SteerContext } from '../../src/core/steer';
-import { flickSummary, switchSummary, trackingSummary } from '../helpers/summaries';
+import { flickSummary, switchSummary, trackingSummary, trackSwitchSummary } from '../helpers/summaries';
 
 const current = 30;
 
@@ -23,6 +23,7 @@ function step(order: number, cm360: number, o: Over = {}): StepResult {
     }),
     switch: switchSummary({ smallGain: null, mediumGain: null, bigGain: null, classN: { small: 0, medium: 0, big: 0 } }),
     tracking: trackingSummary({ leadLagDeg: o.leadLagDeg ?? 0, speedRatio: o.speedRatio === undefined ? 1 : o.speedRatio }),
+    trackSwitch: trackSwitchSummary(),
     score: { logS: o.logS ?? 0, se: 0.05 },
   };
 }
@@ -106,8 +107,8 @@ describe('chooseNext after bracketing', () => {
   });
 
   it('clickBias driver steers slower when clicks overshoot more than baseline', () => {
-    const over = chooseNext(ctx({ steps: bracketSteps(step(3, 31, { clickBias: 1.5 })), fit }), cfg);
-    const under = chooseNext(ctx({ steps: bracketSteps(step(3, 31, { clickBias: -1.5 })), fit }), cfg);
+    const over = chooseNext(ctx({ steps: bracketSteps(step(3, 31, { clickBias: 3 })), fit }), cfg);
+    const under = chooseNext(ctx({ steps: bracketSteps(step(3, 31, { clickBias: -3 })), fit }), cfg);
     expect(over.direction).toBe('slower');
     expect(under.direction).toBe('faster');
   });

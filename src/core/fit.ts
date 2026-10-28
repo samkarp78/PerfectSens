@@ -115,6 +115,14 @@ export function fitCurve(points: FitPoint[], x0: number, cfg: Config, rng: Rng):
   let edge: FitResult['edge'] = null;
   if (uStar > maxU) { uStar = maxU; edge = 'slower'; }
   else if (uStar < minU) { uStar = minU; edge = 'faster'; }
+  else {
+    // A peak within one final step of a tested edge that performs the same as the best point: the optimum is at or
+    // beyond that edge (the quadratic bends early when the far side of the range scores very low).
+    const near = Math.log(1 + cfg.steer.finalStep);
+    const flagged = upwardEdge(points, cfg);
+    if (uStar - minU < near && flagged === 'faster') edge = 'faster';
+    else if (maxU - uStar < near && flagged === 'slower') edge = 'slower';
+  }
 
   return {
     usable: true, coef, pickCm360: Math.exp(x0 + uStar),
