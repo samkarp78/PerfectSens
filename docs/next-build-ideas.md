@@ -88,18 +88,21 @@ Feedback: "still feels like a chore", and 10 minutes with no breaks of the same 
 - **Same layout for both A/B arms:** give P and C identical target layouts so the only difference is the sens. Less noise, but watch for players recognising the pattern over 8 blocks.
 - **Progress total jumps when the A/B adds a round** (18 → 26 in the play-test). Options: show the worst case from the start, show a range ("18–26"), show a "Close result — adding one more round" message, or turn off the extension in Quick mode.
 - **Tracking difficulty ramp:** the current tracking (10–25°/s, 2° target) felt about right (67–81% on target). Only add a ramp if a later test wants it, and keep it identical across blocks.
+- **"I don't know my sens" option at setup:** keep the typed cm/360 input for players who know it (more accurate). Add an "I don't know mine" choice that turns the warm-up into a slider round: free targets with a sens slider and the prompt "adjust until it feels like your game". The value they settle on becomes the starting ("current") sens.
+  - Feel-matching is usually 10–20% off, so the familiarity correction and the "Keep your current sens" verdict mean less. Flag these sessions in the record, and have Results say so.
+  - For these players the warm-up stops being optional.
 
 ## Results and advice
 
 - **Re-tune the tracking-vs-flicking diagnosis.** Its reference value (refTot 0.5) was set for the old, harder tracking, so it now leans toward "train flicking". In the play-test the finding was 1.17 against a 1.15 threshold, which is essentially noise.
-- **Play area calibration:** measure the mousepad instead of asking for it.
-  - With the mouse locked, the player slides from the far left of their pad to the far right (and optionally top to bottom). The raw counts ÷ DPI × 2.54 give the usable width in cm, with no ruler needed.
-  - Repeat 2–3 times and take the smallest.
-  - Uses:
-    - Cap the slowest test sens so a comfortable turn (e.g. 180°) fits the pad.
-    - Warn if the player's current sens already doesn't fit.
-    - Show it on results ("a 180° turn uses 17 cm of your 40 cm pad").
+- **Play area calibration — remaining gaps** (the calibration, the 180°-fits-90%-of-pad cap on the slowest test sens, and the Results pad line were built in revision 2):
+  - **Make pad measurement required** (user decision, 2026-10-28). Today it's optional, and when skipped there is no cap, so the app can test sens too slow for the pad. Every session should measure the pad before the rounds start.
+  - **Warn when the current sens already doesn't fit.** The cap never goes slower than the current sens, so if a 180° at the current sens already needs more than 90% of the pad, the app tests it and the sens near it and says nothing. Show a warning at setup, and on Results say that their current sens is too slow for their pad.
   - It depends on the DPI being entered correctly. A mismatch would show up as an odd pad size, which is itself a useful check of the DPI.
+- **"How did that feel?" rating (user approved, 2026-10-28):** after each round, ask for a 1–5 feel rating. Save it with the round, but never use it in scoring, steering or the verdict, so the test stays blind (the player still doesn't see which sens they played). Results compares feel with performance, e.g. "You liked 34 cm/360 best, but you played best at 28."
+- **Possible (not approved yet): mouse-lift detection.** Flag a stop in movement partway through a big turn, which usually means the player ran out of pad and lifted the mouse. Record and diagnose only; it measures the "can't look behind me" complaint directly and pairs with the pad check.
+- **Possible (not approved yet): reaction time as a fatigue check.** Time from target appearing to the first movement shouldn't depend on sens. If it slows over the session, suggest a break or weigh late rounds more cautiously. Not part of the score.
+- **In-game conversion on Results (for everyone):** turn the recommended cm/360 into the number to type into their game, from their game and mouse DPI. Fallback without a lookup: a ruler check ("set your game sens so sliding the mouse 28 cm turns you exactly one full circle").
 - **Gradual-change advice:** if the recommended change is more than about 10%, suggest moving halfway first, playing a week, then running Quick A/B from History. This follows the pros' "small steps, give it a week" habit.
 - **Sens variation as a training tip** under "What to train". Optional.
 
@@ -109,3 +112,13 @@ Feedback: "still feels like a chore", and 10 minutes with no breaks of the same 
 - **The Finals:** no pro data found. Generic guidance is about 20–33 cm/360.
 - **PSA (Perfect Sensitivity Approximation):** test about 0.5× and 1.5×, keep the better one, halve the gap, repeat 6–8 times. Its strength is the wide start. Its weakness is that each step is a single, unblinded trial judged by feel.
 - **Aimlabs Mouselabs:** passive. It steers by over/undershoot and tracking speed match over up to 100 sessions. It's strong on data volume, but over/undershoot mostly reflects adaptation, and it never directly compares sens against each other.
+
+## From the revision-3 play-test (2026-10-28)
+
+- **Mouse / gear check:** report the mouse event rate and dropped or irregular events.
+  - Show it on Results ("Mouse: 1000 Hz, steady"), and warn when the rate is under about 500 Hz or events are missing.
+  - Also warn during the test (at the next break or between parts) as soon as it's detected.
+  - Diagnosis only.
+- **Part order:** flicks → tracking switching → switching → tracking, alternating clicking and holding parts. It must be the same in every round. Re-run the simulator checks.
+- **Grades that explain themselves:** show the letter together with "+4% vs your calibration round" (or a rank and an improved/not-improved marker).
+  - Add a note that most players improve during a session just from warming up, so "improved" doesn't mean the sens is better.
