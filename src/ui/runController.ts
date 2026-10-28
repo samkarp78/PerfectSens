@@ -81,6 +81,9 @@ export function createRunController(initial: SessionState, cfg: Config = initial
   let cue: Cue | null = null;
   /** The part whose cue was interrupted by a pause; resuming replays that cue. */
   let pausedCue: PartKind | null = null;
+  /** The left button's state from every press and release, whatever the phase, so a button held through a handover
+   *  counts as held from the start of the next hold part. */
+  let buttonDown = false;
 
   const settle = (completedRound = false): void => {
     runner = null;
@@ -97,6 +100,7 @@ export function createRunController(initial: SessionState, cfg: Config = initial
       : spec.kind === 'trackswitch' ? new TrackSwitchRunner(spec, dpc, cfg, t)
       : spec.kind === 'switch' ? new SwitchRunner(spec, dpc, cfg, t)
       : new FlickRunner(spec, dpc, cfg, t);
+    if (buttonDown && (runner instanceof TrackingRunner || runner instanceof TrackSwitchRunner)) runner.onPress(t);
     phase = 'running';
   };
 
@@ -143,12 +147,14 @@ export function createRunController(initial: SessionState, cfg: Config = initial
       checkDone(s.t);
     },
     onClick(t) {
+      buttonDown = true;
       if (phase !== 'running' || !runner) return;
       if (runner instanceof TrackingRunner || runner instanceof TrackSwitchRunner) runner.onPress(t);
       else runner.onClick(t);
       checkDone(t);
     },
     onRelease(t) {
+      buttonDown = false;
       if (phase !== 'running' || !(runner instanceof TrackingRunner || runner instanceof TrackSwitchRunner)) return;
       runner.onRelease(t);
     },

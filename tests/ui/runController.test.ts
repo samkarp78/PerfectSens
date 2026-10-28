@@ -255,3 +255,54 @@ describe('handover cue between parts', () => {
     expect(c.runner).toBeInstanceOf(SwitchRunner);
   });
 });
+
+describe('mouse button held across a handover', () => {
+  /** Plays flicks, then lets switching run out its time, leaving the cue before tracking. */
+  function toTrackingCue(): { c: RunController; t: number } {
+    const c = createRunController(createSession(setup, opts));
+    let t = 0;
+    c.begin(0);
+    for (let guard = 0; guard < 500 && !(c.phase === 'cue' && c.cue!.kind === 'tracking'); guard++) {
+      if (c.phase === 'cue') { t = c.cue!.endsAt; c.tick(t); continue; }
+      const r = c.runner!;
+      if (r instanceof FlickRunner) {
+        const moves = minJerkMoves(r.state.aim, r.state.target!.aim, t, 150, 500, DPC);
+        for (const m of moves) c.onMove(m);
+        t = moves[moves.length - 1]!.t + 10;
+        c.onClick(t);
+        c.onRelease(t + 5);
+        t += 50;
+      } else if (r instanceof SwitchRunner) {
+        for (let k = 0; k < 6; k++) {
+          const goal = r.state.targets[0]!;
+          const moves = minJerkMoves(r.state.aim, goal, t, 150, 500, DPC);
+          for (const m of moves) c.onMove(m);
+          t = moves[moves.length - 1]!.t + 10;
+          c.onClick(t);
+          c.onRelease(t + 5);
+          t += 50;
+        }
+        t = r.state.endsAt; c.tick(t);
+      } else break;
+    }
+    return { c, t };
+  }
+  it('a button pressed during the cue counts as held when the hold part starts', () => {
+    const { c } = toTrackingCue();
+    const cue = c.cue!;
+    c.onClick(cue.startedAt + 100);
+    c.tick(cue.endsAt);
+    const r = c.runner as TrackingRunner;
+    expect(r).toBeInstanceOf(TrackingRunner);
+    expect(r.state.held).toBe(true);
+    expect(r.log().holds![0]).toEqual({ t: cue.endsAt, down: true });
+  });
+  it('a button released during the cue is not held', () => {
+    const { c } = toTrackingCue();
+    const cue = c.cue!;
+    c.onClick(cue.startedAt + 100);
+    c.onRelease(cue.startedAt + 200);
+    c.tick(cue.endsAt);
+    expect((c.runner as TrackingRunner).state.held).toBe(false);
+  });
+});

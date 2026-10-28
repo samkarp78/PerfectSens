@@ -5,7 +5,7 @@ import { fmt, fmtOpt } from './format';
 const PERCENT = 100;
 
 /** Table cells for one step. Steps saved before newer parts existed lack those parts: their cells stay empty. */
-export function stepCells(s: StepResult): { switchTp: string; switchAcc: string; tot: string; dmg: string } {
+export function stepCells(s: StepResult): { switchTp: string; switchAcc: string; tot: string; dmg: string; acquireGain: string } {
   const sw = s.switch as StepResult['switch'] | undefined;
   const ts = s.trackSwitch as StepResult['trackSwitch'] | undefined;
   return {
@@ -13,6 +13,7 @@ export function stepCells(s: StepResult): { switchTp: string; switchAcc: string;
     switchAcc: sw ? `${Math.round(PERCENT * sw.accuracy)}%` : '',
     tot: fmt(s.tracking.tot, 3),
     dmg: ts ? fmt(ts.dmg, 3) : '',
+    acquireGain: ts ? fmtOpt(ts.acquireGain) : '',
   };
 }
 
@@ -39,7 +40,7 @@ export function BlockLog({ rec }: { rec: SessionRecord }) {
         <table class="table">
           <thead>
             <tr>
-              <th>#</th><th>Stage</th><th>cm/360</th><th>Flick TP</th><th>Switch TP</th><th>Switch hits</th><th>ToT</th><th>Track-switch dmg</th>
+              <th>#</th><th>Stage</th><th>cm/360</th><th>Flick TP</th><th>Switch TP</th><th>Switch hits</th><th>ToT</th><th>Track-switch dmg</th><th>Acquire gain</th>
               <th>Gain S/M/B</th><th>Corrections</th>
               <th>Spread</th><th>Steering reason</th><th>A/B</th>
             </tr>
@@ -58,6 +59,7 @@ export function BlockLog({ rec }: { rec: SessionRecord }) {
                   <td>{c.switchAcc}</td>
                   <td>{c.tot}</td>
                   <td>{c.dmg}</td>
+                  <td>{c.acquireGain}</td>
                   <td>{fmtOpt(s.flick.smallGain)} / {fmtOpt(s.flick.mediumGain)} / {fmtOpt(s.flick.bigGain)}</td>
                   <td>{fmt(s.flick.corrections)}</td>
                   <td>{fmt(s.flick.spreadRatio)}</td>

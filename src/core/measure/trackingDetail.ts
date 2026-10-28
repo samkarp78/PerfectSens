@@ -37,7 +37,7 @@ export function walkPath(log: Pick<TrackingBlockLog, 't0' | 'endT' | 'path' | 'h
 export interface TrackingDetail {
   errMean: number | null; errRms: number | null; errMedian: number | null;
   alongRms: number | null; perpMean: number | null; perpRms: number | null;
-  /** Median crosshair speed along the target's direction ÷ target speed (> 1 = running ahead). */
+  /** Crosshair travel along the target's direction ÷ target travel, over held moving samples (> 1 = running ahead). */
   speedRatio: number | null;
   turnReactionMs: number | null; turnOvershootDeg: number | null; turnSettleMs: number | null;
   jitterDegPerSec: number | null;
@@ -89,7 +89,11 @@ export function measureTrackingDetail(log: TrackingBlockLog, cfg: Config): Track
   const moving = held.filter((p) => p.speed > tc.minSpeedForLeadLag);
   const along = moving.map((p) => (p.ex * p.vx + p.ey * p.vy) / p.speed);
   const perp = moving.map((p) => (-p.ex * p.vy + p.ey * p.vx) / p.speed);
-  const ratios = moving.filter((p) => p.ax !== null).map((p) => (p.ax! * p.vx + p.ay! * p.vy) / (p.speed * p.speed));
+  // Ratio of sums (crosshair travel along the target's direction ÷ target travel), not a per-step median: mouse events arrive
+  // at their own rate, so single grid steps hold zero, one or two events' worth of movement.
+  const withVel = moving.filter((p) => p.ax !== null);
+  const targetTravel = withVel.reduce((a, p) => a + p.speed, 0);
+  const speedRatio = targetTravel > 0 ? withVel.reduce((a, p) => a + (p.ax! * p.vx + p.ay! * p.vy) / p.speed, 0) / targetTravel : null;
   const jitter = pts.filter((p) => p.on && p.ax !== null).map((p) => Math.hypot(p.ax! - p.vx, p.ay! - p.vy));
 
   // Losses: on → off changes; reacquire: how long until back on (completed spells only).
@@ -131,7 +135,7 @@ export function measureTrackingDetail(log: TrackingBlockLog, cfg: Config): Track
   return {
     errMean: mean(held.map((p) => p.dist)), errRms: rms(held.map((p) => p.dist)), errMedian: median(held.map((p) => p.dist)),
     alongRms: rms(along), perpMean: mean(perp), perpRms: rms(perp),
-    speedRatio: median(ratios),
+    speedRatio,
     turnReactionMs: mean(reacts), turnOvershootDeg: mean(overs), turnSettleMs: mean(settles),
     jitterDegPerSec: rms(jitter),
     losses, reacquireMs: mean(reacquire),

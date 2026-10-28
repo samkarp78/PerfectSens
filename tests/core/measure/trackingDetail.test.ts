@@ -62,6 +62,15 @@ describe('measureTrackingDetail', () => {
     expect(d.alongRms!).toBeCloseTo(1, 1);
     expect(d.perpRms!).toBeLessThan(0.15);
   });
+  it('perfect follow gives speedRatio ≈ 1 at 60, 125 and 1000 Hz mouse rates', () => {
+    for (const hz of [60, 125, 1000]) {
+      const path: AimSample[] = [];
+      for (let t = T0; t <= END; t += 1000 / hz) path.push({ t, ...target(t - T0) });
+      const d = measureTrackingDetail(logOf(path), cfg);
+      expect(d.speedRatio!, `${hz} Hz`).toBeGreaterThan(0.97);
+      expect(d.speedRatio!, `${hz} Hz`).toBeLessThan(1.03);
+    }
+  });
   it('crosshair at 1.2× target speed gives speedRatio ≈ 1.2', () => {
     const o = target(0);
     const d = measureTrackingDetail(logOf(pathOf((rel) => {
