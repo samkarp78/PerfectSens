@@ -45,7 +45,7 @@ function tpOf(scored: TrialMetrics[], cfg: Config): { tp: number; weDeg: number 
   const weDeg = withClick.length > 0
     ? Math.max(cfg.score.weFactor * sampleSd(withClick.map((t) => t.endAlong!)), cfg.score.minWeDeg)
     : cfg.score.minWeDeg;
-  const de = withClick.length > 0 ? mean(withClick.map((t) => t.distance + t.endAlong!)) : mean(scored.map((t) => t.distance));
+  const de = Math.max(0, withClick.length > 0 ? mean(withClick.map((t) => t.distance + t.endAlong!)) : mean(scored.map((t) => t.distance)));
   const mt = mean(scored.map((t) => t.mtMs)) / MS_PER_S;
   return { tp: Math.log2(de / weDeg + 1) / mt, weDeg };
 }
@@ -62,7 +62,7 @@ export function summarizeFlick(trials: TrialMetrics[], cfg: Config, rng: Rng): F
   if (scored.length > 0) {
     for (let b = 0; b < cfg.score.bootstrapSamples; b++) {
       const sample = scored.map(() => scored[rng.int(0, scored.length - 1)]!);
-      logs.push(Math.log(tpOf(sample, cfg).tp));
+      logs.push(Math.log(Math.max(tpOf(sample, cfg).tp, cfg.score.minTp)));
     }
   }
 

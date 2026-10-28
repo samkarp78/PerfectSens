@@ -132,3 +132,17 @@ describe('summarizeFlick', () => {
     expect(s.mediumGain).toBe(1);
   });
 });
+
+describe('summarizeFlick NaN guard', () => {
+  it('stays finite when trials have zero along-travel', () => {
+    const trials = Array.from({ length: 6 }, (_, i) => metric({ index: i, distance: 0, endAlong: 0 }));
+    const s = summarizeFlick(trials, defaultConfig, createRng(1));
+    expect(Number.isFinite(s.logTpSe)).toBe(true);
+    expect(Number.isFinite(s.tp)).toBe(true);
+  });
+
+  it('stays finite when some trials have negative effective distance', () => {
+    const trials = Array.from({ length: 6 }, (_, i) => metric({ index: i, distance: 1, endAlong: -5 }));
+    expect(Number.isFinite(summarizeFlick(trials, defaultConfig, createRng(2)).logTpSe)).toBe(true);
+  });
+});

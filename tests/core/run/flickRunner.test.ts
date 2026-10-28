@@ -100,3 +100,15 @@ describe('FlickRunner', () => {
     expect(r.state.total).toBe(cfg.flick.warmupTargets);
   });
 });
+
+describe('FlickRunner late clicks', () => {
+  it('ignores a click timestamped before the current target spawned', () => {
+    const r = new FlickRunner(spec(), DPC, cfg, T0);
+    const w = cfg.flick.timeoutMs;
+    r.tick(T0 + 2 * w + 50); // two timeouts elapse before the click is delivered
+    const idx = r.state.trialIndex;
+    expect(r.onClick(T0 + w + 100)).toEqual({ hit: false });
+    expect(r.state.trialIndex).toBe(idx);
+    expect(r.log().trials[r.log().trials.length - 1]!.clicks).toHaveLength(0);
+  });
+});

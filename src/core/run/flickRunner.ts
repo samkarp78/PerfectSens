@@ -63,6 +63,7 @@ export class FlickRunner {
     this.processTimeouts(t);
     if (this.finished) return { hit: false };
     const trial = this.current;
+    if (t < trial.spawnT) return { hit: false };
     const hit = angleBetween(this.aim, trial.target.aim) <= this.cfg.flick.targetRadiusDeg;
     trial.clicks.push({ t, aim: { ...this.aim }, hit });
     if (hit) {

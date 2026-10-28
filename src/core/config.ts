@@ -18,6 +18,7 @@ export const defaultConfig = {
   diagnose: { spreadRatioMax: 1.0, correctionsMax: 1.0, smallGainMax: 1.08, bigGainMin: 0.92,
     refTp: 4.5, refTot: 0.5, imbalance: 0.15 },
   store: { keepRawSessions: 5 },
+  demo: { player: { optimalRatio: 0.75 } },
   sim: { sampleHz: 500, blockGapMs: 1000,
     player: { optimalRatio: 0.88, curvature: 2, familiarityBonus: 0.02, adaptationRate: 0.15, gainExponent: 1, motorNoise: 1,
       driftPerBlock: 0.002, familiarityTolLn: 1e-9 },
