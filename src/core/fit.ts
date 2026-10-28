@@ -88,7 +88,14 @@ export function fitCurve(points: FitPoint[], x0: number, cfg: Config, rng: Rng):
 
   const coef = solveModel(points, points.map((p) => p.y), x0, cfg);
   if (!coef) return fallback(false, null);
-  if (coef.c >= 0) return fallback(true, coef);
+  if (coef.c >= 0) {
+    // Upward curve: pick the best point; if it is the fastest or slowest tested, the peak is at or beyond that edge.
+    const best = fallback(true, coef);
+    const xs = points.map((p) => p.x);
+    const bx = Math.log(best.pickCm360);
+    const edge: FitResult['edge'] = bx <= Math.min(...xs) ? 'faster' : bx >= Math.max(...xs) ? 'slower' : null;
+    return { ...best, edge };
+  }
 
   const uValues = points.map((p) => p.x - x0);
   const minU = Math.min(...uValues), maxU = Math.max(...uValues);

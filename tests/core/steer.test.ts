@@ -134,6 +134,37 @@ describe('chooseNext after bracketing', () => {
     expect(Math.abs(below.signal)).toBeLessThan(cfg.steer.deadband);
   });
 
+  it('when the fit flags its peak beyond a tested edge, extends past that edge whatever the aim signals say', () => {
+    const size = stepSize(2, 6, cfg);
+    for (const [edge, edgeAt, expected] of [['faster', current / 1.15, current / 1.15 / (1 + size)],
+      ['slower', current * 1.15, current * 1.15 * (1 + size)]] as const) {
+      const f: FitResult = { ...fitAt(edgeAt), edge };
+      const last = step(3, 31, { smallGain: edge === 'faster' ? 1.3 : 0.7 }); // aim signals point the other way
+      const d = chooseNext(ctx({ steps: bracketSteps(last), fit: f }), cfg);
+      expect(Math.sign(d.signal)).toBe(edge === 'faster' ? 1 : -1);
+      expect(d.direction).toBe(edge);
+      expect(d.cm360).toBeCloseTo(expected, 9);
+      expect(d.reason).not.toMatch(/\d/);
+    }
+  });
+
+  it('without a confident fit, extends past the best tested step when it is the fastest or slowest tested, whatever the aim signals say', () => {
+    const size = stepSize(2, 6, cfg);
+    const steps = [step(1, current * 1.15, { logS: -0.2 }), step(2, current / 1.3, { logS: 0.3 }),
+      step(3, 29, { logS: 0.1, smallGain: 1.3 })];
+    for (const f of [null, fitAt(32, true, true)]) {
+      const d = chooseNext(ctx({ steps, fit: f }), cfg);
+      expect(d.signal).toBeGreaterThan(cfg.steer.deadband);
+      expect(d.direction).toBe('faster');
+      expect(d.cm360).toBeCloseTo(current / 1.3 / (1 + size), 9);
+      expect(d.reason).not.toMatch(/\d/);
+    }
+    // Not at an extreme: the aim signals decide as before.
+    const inner = [step(1, current * 1.15, { logS: -0.2 }), step(2, current / 1.3, { logS: 0.1 }),
+      step(3, 29, { logS: 0.3, smallGain: 1.3 })];
+    expect(chooseNext(ctx({ steps: inner, fit: null }), cfg).direction).toBe('slower');
+  });
+
   it('falls back to the best-scoring tested step when the fit is missing, unusable or low-confidence', () => {
     const steps = [step(1, current * 1.15, { logS: 0.2 }), step(2, current / 1.15, { logS: 0.1 }),
       step(3, 31, { smallGain: 1.15 })];
@@ -157,6 +188,35 @@ describe('chooseNext after bracketing', () => {
     const d = chooseNext(ctx({ steps, fit }), cfg);
     expect(d.direction).toBe('faster');
     expect(d.cm360).toBeCloseTo(center / (1 + size), 9);
+  });
+
+  it('when both sides of center were tested, keeps stepping outward in the chosen direction instead of repeating a test', () => {
+    // Index 2 after bracketing with the baseline best: center = current, and current·(1.15)^±1 are both tested.
+    const size = stepSize(2, 6, cfg);
+    const steps = [step(1, current * (1 + size), { logS: -0.1, smallGain: 1.15 }), step(2, current / (1 + size), { logS: -0.1, smallGain: 1.3 })];
+    const d = chooseNext(ctx({ steps, fit: null }), cfg);
+    expect(d.direction).toBe('slower');
+    expect(d.cm360).toBeCloseTo(current * (1 + size) ** 2, 9);
+    expect(d.reason).not.toMatch(/\d/);
+  });
+
+  it('when both sides of center were tested, walks outward past the better-scoring neighbour, whatever the aim signals say', () => {
+    const size = stepSize(2, 6, cfg);
+    const steps = [step(1, current * (1 + size), { logS: -0.15 }), step(2, current / (1 + size), { logS: -0.02, smallGain: 1.3 })];
+    const d = chooseNext(ctx({ steps, fit: null }), cfg);
+    expect(d.signal).toBeGreaterThan(0);
+    expect(d.direction).toBe('faster');
+    expect(d.cm360).toBeCloseTo(current / (1 + size) ** 2, 9);
+  });
+
+  it('walks outward on the other side when the chosen side is tested up to the limit', () => {
+    const size = stepSize(2, 6, cfg);
+    const hi = current * cfg.steer.limits.max;
+    const steps = [step(1, current * (1 + size)), step(2, current / (1 + size)), step(3, current * (1 + size) ** 2),
+      step(4, current * (1 + size) ** 3), step(5, hi, { smallGain: 1.15 })];
+    const d = chooseNext(ctx({ steps, fit: fitAt(current) }), cfg);
+    expect(d.direction).toBe('faster');
+    expect(d.cm360).toBeCloseTo(current / (1 + size) ** 2, 9);
   });
 
   it('down-weights signals after a bigger preceding jump', () => {

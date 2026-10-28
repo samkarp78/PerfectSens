@@ -56,6 +56,26 @@ describe('fitCurve', () => {
     expect(r.pickCm360).toBeCloseTo(Math.exp(x0 - 0.2), 9);
   });
 
+  it('upward curvature with the best point at a tested edge flags that edge (low confidence)', () => {
+    // Flattening at both ends of a monotone drop (a floor at the slow end) fits as an upward curve.
+    const ys = [1.6, 1.5, 1.2, 0.6, 0.15, 0.05, 0.0];
+    const fast = fit(us.map((u, i) => ({ x: x0 + u, y: ys[i]!, se: 0.01, t: i / 6, isCurrent: u === 0 })));
+    expect(fast.coef!.c).toBeGreaterThanOrEqual(0);
+    expect(fast.lowConfidence).toBe(true);
+    expect(fast.edge).toBe('faster');
+    expect(fast.pickCm360).toBeCloseTo(Math.exp(x0 - 0.2), 9);
+    const slow = fit(us.map((u, i) => ({ x: x0 + u, y: ys[6 - i]!, se: 0.01, t: i / 6, isCurrent: u === 0 })));
+    expect(slow.edge).toBe('slower');
+  });
+
+  it('upward curvature with an interior best point flags no edge', () => {
+    const ys = [0.5, 0.2, 0.6, 0.0, 0.2, 0.3, 0.55];
+    const r = fit(us.map((u, i) => ({ x: x0 + u, y: ys[i]!, se: 0.01, t: i / 6, isCurrent: u === 0 })));
+    expect(r.coef!.c).toBeGreaterThanOrEqual(0);
+    expect(r.pickCm360).toBeCloseTo(Math.exp(x0 + us[2]!), 9);
+    expect(r.edge).toBeNull();
+  });
+
   it('fewer than minDistinctX distinct x values is unusable', () => {
     const tri = [-0.1, 0, 0.1, -0.1, 0, 0.1];
     const pts = tri.map((u, i) => ({ x: x0 + u, y: -2 * (u - 0.08) ** 2, se: 0.01, t: i / 5, isCurrent: u === 0 }));
