@@ -28,6 +28,7 @@ Feedback: "still feels like a chore", and 10 minutes with no breaks of the same 
   - Scoring: each segment type gets its own score, normalised to the baseline. The composite weights go in config. Switching is a new metric (time per kill, or throughput across switches) and needs its own measure and tests.
   - Each segment type needs its own short unscored lead-in, because switching tasks costs a moment of readjustment.
   - Re-run the simulator checks: shorter segments mean less data per type. The simulated player needs a switching model.
+- **Round timer:** a countdown for the current round or segment, for example "0:32" near the top, alongside the session progress bar. Possibly a thin bar that drains under it, which turns orange in the last 5 s. Tracking counts down from the end of its lead-in. Show segment names once rounds have several parts ("Switching · 0:12").
 - **Real breaks:** 15–20 s every 2–3 rounds that the player can end early. Show the stretch's score, grade and best streak, so the break feels like a milestone. Fatigue also biases later rounds, so this helps the data too.
 - **Optional auto-continue:** a setting for the 3-2-1 countdown, so players can choose to always click to start instead.
 - **A different look per stage** (baseline, dial-in, final showdown): purely visual and safe for the measurement.
