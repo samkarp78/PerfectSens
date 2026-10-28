@@ -555,3 +555,23 @@ Rates go in a build-notes subsection, as in §17.9.
 - Screen layouts and wording for the waiting screen, the hold button (1 s fill), the feel question and the hour-check card, in the existing style.
 - Storage format for the saved search.
 - The step-halving schedule details and the aim-nudge weights, within §18.6.
+
+### 18.13 Build notes and measured rates (2026-10-28)
+
+**Change during the build:** the first simulator run gave a null false change of **5.3%**. Two things caused it:
+- The pooled comparison included the leader's earlier tests, which are the reason it was chosen (selection bias).
+- Head-to-heads were sometimes split across nights, so night form showed up as a difference.
+
+Now:
+- Only the head-to-head's own same-night tests decide "change", with the §8 rule at z = 2.5. Earlier tests still steer and fit.
+- A head-to-head split by the hour check is replayed in full the next night.
+
+**Simulator rates** (3 rounds per test, 1 head-to-head test per side, up to 4 nights):
+
+| Check | Rate |
+|---|---|
+| Null false change | **0/300** (keep 54, none 246) |
+| Convergence (optimum 0.75–1.3× default) | 14/14 change answers within ±8%; kinds: change 14, none 83, keep 3 |
+| Effort | median 3 nights, median 4 tests per night |
+
+Power is low. Most searches with a real optimum end with "no clear winner", because one 3-minute test per side is a small head-to-head.
