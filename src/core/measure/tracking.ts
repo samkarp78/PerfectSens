@@ -46,10 +46,21 @@ export function measureTracking(log: TrackingBlockLog, cfg: Config, rng: Rng): T
   const hits = onTarget.filter(Boolean).length;
   const tot = hits / n;
 
+  const logTotSe = chunkBootstrapSe(onTarget, cfg, rng);
+
+  return {
+    tot, logTotSe, n, detail,
+    leadLagDeg: lags.length > 0 ? lags.reduce((a, b) => a + b, 0) / lags.length : 0,
+  };
+}
+
+/** SD of ln(fraction true) over bootstraps of score.trackingSegmentMs chunks of a tracking-grid flag series. */
+export function chunkBootstrapSe(flags: readonly boolean[], cfg: Config, rng: Rng): number {
+  if (flags.length === 0) return 0;
   const perChunk = Math.max(1, Math.round((cfg.score.trackingSegmentMs / MS_PER_S) * cfg.tracking.gridHz));
   const chunks: { hits: number; n: number }[] = [];
-  for (let i = 0; i < n; i += perChunk) {
-    const slice = onTarget.slice(i, i + perChunk);
+  for (let i = 0; i < flags.length; i += perChunk) {
+    const slice = flags.slice(i, i + perChunk);
     chunks.push({ hits: slice.filter(Boolean).length, n: slice.length });
   }
   const logs: number[] = [];
@@ -61,9 +72,5 @@ export function measureTracking(log: TrackingBlockLog, cfg: Config, rng: Rng): T
     }
     logs.push(Math.log(Math.max(h / m, cfg.score.minTot)));
   }
-
-  return {
-    tot, logTotSe: sampleSd(logs), n, detail,
-    leadLagDeg: lags.length > 0 ? lags.reduce((a, b) => a + b, 0) / lags.length : 0,
-  };
+  return sampleSd(logs);
 }

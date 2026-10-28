@@ -16,6 +16,11 @@ export const defaultConfig = {
    *  The first `warmKills` kills are unscored warm-in. */
   switch: { blockMs: 14000, active: 3, targetRadiusDeg: 1.5, region: { yaw: 35, pitch: 15 }, minSeparationDeg: 8, warmKills: 2,
     maxTargets: 200 },
+  /** Tracking switching: `active` moving targets; holding the button on one deals damage until healthMs of damage kills it,
+   *  then the next seeded target spawns. The first leadInMs is unscored. */
+  trackswitch: { blockMs: 14000, leadInMs: 1500, active: 3, targetRadiusDeg: 2, healthMs: 700, region: { yaw: 35, pitch: 15 },
+    speedDegPerSec: { min: 10, max: 25 }, segmentMs: { min: 700, max: 2000 }, directionSpreadDeg: 45, minSeparationDeg: 8,
+    maxTargets: 200, placeTries: 50 },
   /** Every part of a round has the same length (partMs); between parts a cueMs handover with ticks cueTickMs apart. */
   round: { cueMs: 1800, cueTickMs: 600 },
   submovement: { binMs: 5, smoothBins: 3, onsetDegPerSec: 30, endDegPerSec: 20, endHoldMs: 30, edgeBins: 1 },
@@ -36,7 +41,8 @@ export const defaultConfig = {
   store: { keepRawSessions: 5 },
   demo: { player: { optimalRatio: 0.75 } },
   /** Quick test mode (about 5 min, for trying the tool out): shorter blocks; too little data for a reliable answer. */
-  quick: { distancesDeg: [8,12,17,21, 23,27,31,34, 40,49,58,66], flickBlockMs: 8000, wavePerClass: 1, switchBlockMs: 8000, trackingDurationMs: 7000, trackingLeadInMs: 1000 },
+  quick: { distancesDeg: [8,12,17,21, 23,27,31,34, 40,49,58,66], flickBlockMs: 8000, wavePerClass: 1, switchBlockMs: 8000, trackingDurationMs: 7000, trackingLeadInMs: 1000,
+    trackswitchBlockMs: 8000, trackswitchLeadInMs: 1000 },
   sim: { sampleHz: 500, blockGapMs: 1000,
     player: { optimalRatio: 0.88, curvature: 2, familiarityBonus: 0.02, adaptationRate: 0.15, gainExponent: 1, motorNoise: 1,
       driftPerBlock: 0.002, familiarityTolLn: 1e-9 },
@@ -52,13 +58,14 @@ export const defaultConfig = {
 export type Config = typeof defaultConfig;
 
 /** The parts of a round, in order. */
-export const PART_KINDS = ['flick', 'switch', 'tracking'] as const;
+export const PART_KINDS = ['flick', 'switch', 'tracking', 'trackswitch'] as const;
 export type PartKind = (typeof PART_KINDS)[number];
 
 /** A part's whole slot (ms), unscored lead-in included. */
 export function partMs(kind: PartKind, cfg: Config): number {
   if (kind === 'flick') return cfg.flick.blockMs;
   if (kind === 'switch') return cfg.switch.blockMs;
+  if (kind === 'trackswitch') return cfg.trackswitch.blockMs;
   return cfg.tracking.leadInMs + cfg.tracking.durationMs;
 }
 
@@ -72,5 +79,6 @@ export function configForMode(mode: 'default' | 'thorough' | 'quick', cfg: Confi
     flick: { ...cfg.flick, distancesDeg: q.distancesDeg, blockMs: q.flickBlockMs, wavePerClass: q.wavePerClass },
     switch: { ...cfg.switch, blockMs: q.switchBlockMs },
     tracking: { ...cfg.tracking, durationMs: q.trackingDurationMs, leadInMs: q.trackingLeadInMs },
+    trackswitch: { ...cfg.trackswitch, blockMs: q.trackswitchBlockMs, leadInMs: q.trackswitchLeadInMs },
   } as unknown as Config;
 }

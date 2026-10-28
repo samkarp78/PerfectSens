@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { defaultConfig as cfg } from '../../src/core/config';
-import { classify, makeFlickTargets, trackingTargetAt } from '../../src/core/blocks';
+import { defaultConfig as cfg, defaultConfig } from '../../src/core/config';
+import { classify, makeFlickTargets, makeTrackSwitchTargets, movingAimAt, trackingTargetAt } from '../../src/core/blocks';
 import type { BlockSpec } from '../../src/core/types';
 
 const spec = (over: Partial<BlockSpec> = {}): BlockSpec =>
@@ -79,5 +79,38 @@ describe('trackingTargetAt', () => {
         expect(Math.abs(a.pitch)).toBeLessThanOrEqual(cfg.tracking.bounds.pitch + 1e-9);
       }
     }
+  });
+});
+
+describe('movingAimAt and tracking-switching targets', () => {
+  const tspec = { id: 't', stage: 'baseline' as const, kind: 'tracking' as const, cm360: 30, seed: 4242, stepIndex: 0, arm: null };
+  it('trackingTargetAt unchanged after the movingAimAt refactor', () => {
+    const gold = [{ yaw: 0, pitch: 0 }, { yaw: -17.503637600880353, pitch: -0.13238864665353844 },
+      { yaw: 2.5095286945518183, pitch: -2.4998703799110586 }, { yaw: 5.822488188995209, pitch: 8.277554488594298 },
+      { yaw: 3.0182929397241764, pitch: -5.497429541825653 }];
+    [0, 1234.5, 5000, 9999, 13999].forEach((t, i) => expect(trackingTargetAt(tspec, t, defaultConfig)).toEqual(gold[i]));
+  });
+  it('movingAimAt stays inside bounds and is deterministic per seed', () => {
+    const ts = defaultConfig.trackswitch;
+    const origin = { yaw: 30, pitch: -10 };
+    expect(movingAimAt(7, origin, 0, ts.region, ts)).toEqual(origin);
+    for (let t = 0; t < 20000; t += 37) {
+      const a = movingAimAt(7, origin, t, ts.region, ts);
+      expect(Math.abs(a.yaw)).toBeLessThanOrEqual(ts.region.yaw + 1e-9);
+      expect(Math.abs(a.pitch)).toBeLessThanOrEqual(ts.region.pitch + 1e-9);
+      expect(a).toEqual(movingAimAt(7, origin, t, ts.region, ts));
+    }
+    expect(movingAimAt(8, origin, 3000, ts.region, ts)).not.toEqual(movingAimAt(7, origin, 3000, ts.region, ts));
+  });
+  it('makeTrackSwitchTargets: deterministic origins in the region, first active set apart', () => {
+    const sspec = { ...tspec, kind: 'trackswitch' as const };
+    const a = makeTrackSwitchTargets(sspec, defaultConfig);
+    expect(a).toEqual(makeTrackSwitchTargets(sspec, defaultConfig));
+    expect(a).toHaveLength(defaultConfig.trackswitch.maxTargets);
+    for (const t of a) expect(Math.abs(t.origin.yaw)).toBeLessThanOrEqual(defaultConfig.trackswitch.region.yaw);
+    const first = a.slice(0, defaultConfig.trackswitch.active);
+    for (let i = 0; i < first.length; i++) for (let j = i + 1; j < first.length; j++)
+      expect(Math.hypot(first[i]!.origin.yaw - first[j]!.origin.yaw, first[i]!.origin.pitch - first[j]!.origin.pitch))
+        .toBeGreaterThanOrEqual(defaultConfig.trackswitch.minSeparationDeg);
   });
 });

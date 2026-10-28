@@ -12,9 +12,13 @@ export interface GridSample { t: number; rel: number; cross: Aim; held: boolean 
 
 /** The scored window (after the lead-in) on the tracking grid; logs without `holds` count as held throughout. */
 export function walkGrid(log: TrackingBlockLog, cfg: Config): GridSample[] {
-  const stepMs = MS_PER_S / cfg.tracking.gridHz;
-  const start = log.t0 + cfg.tracking.leadInMs;
-  const startAim = trackingTargetAt(log.spec, 0, cfg);
+  return walkPath(log, log.t0 + cfg.tracking.leadInMs, MS_PER_S / cfg.tracking.gridHz, trackingTargetAt(log.spec, 0, cfg));
+}
+
+/** Grid samples every stepMs from `start` to log.endT: the latest aim sample at or before each time (startAim before any)
+ *  and the button state; logs without `holds` count as held throughout. */
+export function walkPath(log: Pick<TrackingBlockLog, 't0' | 'endT' | 'path' | 'holds'>, start: number, stepMs: number,
+  startAim: Aim): GridSample[] {
   const out: GridSample[] = [];
   const holds = log.holds;
   let idx = -1, hi = -1;

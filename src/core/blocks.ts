@@ -1,11 +1,12 @@
 import type { Config } from './config';
 import { createRng, type Rng } from './rng';
 import { offsetAim } from './geometry';
-import type { Aim, BlockSpec, FlickClass, FlickTarget } from './types';
+import type { Aim, BlockSpec, FlickClass, FlickTarget, TrackSwitchTarget } from './types';
 
 const RAD = Math.PI / 180;
 const DEG = 180 / Math.PI;
 const HALF_TURN_DEG = 180;
+const ORIGIN: Aim = { yaw: 0, pitch: 0 };
 const MS_PER_S = 1000;
 
 export function classify(distanceDeg: number, cfg: Config): FlickClass {
@@ -78,18 +79,23 @@ export function makeFlickTargets(spec: BlockSpec, cfg: Config): FlickTarget[] {
 interface Segment { t0: number; t1: number; x0: number; y0: number; vx: number; vy: number } // raw (unfolded) path, deg and deg/ms
 interface Path { rng: Rng; segs: Segment[] }
 
-const paths = new WeakMap<Config, Map<number, Path>>();
+/** How a moving target wanders: segment lengths, speeds and how far from horizontal each segment may head. */
+export interface Motion {
+  segmentMs: { min: number; max: number }; speedDegPerSec: { min: number; max: number }; directionSpreadDeg: number;
+}
+interface Bounds { yaw: number; pitch: number }
 
-function pathFor(seed: number, cfg: Config): Path {
-  let bySeed = paths.get(cfg);
-  if (!bySeed) paths.set(cfg, (bySeed = new Map()));
+const paths = new WeakMap<Motion, Map<number, Path>>();
+
+function pathFor(seed: number, motion: Motion): Path {
+  let bySeed = paths.get(motion);
+  if (!bySeed) paths.set(motion, (bySeed = new Map()));
   let p = bySeed.get(seed);
   if (!p) bySeed.set(seed, (p = { rng: createRng(seed), segs: [] }));
   return p;
 }
 
-function extend(p: Path, tMs: number, cfg: Config): void {
-  const tc = cfg.tracking;
+function extend(p: Path, tMs: number, tc: Motion): void {
   while (p.segs.length === 0 || at(p.segs, p.segs.length - 1).t1 <= tMs) {
     const last = p.segs[p.segs.length - 1];
     const t0 = last ? last.t1 : 0;
@@ -109,10 +115,11 @@ function fold(x: number, bound: number): number {
   return (m <= 2 * bound ? m : period - m) - bound;
 }
 
-export function trackingTargetAt(spec: BlockSpec, tMs: number, cfg: Config): Aim {
-  const p = pathFor(spec.seed, cfg);
+/** A moving target's aim tMs after it starts at `origin`: a seeded path of constant-velocity segments, reflected at ±bounds. */
+export function movingAimAt(seed: number, origin: Aim, tMs: number, bounds: Bounds, motion: Motion): Aim {
+  const p = pathFor(seed, motion);
   const t = Math.max(0, tMs);
-  extend(p, t, cfg);
+  extend(p, t, motion);
   let lo = 0, hi = p.segs.length - 1;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
@@ -120,7 +127,11 @@ export function trackingTargetAt(spec: BlockSpec, tMs: number, cfg: Config): Aim
   }
   const s = at(p.segs, lo);
   const dt = t - s.t0;
-  return { yaw: fold(s.x0 + s.vx * dt, cfg.tracking.bounds.yaw), pitch: fold(s.y0 + s.vy * dt, cfg.tracking.bounds.pitch) };
+  return { yaw: fold(origin.yaw + s.x0 + s.vx * dt, bounds.yaw), pitch: fold(origin.pitch + s.y0 + s.vy * dt, bounds.pitch) };
+}
+
+export function trackingTargetAt(spec: BlockSpec, tMs: number, cfg: Config): Aim {
+  return movingAimAt(spec.seed, ORIGIN, tMs, cfg.tracking.bounds, cfg.tracking);
 }
 
 /** Target velocity (deg/s in yaw and pitch) at tMs: central difference over ±0.5 ms of the folded path. */
@@ -132,8 +143,8 @@ export function trackingVelocityAt(spec: BlockSpec, tMs: number, cfg: Config): {
 
 /** Segment-change times (rel ms) in [fromMs, toMs) where the target turns by more than tracking.turnMinDeg. */
 export function trackingTurns(spec: BlockSpec, fromMs: number, toMs: number, cfg: Config): number[] {
-  const p = pathFor(spec.seed, cfg);
-  extend(p, toMs, cfg);
+  const p = pathFor(spec.seed, cfg.tracking);
+  extend(p, toMs, cfg.tracking);
   const probe = 5;
   const out: number[] = [];
   for (const seg of p.segs) {
@@ -163,4 +174,27 @@ export function makeSwitchTargets(spec: BlockSpec, cfg: Config): Aim[] {
     out.push(a);
   }
   return out;
+}
+
+/** Seeded tracking-switching targets: path seeds and start points uniform in the region, each start at least
+ *  minSeparationDeg from the previous `active - 1` starts. */
+export function makeTrackSwitchTargets(spec: BlockSpec, cfg: Config): { seed: number; origin: Aim }[] {
+  const ts = cfg.trackswitch;
+  const rng = createRng(spec.seed);
+  const out: { seed: number; origin: Aim }[] = [];
+  while (out.length < ts.maxTargets) {
+    const recent = out.slice(-(ts.active - 1)).map((x) => x.origin);
+    let a: Aim = ORIGIN;
+    for (let tries = 0; tries < ts.placeTries; tries++) {
+      a = { yaw: uniform(rng, -ts.region.yaw, ts.region.yaw), pitch: uniform(rng, -ts.region.pitch, ts.region.pitch) };
+      if (recent.every((r) => Math.hypot(r.yaw - a.yaw, r.pitch - a.pitch) >= ts.minSeparationDeg)) break;
+    }
+    out.push({ seed: rng.int(0, 2 ** 31 - 1), origin: a });
+  }
+  return out;
+}
+
+/** Where a tracking-switching target is at absolute time absT. */
+export function trackSwitchTargetAim(t: TrackSwitchTarget, absT: number, cfg: Config): Aim {
+  return movingAimAt(t.seed, t.origin, absT - t.spawnT, cfg.trackswitch.region, cfg.trackswitch);
 }

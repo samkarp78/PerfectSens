@@ -9,6 +9,7 @@ test('30 flick distances, 10 per class', () => {
 });
 
 test('all parts are equal length (default and quick)', () => {
+  expect(PART_KINDS).toEqual(['flick', 'switch', 'tracking', 'trackswitch']);
   for (const cfg of [defaultConfig, configForMode('quick')]) {
     const lens = PART_KINDS.map((k) => partMs(k, cfg));
     expect(new Set(lens).size).toBe(1);

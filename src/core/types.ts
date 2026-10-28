@@ -11,7 +11,7 @@ export type Mode = 'default' | 'thorough' | 'quick';
 /** padWidthCm: measured usable mousepad width (play-area calibration); optional. */
 export interface Setup { dpi: number; cm360: number; inGameSens: number | null; fov: number; fovType: FovType; mode: Mode; padWidthCm?: number | null }
 export type Stage = 'warmup' | 'baseline' | 'dialin' | 'recheck' | 'ab';
-export type BlockKind = 'warmup' | 'flick' | 'switch' | 'tracking';
+export type BlockKind = 'warmup' | 'flick' | 'switch' | 'tracking' | 'trackswitch';
 export type Arm = 'P' | 'C';                        // pick / current
 export type FlickClass = 'small' | 'medium' | 'big';
 export interface BlockSpec { id: string; stage: Stage; kind: BlockKind; cm360: number; seed: number; stepIndex: number; arm: Arm | null }
@@ -27,6 +27,12 @@ export interface SwitchClick { t: number; aim: Aim; hit: boolean }
 export interface SwitchKill { t: number; target: Aim; from: Aim }
 /** A switching block: kills (with the aim at the previous kill, or the start), every click, and the aim path. */
 export interface SwitchBlockLog { spec: BlockSpec; t0: number; endT: number; kills: SwitchKill[]; clicks: SwitchClick[]; path: AimSample[] }
+/** A tracking-switching target: its own seeded path from `origin`, starting at spawnT; killT null while alive. */
+export interface TrackSwitchTarget { index: number; seed: number; origin: Aim; spawnT: number; killT: number | null }
+export interface TrackSwitchKill { t: number; index: number; aim: Aim }
+/** Tracking switching: every target that spawned (positions reproducible from them), kills, holds and the aim path. */
+export interface TrackSwitchBlockLog { spec: BlockSpec; t0: number; endT: number; path: AimSample[]; holds: HoldEvent[];
+  targets: TrackSwitchTarget[]; kills: TrackSwitchKill[] }
 export interface TrackingBlockLog { spec: BlockSpec; t0: number; endT: number; path: AimSample[]; holds?: HoldEvent[] }
 export interface StepResult { order: number; stage: Exclude<Stage, 'warmup'>; arm: Arm | null; cm360: number;
   trials: TrialMetrics[]; flick: FlickSummary; switch: SwitchSummary; tracking: TrackingSummary; score: StepScore }
