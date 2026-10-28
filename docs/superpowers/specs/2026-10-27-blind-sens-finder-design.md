@@ -420,3 +420,138 @@ These thresholds are provisional and live in config:
   - the A/B stayed "no clear winner", with current about 4% ahead.
 
 **End-of-part countdown beeps:** a beep as each part's time left crosses 5, 4, 3, 2 and 1 s. It is sound only: the timer display is unchanged, and nothing is drawn near the centre of the screen.
+
+## 18. Play-Along mode (2026-10-28)
+
+### 18.1 Why
+
+Standard mode puts every new sens in front of the player cold. An unfamiliar sens scores worse just from novelty, which biases results toward the current sens. Fifteen minutes of straight testing also feels like a chore and tires the player, so the late rounds give worse data.
+
+Play-Along alternates real game matches with short in-app tests. The player plays a match (e.g. a TDM in The Finals) on a sens, alt-tabs back to the browser, and tests that sens straight away, already warmed up on it in their real game.
+
+**Goals:**
+- Every sens is tested after a real game match on it.
+- Short test blocks with game breaks in between, so it never feels like a chore.
+- A useful answer in about an hour: a range, or a single number if it's already sure.
+- The search can continue on another night.
+
+**Non-goals:**
+- Replacing Standard or Quick mode. They stay unchanged as the fast options.
+- Measuring anything inside the game. The app never reads game data; the match is only warm-up and feel.
+- ADS or scope sens. Only hip-fire is used.
+
+**Anti-goals,** which would make this a failure even if it works:
+- Telling the player to change sens on luck. The false change target stays ≤ 1%, as in §17.6.
+- Interrupting the player mid-match, or forcing them to remember numbers between the game and the app.
+- Feel overriding the data.
+
+### 18.2 Constraints
+
+- Everything in §2, with one deliberate exception: Play-Along has a built-in **The Finals** conversion (§18.4).
+- The app runs in a browser while the game is open. The player alt-tabs between them, so pointer lock is lost on every switch.
+- **Pad measurement is required** in Play-Along (from the backlog's "make pad measurement required"). The revision-2 cap applies: no test sens may need more than 90% of the pad for a 180°.
+- Scored-test content, scoring and data are exactly the §17 four-part round, so Play-Along data means the same as Standard data.
+
+### 18.3 The loop
+
+1. **Setup:** game (The Finals or Other), DPI, current sens (as a whole The Finals number, or cm/360 for Other), and pad measurement.
+2. **Match on the default sens.** A waiting screen says "Play a match on **33**, then come back". The player alt-tabs and plays.
+3. **Return:** the player holds **I'm back** for 1 s. A stray click can't trigger it. Then comes the feel question (§18.7), then a click to lock the mouse.
+4. **Test** (§18.5) at that sens.
+5. **The app picks a pair,** one lower and one higher (§18.6). It shows one of them, chosen at random, on the waiting screen as the number to type into the game.
+6. **Match, return, feel, test** for that sens, then the same for the other one.
+7. **Next pair,** narrower and centred on the current best (§18.6). Repeat 5–6.
+8. **Hour check** (§18.8): show the range and ask whether to continue.
+9. **Before any "change" verdict**, the head-to-head (§18.9).
+
+The waiting screen always shows the number to type in large text (with cm/360 underneath), so the player never has to remember it. It also shows what's next ("After this: a 3-minute test") and the night's elapsed time.
+
+### 18.4 Games and the sens number
+
+- **The Finals (built in):**
+  - Hip-fire yaw is 0.001° per count per sens point, so cm/360 = 914.4 ÷ (sens × DPI) and sens = 914.4 ÷ (cm/360 × DPI).
+  - Source: three mouse-sensitivity.com lookups at 800 DPI (33 → 34.6364, 16.5 → 69.2727, 66 → 17.3182 cm/360), all exactly on this line. The constant ships as is, with no in-game ruler check (user decision).
+  - **Whole numbers only.** The Finals has no decimal sens, so every test sens is a whole number, and the app uses that number's exact cm/360. Ranges are shown in whole numbers.
+- **Other game:** the player enters cm/360. The waiting screen shows the cm/360 plus a ruler check ("set your game sens so sliding the mouse 30.0 cm turns you exactly one full circle"). Steering is not limited to whole numbers.
+- Adding more games later is a constant per game, not a new design.
+
+### 18.5 The test block
+
+- A **15 s unscored lead-in** of free flick targets at the test sens, to readjust after the switch from the game.
+- Then **3 rounds** of the §17 four-part round (about 3 min), with the handover cues and chimes, and no breaks inside the block.
+- Scores, grades and streak results are **hidden** until the night's range or verdict is shown. The block ends on a neutral "Test saved" card. The player knows the number in Play-Along, so seeing each sens's score would undo what blinding is left (user decision: keep hidden).
+- In-app screens call the sens "Sens A", "Sens B" and so on. The real number appears only on the waiting screen.
+- Esc or losing pointer lock pauses. An interrupted part restarts on resume, as now. If the player leaves mid-block, the incomplete block is discarded and that sens's test is redone after the next match.
+- The block length (3 min, 3 rounds) is provisional. The simulator check (§18.11) confirms it before the build is final.
+
+### 18.6 Steering and fitting
+
+- §7's usability test and its fallback (best tested block) carry over unchanged. The per-night offset is only added once there are blocks from two or more nights. *(My call.)*
+- The fit is §7's model over every Play-Along test block, with a **per-night offset** (ridge-shrunk like `d` and `f`) so nights with a different day form can be pooled. `t_b` is block order within the night. The familiarity term `f` stays, because the default sens is still the most familiar one, even if the match warm-up shrinks it.
+- **First pair:** about ±20% around the default sens. *(My call: wider than Standard's ±15%, because Play-Along has fewer steps.)*
+- **Each next pair:** centred on the fit's peak (or the best tested sens while the fit isn't usable), with the step about halved each time. The aim-signal nudges from §6 still apply.
+- **Snapping (The Finals):** each target is rounded to a whole number. If it lands on a number already tested, or both sides land on the same number, move one whole number outward. If no new whole number is left inside the range, the range has stopped narrowing.
+- The §6 limits (0.6×–1.6× current) apply.
+- **Pad cap:** a target too slow for the pad (180° over 90% of the pad) is automatically moved to the slowest sens that fits, rounded to the side that fits (user decision). If that sens is already tested, or is the other side of the pair, that side is skipped and the step tests only the faster side.
+- The **range** is §7's bootstrap range, shown in the game's numbers ("between 32 and 37") with cm/360 underneath.
+
+### 18.7 Feel question
+
+- After each **I'm back** and before the test, the app asks "How did that feel?" with three answers: **Too fast / Too slow / About right**. It replaces the 1–5 rating in this mode.
+- Feel is saved with the test block and **never steers** the search, the fit or the A/B maths.
+- **Feel breaks ties:**
+  - When choosing the single recommended number inside a final range, prefer the "About right" sens nearest the fit's peak. With none, use the peak.
+  - When the head-to-head is "no clear winner" and only one of the two felt "About right", Results recommends that one and labels it "tie broken by feel".
+- **Disagreement flag:** if a sens gets "Too slow" (or "Too fast") on two separate matches, Results says so next to the numbers. For example: "You played best at 30, but it felt too slow both times. Consider 32 and give it a week."
+
+### 18.8 Hour check and continuing
+
+- After the first test that finishes past **50 minutes** of night time (counted from the first waiting screen, matches included), the app shows the current range and asks **"Keep narrowing it down?"**:
+  - **Keep going tonight:** the next match and test.
+  - **Continue another night:** everything is saved, and the next Play-Along start offers "Continue your search (range 32–37)".
+  - **I'm done:** it shows the middle of the range as the number to play on (feel tie-break per §18.7), labelled **"Best guess, not confirmed yet"**, and saves it in History as a range result (user decision). A best guess is not a "change" verdict, and the ≤ 1% guarantee doesn't apply to it. Results says this, and offers to run the head-to-head next time to confirm it.
+- It never interrupts mid-step; the check only appears between steps.
+- **Early finish:** if the range has stopped narrowing (§18.6), the app goes straight to the head-to-head (§18.9). The head-to-head's verdict is the single answer (the leader for "change", the default for "keep"), and the night then finishes without the hour check.
+- **Saving:** progress is saved after every completed test, in the same local storage as History. A search older than 14 days asks whether to continue or start fresh. *(My call.)*
+- **Starting a continued night:** if the head-to-head is pending, it runs first. Otherwise the night's first test is at the default sens, to anchor the per-night offset.
+
+### 18.9 Head-to-head before "change"
+
+- Before the app ever recommends changing, the current leader and the default sens each get one more match plus test, in random order.
+- **"Change"** needs both of these:
+  - the pooled comparison over all of those two sens's blocks clears §8's rules (δ > ln(1.03) and δ > z·SE);
+  - the head-to-head's own pair of blocks also favours the leader.
+
+  This is the Play-Along version of §17.6's "both A/B rounds". The exact z is calibrated in the simulator for **≤ 1% false change**.
+- Otherwise: **Keep** if the default wins, or **No clear winner** (then the feel tie-break of §18.7 may apply, labelled).
+- If the hour check comes first, the head-to-head is the first thing next night.
+- **The leader is the default sens:** no head-to-head is needed, and the verdict is **Keep**.
+- **The head-to-head blocks count in the pooled fit.** If they make a different sens the leader, that sens gets its own head-to-head against the default. There's at most one more per night; after that, the hour check runs. *(My call.)*
+- **If the simulator can't reach ≤ 1%** at 3 or 4 rounds, the head-to-head grows to two blocks per side before anything else changes. The guarantee is never weakened, and every inconclusive result stays "keep current". *(My call.)* The simulator check runs early in the build, as a gate rather than a final check.
+
+### 18.10 Data recorded
+
+Everything the §17 parts record, for every block, plus:
+- night index, wall-clock times, and time away (waiting-screen duration) before each test;
+- game, DPI, and the in-game number and cm/360 of each test;
+- the feel answer;
+- pair, step size and snapping decisions, with reasons (as §6's steering log);
+- lead-in data (recorded, not scored);
+- interrupted and discarded blocks.
+
+Results and History get a Play-Along view: each tested sens in game numbers with its feel answers and nights, the range, the head-to-head, the verdict and the diagnosis (§9, from the blocks at the final sens).
+
+### 18.11 Validation
+
+The simulated player gets a Play-Along model: a smaller novelty penalty after a match, a random night-to-night form offset, and per-test fatigue that resets after each match. Before the build is final, the simulator must show:
+- null false change ≤ 1%, with z tuned if needed;
+- whether 3 rounds per test is enough, or whether 4 is needed, to reach Standard-like convergence within two nights;
+- typical tests per night and nights to a single answer.
+
+Rates go in a build-notes subsection, as in §17.9.
+
+### 18.12 Left to the builder
+
+- Screen layouts and wording for the waiting screen, the hold button (1 s fill), the feel question and the hour-check card, in the existing style.
+- Storage format for the saved search.
+- The step-halving schedule details and the aim-nudge weights, within §18.6.
