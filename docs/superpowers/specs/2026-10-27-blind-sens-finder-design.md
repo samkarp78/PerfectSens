@@ -669,3 +669,5 @@ Re-run (5 simulated players each, up to 6 nights):
 | 50 → 30 | change to 33–34 (5/5) | change to 31–33 (5/5) |
 | 33 → 40 | change 1/5, others none | change 2/5 (39–40), others none, range 34–48 |
 | 33 → 33 | keep 4/5, none 1/5 | unchanged |
+
+Re-check after the edge rule and wider limits: null false change **0/300** (keep 52, none 230, best guess 18 when the 4-night simulator cap was reached). Convergence: 18/18 change answers within ±8%; kinds: change 18, none 76, keep 6. Median 3 nights, 4 tests per night.
