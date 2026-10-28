@@ -318,3 +318,11 @@ describe('countdownBeep', () => {
     expect(countdownBeep(5500, 3500)).toBe(4); // a slow frame: one beep, for the latest second
   });
 });
+
+describe('hudText in fixed mode', () => {
+  it('numbers the rounds of a test and never shows a sens', () => {
+    const p = { stage: 'baseline' as const, stepIndex: 1, totalSteps: 3, kind: 'flick' as const, blocksDone: 4, blocksTotal: 12 };
+    expect(hudText(p, 'fixed')).toBe('Test · Round 2 of 3 · Flicks');
+    expect(hudText({ ...p, stage: 'warmup', kind: 'warmup', stepIndex: 0 }, 'fixed')).toBe('Lead-in');
+  });
+});

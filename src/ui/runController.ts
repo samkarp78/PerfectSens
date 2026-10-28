@@ -54,7 +54,8 @@ const follows = (prev: string, next: string | undefined): boolean => {
 };
 
 /** HUD label for a block. Never contains a sensitivity value; the recheck reads as a normal step. */
-export function hudText(p: Progress): string {
+export function hudText(p: Progress, mode: SessionState['mode'] = 'full'): string {
+  if (mode === 'fixed') return p.stage === 'warmup' ? 'Lead-in' : `Test · Round ${p.stepIndex + 1} of ${p.totalSteps} · ${kindLabel(p)}`;
   switch (p.stage) {
     case 'warmup': return 'Warm-up';
     case 'baseline': return `Calibration · ${kindLabel(p)}`;
@@ -135,7 +136,7 @@ export function createRunController(initial: SessionState, cfg: Config = initial
     get session() { return session; },
     get runner() { return runner; },
     get cue() { return cue; },
-    get hud() { return session.progress ? hudText(session.progress) : ''; },
+    get hud() { return session.progress ? hudText(session.progress, session.mode) : ''; },
     get restText() {
       const spec = nextBlock(session);
       if (!spec) return '';

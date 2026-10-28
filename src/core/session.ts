@@ -8,12 +8,14 @@ import { measureTracking, type TrackingSummary } from './measure/tracking';
 import { measureTrackSwitch } from './measure/trackSwitch';
 import { buildResult, type SessionResult } from './result';
 import { createRng, type Rng } from './rng';
-import { stepScore } from './score';
+import { stepScore, type ScoreBaseline } from './score';
 import { chooseNext, type SteerDecision } from './steer';
 import type { Arm, BlockKind, BlockSpec, FlickBlockLog, Setup, Stage, StepResult, SwitchBlockLog, TrackingBlockLog,
   TrackSwitchBlockLog } from './types';
 
-export interface SessionOptions { seed: number; warmup: boolean; quickAbCm360: number | null; askBeforeExtending?: boolean }
+/** fixed: a Play-Along test block — the warm-up then `rounds` rounds at setup.cm360, scored against scoreBaseline (or its first round). */
+export interface SessionOptions { seed: number; warmup: boolean; quickAbCm360: number | null; askBeforeExtending?: boolean;
+  fixed?: { rounds: number; scoreBaseline: ScoreBaseline | null } }
 
 type StepStage = Exclude<Stage, 'warmup'>;
 
@@ -28,7 +30,7 @@ interface PendingStep {
 }
 
 export interface SessionState {
-  readonly setup: Setup; readonly mode: 'full' | 'quickab'; readonly steps: StepResult[];
+  readonly setup: Setup; readonly mode: 'full' | 'quickab' | 'fixed'; readonly steps: StepResult[];
   readonly fit: FitResult | null; readonly steerLog: SteerDecision[]; readonly abDecisions: AbDecision[];
   readonly logs: { flick: FlickBlockLog[]; switch: SwitchBlockLog[]; tracking: TrackingBlockLog[]; trackSwitch: TrackSwitchBlockLog[] }; readonly result: SessionResult | null;
   /** The first A/B round was too close to call and the player must choose (extendAb) whether to play the second. */
@@ -48,6 +50,8 @@ export interface SessionState {
   /** @internal */ readonly _arms: Arm[];
   /** @internal A/B pick (P arm); null until the dial-in is done */ readonly _pick: number | null;
   /** @internal ask the player before the second A/B round instead of extending automatically */ readonly _ask: boolean;
+  /** @internal fixed mode: rounds to play and the baseline they are scored against */ readonly _rounds: number;
+  /** @internal */ readonly _scoreBaseline: ScoreBaseline | null;
 }
 
 /** Each step is a round of four blocks: flicks, switching, tracking, tracking switching. */
@@ -65,10 +69,10 @@ const isFitStep = (st: StepResult): boolean => st.stage !== 'ab';
 export function createSession(setup: Setup, opts: SessionOptions, cfg: Config = defaultConfig): SessionState {
   const quick = opts.quickAbCm360 !== null;
   const base: SessionState = {
-    setup, mode: quick ? 'quickab' : 'full', steps: [], fit: null, steerLog: [], abDecisions: [],
+    setup, mode: opts.fixed ? 'fixed' : quick ? 'quickab' : 'full', steps: [], fit: null, steerLog: [], abDecisions: [],
     logs: { flick: [], switch: [], tracking: [], trackSwitch: [] }, result: null, progress: null, awaitingExtension: false, extensionReason: null, _ask: opts.askBeforeExtending ?? false,
     _cfg: cfg, _seed: opts.seed, _warmupPending: opts.warmup, _pending: null, _retries: 0,
-    _arms: [], _pick: null,
+    _arms: [], _pick: null, _rounds: opts.fixed?.rounds ?? 0, _scoreBaseline: opts.fixed?.scoreBaseline ?? null,
   };
   const start = quick ? { ...base, _pick: opts.quickAbCm360, _arms: abSequence(rootFork(base, 'ab')) } : base;
   return withProgress(planNext(start));
@@ -101,10 +105,12 @@ function withProgress(s: SessionState): SessionState {
   const inSequence = spec.stage === 'dialin' || spec.stage === 'recheck';
   const p = s._pending;
   const blocksDone = BLOCKS_PER_STEP * s.steps.length + (p?.flick ? 1 : 0) + (p?.switch ? 1 : 0) + (p?.tracking ? 1 : 0);
+  const fixed = s.mode === 'fixed';
   return {
     ...s,
     progress: {
-      stage: spec.stage, stepIndex: inSequence ? spec.stepIndex : 0, totalSteps: dialinCount(s) + 1, kind: spec.kind,
+      stage: spec.stage, stepIndex: fixed ? s.steps.length : inSequence ? spec.stepIndex : 0,
+      totalSteps: fixed ? s._rounds : dialinCount(s) + 1, kind: spec.kind,
       blocksDone, blocksTotal: BLOCKS_PER_STEP * plannedSteps(s),
     },
   };
@@ -113,6 +119,7 @@ function withProgress(s: SessionState): SessionState {
 /** Steps the session expects to run: baseline + dial-in + recheck + the A/B arms planned so far
  *  (one ABBA round until the A/B is planned); quick A/B runs only its arms. */
 function plannedSteps(s: SessionState): number {
+  if (s.mode === 'fixed') return s._rounds;
   if (s.mode === 'quickab') return s._arms.length;
   const ab = s._pick === null ? AB_ROUND_LENGTH : s._arms.length;
   return 1 + dialinCount(s) + 1 + ab;
@@ -166,7 +173,8 @@ export function submitBlock(s: SessionState,
   const tracking = p.tracking!;
   const first = s.steps[0];
   const baseline = s.mode === 'quickab' ? null
-    : p.stage === 'baseline' || !first ? { tp: flick.summary.tp, switchTp: sw.tp, tot: tracking.tot, dmg: ts.dmg }
+    : s.mode === 'fixed' && s._scoreBaseline ? s._scoreBaseline
+    : (p.stage === 'baseline' && s.mode !== 'fixed') || !first ? { tp: flick.summary.tp, switchTp: sw.tp, tot: tracking.tot, dmg: ts.dmg }
     : { tp: first.flick.tp, switchTp: first.switch.tp, tot: first.tracking.tot, dmg: first.trackSwitch.dmg };
   const step: StepResult = {
     order: s.steps.length, stage: p.stage, arm: p.arm, cm360: p.cm360, trials: flick.trials,
@@ -202,6 +210,14 @@ export function fitFromSteps(setup: Setup, steps: StepResult[], cfg: Config = de
 /** Decides what the next step is (or finishes the session) once no step is pending. */
 function planNext(s: SessionState): SessionState {
   const current = s.setup.cm360;
+  if (s.mode === 'fixed') {
+    const i = s.steps.length;
+    if (i < s._rounds) {
+      return { ...s, _pending: { stage: 'baseline', arm: null, cm360: current, idBase: `round-${i}`, specIndex: i, flick: null, switch: null, tracking: null } };
+    }
+    // The result only marks the block finished; Play-Along reads the steps.
+    return { ...s, _pending: null, result: buildResult({ setup: s.setup, fit: null, pickCm360: current, ab: null, abSkipped: true, findings: [] }) };
+  }
   if (s.mode === 'full') {
     if (s.steps.length === 0) {
       return { ...s, _pending: { stage: 'baseline', arm: null, cm360: current, idBase: 'baseline', specIndex: 0, flick: null, switch: null, tracking: null } };

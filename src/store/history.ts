@@ -25,6 +25,7 @@ const BY_CREATED = 'createdAt';
 
 export function recordFromSession(s: SessionState, now: Date, id: string): SessionRecord {
   if (!s.result) throw new Error('Session has no result yet');
+  if (s.mode === 'fixed') throw new Error('A Play-Along test block is saved with its search, not on its own');
   return {
     id, createdAt: now.toISOString(), mode: s.mode, setup: s.setup, result: s.result,
     steps: s.steps, steerLog: s.steerLog, abDecisions: s.abDecisions, raw: s.logs,

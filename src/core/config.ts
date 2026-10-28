@@ -76,6 +76,14 @@ export function partMs(kind: PartKind, cfg: Config): number {
   return cfg.tracking.leadInMs + cfg.tracking.durationMs;
 }
 
+/** The config a Play-Along test block runs with: the warm-up is the short lead-in, and there are no breaks. */
+export function configForPlayAlong(cfg: Config = defaultConfig): Config {
+  return {
+    ...cfg,
+    session: { ...cfg.session, warmupMs: cfg.playAlong.leadInMs, breakEveryRounds: Number.MAX_SAFE_INTEGER },
+  } as unknown as Config;
+}
+
 /** The config a session in this mode runs with: quick mode swaps in the shorter block sizes. */
 export function configForMode(mode: 'default' | 'thorough' | 'quick', cfg: Config = defaultConfig): Config {
   if (mode !== 'quick') return cfg;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultConfig as cfg } from '../../src/core/config';
+import { configForPlayAlong, defaultConfig as cfg } from '../../src/core/config';
 import { degPerCount } from '../../src/core/geometry';
 import { createRng } from '../../src/core/rng';
 import { FlickRunner } from '../../src/core/run/flickRunner';
@@ -312,5 +312,33 @@ describe('fitFromSteps', () => {
 
   it('returns null with no fit steps', () => {
     expect(fitFromSteps(setupFor(), [])).toBeNull();
+  });
+});
+
+describe('fixed mode (Play-Along test block)', () => {
+  const fixedRun = (scoreBaseline: { tp: number; switchTp: number; tot: number; dmg: number } | null) =>
+    runSimSession(setupFor(), defaultSimPlayer(CURRENT),
+      opts({ warmup: true, fixed: { rounds: 3, scoreBaseline } }), configForPlayAlong());
+
+  it('plays a lead-in then N rounds at one sens and finishes', () => {
+    const { state, blocks } = fixedRun(null);
+    expect(state.mode).toBe('fixed');
+    expect(blocks[0]!.spec.kind).toBe('warmup');
+    expect(blocks[0]!.spec.cm360).toBe(CURRENT);
+    expect(state.steps).toHaveLength(3);
+    expect(state.steps.every((st) => st.cm360 === CURRENT)).toBe(true);
+    expect(state.result).not.toBeNull();
+    expect(state.fit).toBeNull();
+  });
+
+  it('scores against a supplied baseline', () => {
+    expect(fixedRun(null).state.steps[0]!.score.logS).toBe(0);
+    expect(fixedRun({ tp: 1, switchTp: 1, tot: 1, dmg: 1 }).state.steps[0]!.score.logS).not.toBe(0);
+  });
+
+  it('uses the Play-Along lead-in length and no breaks', () => {
+    const c = configForPlayAlong();
+    expect(c.session.warmupMs).toBe(15000);
+    expect(c.session.breakEveryRounds).toBeGreaterThan(1000);
   });
 });
