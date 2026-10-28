@@ -20,6 +20,7 @@ export interface History {
 const DB_NAME = 'bsf';
 const DB_VERSION = 1;
 const STORE = 'sessions';
+const RAW_STORE = 'raw';
 const BY_CREATED = 'createdAt';
 
 export function recordFromSession(s: SessionState, now: Date, id: string): SessionRecord {
@@ -47,6 +48,7 @@ function openDb(): Promise<IDBDatabase | null> {
       req.onupgradeneeded = () => {
         const store = req.result.createObjectStore(STORE, { keyPath: 'id' });
         store.createIndex(BY_CREATED, 'createdAt');
+        req.result.createObjectStore(RAW_STORE);
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => resolve(null);
@@ -61,24 +63,40 @@ export async function openHistory(cfg: Config = defaultConfig): Promise<History 
   if (typeof globalThis.indexedDB === 'undefined') return null;
   const db = await openDb();
   if (!db) return null;
-  return {
-    async save(rec) {
-      const tx = db.transaction(STORE, 'readwrite');
-      const store = tx.objectStore(STORE);
-      store.put(rec);
-      // Newest first by createdAt; null `raw` on everything past the keep limit.
-      const cursorReq = store.index(BY_CREATED).openCursor(null, 'prev');
+
+  const attempt = async (rec: SessionRecord, withRaw: boolean): Promise<void> => {
+    const tx = db.transaction([STORE, RAW_STORE], 'readwrite');
+    const finished = done(tx);
+    finished.catch(() => undefined);
+    try {
+      const sessions = tx.objectStore(STORE);
+      const raw = tx.objectStore(RAW_STORE);
+      sessions.put({ ...rec, raw: null });
+      if (withRaw && rec.raw !== null) raw.put(rec.raw, rec.id);
+      // Newest first by createdAt; drop raw for everything past the keep limit.
+      const cursorReq = sessions.index(BY_CREATED).openCursor(null, 'prev');
       let seen = 0;
       cursorReq.onsuccess = () => {
         const cur = cursorReq.result;
         if (!cur) return;
         seen += 1;
-        if (seen > cfg.store.keepRawSessions && (cur.value as SessionRecord).raw !== null) {
-          cur.update({ ...(cur.value as SessionRecord), raw: null });
-        }
+        if (seen > cfg.store.keepRawSessions) raw.delete((cur.value as SessionRecord).id);
         cur.continue();
       };
-      await done(tx);
+    } catch (e) {
+      try { tx.abort(); } catch { /* already finished */ }
+      throw e;
+    }
+    await finished;
+  };
+
+  return {
+    async save(rec) {
+      try {
+        await attempt(rec, true);
+      } catch {
+        await attempt(rec, false);
+      }
     },
     async list() {
       const tx = db.transaction(STORE, 'readonly');
@@ -95,8 +113,10 @@ export async function openHistory(cfg: Config = defaultConfig): Promise<History 
       return out;
     },
     async get(id) {
-      const rec = await wrap(db.transaction(STORE, 'readonly').objectStore(STORE).get(id));
-      return (rec as SessionRecord | undefined) ?? null;
+      const tx = db.transaction([STORE, RAW_STORE], 'readonly');
+      const [rec, raw] = await Promise.all([wrap(tx.objectStore(STORE).get(id)), wrap(tx.objectStore(RAW_STORE).get(id))]);
+      if (!rec) return null;
+      return { ...(rec as SessionRecord), raw: (raw as SessionRecord['raw'] | undefined) ?? null };
     },
   };
 }

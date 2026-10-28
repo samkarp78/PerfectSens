@@ -50,6 +50,43 @@ describe('history', () => {
     expect(await h.get('nope')).toBeNull();
   });
 
+  it('stores raw in its own object store and keeps the session record light', async () => {
+    const h = (await openHistory())!;
+    await h.save(make(1));
+    const db = await new Promise<IDBDatabase>((res) => { const r = indexedDB.open('bsf'); r.onsuccess = () => res(r.result); });
+    expect([...db.objectStoreNames].sort()).toEqual(['raw', 'sessions']);
+    const read = (name: string, key: string) => new Promise<any>((res) => { const r = db.transaction(name).objectStore(name).get(key); r.onsuccess = () => res(r.result); });
+    expect((await read('sessions', 's1')).raw).toBeNull();
+    expect(await read('raw', 's1')).toBeTruthy();
+    expect((await h.get('s1'))!.raw!.flick).toHaveLength(1);
+    db.close();
+  });
+
+  it('prunes raw entries beyond 5 from the raw store', async () => {
+    const h = (await openHistory())!;
+    for (let i = 1; i <= 7; i++) await h.save(make(i));
+    const db = await new Promise<IDBDatabase>((res) => { const r = indexedDB.open('bsf'); r.onsuccess = () => res(r.result); });
+    const keys = await new Promise<IDBValidKey[]>((res) => { const r = db.transaction('raw').objectStore('raw').getAllKeys(); r.onsuccess = () => res(r.result); });
+    expect(keys.sort()).toEqual(['s3', 's4', 's5', 's6', 's7']);
+    db.close();
+  });
+
+  it('still persists the session when saving raw fails', async () => {
+    const h = (await openHistory())!;
+    const bad = { ...make(1), raw: { flick: [() => 1], tracking: [] } } as unknown as SessionRecord;
+    await h.save(bad);
+    const got = await h.get('s1');
+    expect(got).not.toBeNull();
+    expect(got!.raw).toBeNull();
+    expect((await h.list()).map((s) => s.id)).toEqual(['s1']);
+  });
+
+  it('rejects when even the save without raw fails', async () => {
+    const h = (await openHistory())!;
+    const bad = { ...make(1), setup: (() => 1) as unknown as Setup } as SessionRecord;
+    await expect(h.save(bad)).rejects.toBeTruthy();
+  });
+
   it('resolves null without indexedDB', async () => {
     vi.stubGlobal('indexedDB', undefined);
     await expect(openHistory()).resolves.toBeNull();
