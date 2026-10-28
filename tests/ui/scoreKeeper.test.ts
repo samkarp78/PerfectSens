@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createScoreKeeper, gradeFor, flickEvents, switchEvents, POINTS } from '../../src/ui/scoreKeeper';
+import { createScoreKeeper, gradeFor, flickEvents, switchEvents, trackSwitchEvents, POINTS } from '../../src/ui/scoreKeeper';
 import type { FlickTrial } from '../../src/core/types';
 
 const trial = (o: Partial<FlickTrial>): FlickTrial => ({
@@ -77,5 +77,18 @@ describe('flick events are live', () => {
     expect(b.events).toEqual([]);
     const hitNow = [trial({ hitT: 300, clicks: [{ t: 100, aim: { yaw: 5, pitch: 0 }, hit: false }, { t: 300, aim: { yaw: 0, pitch: 0 }, hit: true }] })];
     expect(flickEvents(hitNow, b.next).events).toEqual([{ hit: true, ms: 300 }]);
+  });
+});
+
+describe('trackSwitchEvents', () => {
+  it('trackswitch kills score points', () => {
+    const aim = { yaw: 0, pitch: 0 };
+    const log = { t0: 0, kills: [{ t: 900, index: 0, aim }, { t: 1700, index: 1, aim }] };
+    expect(trackSwitchEvents(log, 0)).toEqual({ events: [{ hit: true, ms: 900 }, { hit: true, ms: 800 }], next: 2 });
+    expect(trackSwitchEvents(log, 2)).toEqual({ events: [], next: 2 });
+    const k = createScoreKeeper();
+    for (const e of trackSwitchEvents(log, 0).events) k.hit(e.ms);
+    expect(k.state.points).toBeGreaterThan(0);
+    expect(k.state.streak).toBe(2);
   });
 });

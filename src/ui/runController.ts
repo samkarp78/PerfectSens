@@ -1,14 +1,17 @@
-import type { Config } from '../core/config';
+import { PART_KINDS, type Config, type PartKind } from '../core/config';
 import { degPerCount } from '../core/geometry';
 import { FlickRunner } from '../core/run/flickRunner';
 import { SwitchRunner } from '../core/run/switchRunner';
 import { TrackingRunner } from '../core/run/trackingRunner';
+import { TrackSwitchRunner } from '../core/run/trackSwitchRunner';
 import { extendAb, nextBlock, submitBlock, type SessionState } from '../core/session';
 import type { MoveSample } from '../core/types';
 
 /** 'asking': the first A/B round was too close to call and the player chooses whether to play the second. */
 /** 'break': a longer pause after every few rounds (the player clicks to go on). */
-export type RunPhase = 'rest' | 'running' | 'paused' | 'break' | 'asking' | 'finished';
+/** 'cue': the short unscored handover between two parts of a round (mouse stays locked, input ignored). */
+export type RunPhase = 'rest' | 'running' | 'cue' | 'paused' | 'break' | 'asking' | 'finished';
+export interface Cue { kind: PartKind; startedAt: number; endsAt: number }
 
 export interface RunController {
   readonly phase: RunPhase;
@@ -24,17 +27,31 @@ export interface RunController {
   skipWarmup(): void;
   answerExtension(accept: boolean): void;
   readonly runner: Runner | null;
+  /** The handover in progress (phase 'cue'), else null. */
+  readonly cue: Cue | null;
 }
 
 type Progress = NonNullable<SessionState['progress']>;
-export type Runner = FlickRunner | SwitchRunner | TrackingRunner;
+export type Runner = FlickRunner | SwitchRunner | TrackingRunner | TrackSwitchRunner;
 
 export const WARMUP_REST_TEXT = 'Warm-up — free targets at your current sens, not scored.';
-/** Shown before a round: a flick block followed straight away by a tracking block. */
-export const ROUND_REST_TEXT = 'Next round: flick each target, clear the targets in any order, then hold the mouse button and track.';
+/** Shown before a round: its four parts follow each other with a short cue in between. */
+export const ROUND_REST_TEXT = 'Next round: flick each target, clear the targets in any order, hold the button and track, then hold on the moving targets to take them down.';
+/** Shown when a single part is retried. */
+export const SWITCH_REST_TEXT = 'Next: switching — clear the targets in any order.';
 export const TRACKING_REST_TEXT = 'Next: tracking — hold the mouse button and keep the crosshair on the moving target.';
+export const TRACKSWITCH_REST_TEXT = 'Next: tracking switching — hold the mouse button on a moving target until it goes down, then the next.';
 
-const kindLabel = (p: Progress): string => (p.kind === 'tracking' ? 'Tracking' : p.kind === 'switch' ? 'Switching' : 'Flicks');
+const PART_LABEL: Record<PartKind, string> = { flick: 'Flicks', switch: 'Switching', tracking: 'Tracking', trackswitch: 'Tracking switching' };
+export const partLabel = (kind: PartKind): string => PART_LABEL[kind];
+const kindLabel = (p: Progress): string => (p.kind === 'warmup' ? 'Warm-up' : PART_LABEL[p.kind]);
+/** Banner text during the handover to `kind`. */
+export const cueText = (kind: PartKind): string => `Next: ${PART_LABEL[kind]}`;
+/** True when `next` is the part that follows `prev` within a round. */
+const follows = (prev: string, next: string | undefined): boolean => {
+  const i = PART_KINDS.indexOf(prev as PartKind);
+  return i >= 0 && i + 1 < PART_KINDS.length && PART_KINDS[i + 1] === next;
+};
 
 /** HUD label for a block. Never contains a sensitivity value; the recheck reads as a normal step. */
 export function hudText(p: Progress): string {
@@ -61,9 +78,13 @@ export function createRunController(initial: SessionState, cfg: Config = initial
   let session = initial;
   let phase: RunPhase = session.result ? 'finished' : session.awaitingExtension ? 'asking' : 'rest';
   let runner: Runner | null = null;
+  let cue: Cue | null = null;
+  /** The part whose cue was interrupted by a pause; resuming replays that cue. */
+  let pausedCue: PartKind | null = null;
 
   const settle = (completedRound = false): void => {
     runner = null;
+    cue = null;
     phase = restPhase(session, completedRound);
   };
 
@@ -71,13 +92,20 @@ export function createRunController(initial: SessionState, cfg: Config = initial
     const spec = nextBlock(session);
     if (!spec) return;
     const dpc = degPerCount(session.setup.dpi, spec.cm360);
+    cue = null;
     runner = spec.kind === 'tracking' ? new TrackingRunner(spec, dpc, cfg, t)
+      : spec.kind === 'trackswitch' ? new TrackSwitchRunner(spec, dpc, cfg, t)
       : spec.kind === 'switch' ? new SwitchRunner(spec, dpc, cfg, t)
       : new FlickRunner(spec, dpc, cfg, t);
     phase = 'running';
   };
 
-  /** Within a round, flicks flow straight into switching and switching into tracking; a finished round rests. */
+  const startCue = (t: number, kind: PartKind): void => {
+    runner = null;
+    cue = { kind, startedAt: t, endsAt: t + cfg.round.cueMs };
+    phase = 'cue';
+  };
+  /** Within a round each part hands over to the next through a short cue; a finished round (or a retry) rests. */
   const checkDone = (t: number): void => {
     if (!runner || !runner.state.done) return;
     const kind = runner.log().spec.kind;
@@ -85,24 +113,29 @@ export function createRunController(initial: SessionState, cfg: Config = initial
     session = submitBlock(session, runner.log());
     settle(session.steps.length > rounds);
     const next = nextBlock(session)?.kind;
-    const continues = (kind === 'flick' && next === 'switch') || (kind === 'switch' && next === 'tracking');
-    if (continues && phase === 'rest') start(t);
+    if (follows(kind, next) && phase === 'rest') startCue(t, next as PartKind);
   };
 
   return {
     get phase() { return phase; },
     get session() { return session; },
     get runner() { return runner; },
+    get cue() { return cue; },
     get hud() { return session.progress ? hudText(session.progress) : ''; },
     get restText() {
       const spec = nextBlock(session);
       if (!spec) return '';
       if (spec.kind === 'warmup') return WARMUP_REST_TEXT;
-      return spec.kind === 'tracking' ? TRACKING_REST_TEXT : ROUND_REST_TEXT;
+      if (spec.kind === 'switch') return SWITCH_REST_TEXT;
+      if (spec.kind === 'tracking') return TRACKING_REST_TEXT;
+      return spec.kind === 'trackswitch' ? TRACKSWITCH_REST_TEXT : ROUND_REST_TEXT;
     },
     begin(t) {
       if (phase !== 'rest' && phase !== 'paused' && phase !== 'break') return;
-      start(t);
+      const replay = phase === 'paused' ? pausedCue : null;
+      pausedCue = null;
+      if (replay) startCue(t, replay);
+      else start(t);
     },
     onMove(s) {
       if (phase !== 'running' || !runner) return;
@@ -111,22 +144,25 @@ export function createRunController(initial: SessionState, cfg: Config = initial
     },
     onClick(t) {
       if (phase !== 'running' || !runner) return;
-      if (runner instanceof TrackingRunner) runner.onPress(t);
+      if (runner instanceof TrackingRunner || runner instanceof TrackSwitchRunner) runner.onPress(t);
       else runner.onClick(t);
       checkDone(t);
     },
     onRelease(t) {
-      if (phase !== 'running' || !(runner instanceof TrackingRunner)) return;
+      if (phase !== 'running' || !(runner instanceof TrackingRunner || runner instanceof TrackSwitchRunner)) return;
       runner.onRelease(t);
     },
     tick(t) {
+      if (phase === 'cue' && cue && t >= cue.endsAt) { start(t); return; }
       if (phase !== 'running' || !runner) return;
       runner.tick(t);
       checkDone(t);
     },
     onLockLost() {
-      if (phase !== 'running') return;
+      if (phase !== 'running' && phase !== 'cue') return;
+      pausedCue = phase === 'cue' ? cue!.kind : null;
       runner = null;
+      cue = null;
       phase = 'paused';
     },
     skipWarmup() {

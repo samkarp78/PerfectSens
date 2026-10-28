@@ -1,4 +1,4 @@
-import type { FlickTrial, SwitchBlockLog } from '../core/types';
+import type { FlickTrial, SwitchBlockLog, TrackSwitchBlockLog } from '../core/types';
 
 /** Display-only points. They never feed the measurement and are the same for every sens. */
 export const POINTS = {
@@ -82,4 +82,14 @@ export function switchEvents(log: Pick<SwitchBlockLog, 't0' | 'kills' | 'clicks'
     kill++;
   }
   return { events, next: log.clicks.length };
+}
+
+/** Tracking switching: each kill since index `from` is a hit (with the time since the previous kill). There are no misses:
+ *  nothing here breaks a streak. */
+export function trackSwitchEvents(log: Pick<TrackSwitchBlockLog, 't0' | 'kills'>, from: number): { events: ShotEvent[]; next: number } {
+  const events: ShotEvent[] = [];
+  for (let i = from; i < log.kills.length; i++) {
+    events.push({ hit: true, ms: log.kills[i]!.t - (i === 0 ? log.t0 : log.kills[i - 1]!.t) });
+  }
+  return { events, next: log.kills.length };
 }

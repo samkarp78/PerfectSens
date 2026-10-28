@@ -2,7 +2,10 @@ import type { Stretch } from './scoreKeeper';
 
 /** Overlay cards for the run screen: rest/pause, break, the A/B question and the countdown. */
 
-const EXTEND_TEXT = 'Close result — play 4 more rounds (about 4 min) for a firmer answer?';
+const EXTEND_TEXT = {
+  close: 'Close result — play 4 more rounds (about 4 min) for a firmer answer?',
+  ahead: 'Your new sens is ahead — play 4 more rounds (about 4 min) to confirm it?',
+} as const;
 
 export function Countdown({ text, n }: { text: string; n: number }) {
   return (
@@ -14,11 +17,12 @@ export function Countdown({ text, n }: { text: string; n: number }) {
   );
 }
 
-export function AskCard({ onAnswer }: { onAnswer(accept: boolean): void }) {
+/** reason: why the session asks — 'ahead' when the first round favoured the new sens (a change needs both rounds). */
+export function AskCard({ reason, onAnswer }: { reason: 'ahead' | 'close'; onAnswer(accept: boolean): void }) {
   return (
     <div class="rest-overlay">
       <div class="rest-card rest-ask">
-        <p class="rest-text">{EXTEND_TEXT}</p>
+        <p class="rest-text">{EXTEND_TEXT[reason]}</p>
         <div class="ask-buttons">
           <button type="button" class="btn btn-primary" onClick={() => onAnswer(true)}>Play 4 more</button>
           <button type="button" class="btn" onClick={() => onAnswer(false)}>Finish now</button>

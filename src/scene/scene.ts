@@ -21,6 +21,8 @@ export const CAMERA_FAR = 200;
 export const MAX_PIXEL_RATIO = 2;
 export const MAX_SWITCH_TARGETS = 3;
 export const POP_MS = 220; // hit effect duration
+export const HEALTH_RING_SEGMENTS = 48;
+export const HEALTH_RING_COLOR = 0xffffff;
 export const POP_GROWTH = 2.4; // the ring grows to this multiple of the target size
 
 export interface SceneApi {
@@ -28,6 +30,8 @@ export interface SceneApi {
   setFlickTarget(a: Aim | null): void;
   setTrackingTarget(a: Aim | null, onTarget: boolean): void;
   setSwitchTargets(aims: readonly Aim[]): void;
+  /** Tracking-switching targets with a ring showing remaining health (1 = full); `damaging` is lit. */
+  setTrackSwitchTargets(targets: readonly { aim: Aim; health: number }[], damaging: number | null): void;
   /** A short expanding ring where a target was hit. */
   popAt(a: Aim): void;
   resize(w: number, h: number): void;
@@ -61,7 +65,8 @@ function makeGridTexture(): THREE.CanvasTexture {
 
 export function createScene(
   canvas: HTMLCanvasElement,
-  opts: { fov: number; fovType: FovType; targetRadiusDeg: number; trackingRadiusDeg?: number },
+  opts: { fov: number; fovType: FovType; targetRadiusDeg: number; trackingRadiusDeg?: number; switchRadiusDeg?: number;
+    trackSwitchRadiusDeg?: number },
 ): SceneApi {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   const scene = new THREE.Scene();
@@ -89,11 +94,25 @@ export function createScene(
   flickMesh.visible = false;
   trackMesh.visible = false;
   scene.add(flickMesh, trackMesh);
+  const switchGeo = new THREE.SphereGeometry(sphereRadiusFor(opts.switchRadiusDeg ?? opts.targetRadiusDeg, TARGET_DISTANCE), 32, 24);
   const switchMeshes = Array.from({ length: MAX_SWITCH_TARGETS }, () => {
-    const m = new THREE.Mesh(targetGeo, flickMat);
+    const m = new THREE.Mesh(switchGeo, flickMat);
     m.visible = false;
     scene.add(m);
     return m;
+  });
+  const tsRadius = sphereRadiusFor(opts.trackSwitchRadiusDeg ?? opts.targetRadiusDeg, TARGET_DISTANCE);
+  const tsGeo = new THREE.SphereGeometry(tsRadius, 32, 24);
+  const healthMat = new THREE.MeshBasicMaterial({ color: HEALTH_RING_COLOR, side: THREE.DoubleSide });
+  const tsTargets = Array.from({ length: MAX_SWITCH_TARGETS }, () => {
+    const mat = new THREE.MeshStandardMaterial({ color: TARGET_COLOR, roughness: 0.4 });
+    const ball = new THREE.Mesh(tsGeo, mat);
+    // Each ring has its own geometry so its draw range (the health arc) can differ.
+    const ringG = new THREE.RingGeometry(tsRadius * 1.25, tsRadius * 1.45, HEALTH_RING_SEGMENTS, 1, Math.PI / 2);
+    const ring = new THREE.Mesh(ringG, healthMat);
+    ball.visible = false; ring.visible = false;
+    scene.add(ball, ring);
+    return { ball, mat, ring, ringG };
   });
   const ringGeo = new THREE.RingGeometry(0.8, 1, 32);
   const pops: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; born: number }[] = [];
@@ -113,6 +132,17 @@ export function createScene(
     },
     setFlickTarget(a) { place(flickMesh, a); },
     setSwitchTargets(aims) { switchMeshes.forEach((m, i) => place(m, aims[i] ?? null)); },
+    setTrackSwitchTargets(targets, damaging) {
+      tsTargets.forEach((t, i) => {
+        const x = targets[i];
+        place(t.ball, x?.aim ?? null);
+        place(t.ring, x?.aim ?? null);
+        if (!x) return;
+        t.ring.lookAt(0, 0, 0);
+        t.ringG.setDrawRange(0, Math.ceil(HEALTH_RING_SEGMENTS * Math.max(0, Math.min(1, x.health))) * 6);
+        t.mat.color.setHex(damaging === i ? TARGET_ON_COLOR : TARGET_COLOR);
+      });
+    },
     popAt(a) {
       const mat = new THREE.MeshBasicMaterial({ color: TARGET_ON_COLOR, transparent: true, side: THREE.DoubleSide, depthWrite: false });
       const mesh = new THREE.Mesh(ringGeo, mat);
@@ -149,7 +179,9 @@ export function createScene(
       roomGeo.dispose(); roomMat.dispose(); gridTex.dispose();
       for (const p of pops) p.mat.dispose();
       ringGeo.dispose();
-      targetGeo.dispose(); trackGeo.dispose(); flickMat.dispose(); trackMat.dispose();
+      targetGeo.dispose(); trackGeo.dispose(); flickMat.dispose(); trackMat.dispose(); switchGeo.dispose();
+      tsGeo.dispose(); healthMat.dispose();
+      for (const t of tsTargets) { t.mat.dispose(); t.ringG.dispose(); }
       renderer.dispose();
     },
   };

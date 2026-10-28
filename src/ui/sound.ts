@@ -1,3 +1,5 @@
+import type { PartKind } from '../core/config';
+
 /** Small synthesised sound effects (Web Audio; no audio files). Display only: identical for every sens. */
 export interface Sounds {
   hit(streak: number): void;
@@ -5,10 +7,17 @@ export interface Sounds {
   /** Quiet tick while the tracking target is held; rate-limited by the caller. */
   tick(): void;
   countdown(final: boolean): void;
+  /** A short two-note chime that starts each part; one pitch per part kind. */
+  chime(kind: PartKind): void;
   setEnabled(on: boolean): void;
+  /** Releases the audio context (when the run screen closes). */
+  close(): void;
 }
 
 const VOLUME = 0.18;
+const CHIME_HZ: Record<PartKind, number> = { flick: 523, switch: 659, tracking: 784, trackswitch: 988 };
+const CHIME_GAP_MS = 90;
+const FIFTH = 1.5;
 
 export function createSounds(enabled: boolean): Sounds {
   let on = enabled;
@@ -45,6 +54,12 @@ export function createSounds(enabled: boolean): Sounds {
     miss() { note(180, 120, 'sawtooth', 0.35, 120); },
     tick() { note(1800, 25, 'square', 0.12); },
     countdown(final) { note(final ? 880 : 440, final ? 220 : 120, 'sine', 0.8); },
+    chime(kind) {
+      const f = CHIME_HZ[kind];
+      note(f, 120, 'sine', 0.7);
+      setTimeout(() => note(f * FIFTH, 180, 'sine', 0.6), CHIME_GAP_MS);
+    },
     setEnabled(v) { on = v; },
+    close() { if (ctx) void ctx.close(); ctx = null; on = false; },
   };
 }

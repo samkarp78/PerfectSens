@@ -67,3 +67,11 @@ describe('setupStore', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('toJson raw logs', () => {
+  it('export includes trackSwitch logs', () => {
+    const parsed = JSON.parse(toJson(rec)) as { raw: { trackSwitch: unknown[]; switch: { clicks: { aim: unknown }[] }[] } };
+    expect(parsed.raw.trackSwitch.length).toBeGreaterThanOrEqual(rec.steps.length);
+    expect(parsed.raw.switch[0]!.clicks[0]!.aim).toBeDefined();
+  });
+});

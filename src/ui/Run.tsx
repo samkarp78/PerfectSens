@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import './styles.css';
 import { defaultConfig } from '../core/config';
-import type { SessionState } from '../core/session';
+import { BLOCKS_PER_STEP, type SessionState } from '../core/session';
 import { FlickRunner } from '../core/run/flickRunner';
 import { SwitchRunner } from '../core/run/switchRunner';
 import { TrackingRunner } from '../core/run/trackingRunner';
+import { TrackSwitchRunner } from '../core/run/trackSwitchRunner';
 import { requestRawPointerLock, startCapture } from '../input/rawInput';
 import { createScene } from '../scene/scene';
 import { offscreenArrow } from '../scene/camera';
 import { angleBetween, vfovDeg } from '../core/geometry';
 import type { Aim } from '../core/types';
-import { createRunController, type Runner, type RunController, type RunPhase } from './runController';
-import { createScoreKeeper, flickEvents, gradeFor, switchEvents, type ScoreState } from './scoreKeeper';
+import { createRunController, cueText, type Runner, type RunController, type RunPhase } from './runController';
+import { createScoreKeeper, flickEvents, gradeFor, switchEvents, trackSwitchEvents, type ScoreState } from './scoreKeeper';
 import { createSounds } from './sound';
 import { AskCard, BreakCard, Countdown, type BreakStats } from './RunCards';
 import type { Prefs } from '../store/prefs';
@@ -32,28 +33,37 @@ const PAUSED_TEXT = 'Paused — this part will restart.';
 const QUIT_CONFIRM_MS = 3000;
 /** Seconds counted down before the next round starts on its own (while the mouse stays locked). */
 const COUNTDOWN_S = 3;
-/** Tracking tick sound interval while the target is held. */
+/** Tick sound interval while a tracking target is held (or a tracking-switching target takes damage). */
 const TICK_MS = 125;
-/** Blocks per round (flicks, switching, tracking). */
-const PER_ROUND = 3;
 /** Arrow sits on an ellipse this fraction of the half-width/height from the centre. */
 const ARROW_RING = 0.38;
+/** The part timer turns orange for the last few seconds. */
+const TIMER_ENDING_MS = 5000;
 
 const viewOf = (c: RunController): View => {
   const p = c.session.progress;
   return { phase: c.phase, hud: c.hud, restText: c.restText, done: p?.blocksDone ?? 0, total: p?.blocksTotal ?? 0 };
 };
-const partName = (r: Runner): string => (r instanceof TrackingRunner ? 'Tracking' : r instanceof SwitchRunner ? 'Switching' : 'Flicks');
+const partName = (r: Runner): string => (r instanceof TrackSwitchRunner ? 'Tracking switching' : r instanceof TrackingRunner ? 'Tracking'
+  : r instanceof SwitchRunner ? 'Switching' : r.log().spec.kind === 'warmup' ? 'Warm-up' : 'Flicks');
 const clock = (ms: number): string => {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
+const nearest = (aim: Aim, targets: readonly Aim[]): Aim | null =>
+  [...targets].sort((a, b) => angleBetween(aim, a) - angleBetween(aim, b))[0] ?? null;
 
 export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const arrowRef = useRef<HTMLDivElement>(null);
   const holdRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<HTMLDivElement>(null);
+  const timerNameRef = useRef<HTMLDivElement>(null);
+  const timerNumRef = useRef<HTMLDivElement>(null);
+  const timerBarRef = useRef<HTMLDivElement>(null);
+  const cueRef = useRef<HTMLDivElement>(null);
+  const cueTextRef = useRef<HTMLParagraphElement>(null);
+  const cueNumRef = useRef<HTMLParagraphElement>(null);
   const scoreRef = useRef<HTMLDivElement>(null);
   const ctrlRef = useRef<RunController | null>(null);
   if (!ctrlRef.current) ctrlRef.current = createRunController(session);
@@ -95,9 +105,11 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
   useEffect(() => {
     const canvas = canvasRef.current!;
     const { setup } = ctrl.session;
+    const cfg = ctrl.session._cfg;
     const scene = createScene(canvas, {
       fov: setup.fov, fovType: setup.fovType, targetRadiusDeg: defaultConfig.flick.targetRadiusDeg,
-      trackingRadiusDeg: defaultConfig.tracking.targetRadiusDeg,
+      trackingRadiusDeg: defaultConfig.tracking.targetRadiusDeg, switchRadiusDeg: defaultConfig.switch.targetRadiusDeg,
+      trackSwitchRadiusDeg: defaultConfig.trackswitch.targetRadiusDeg,
     });
     const showArrow = (aim: Aim, target: Aim | null) => {
       const el = arrowRef.current;
@@ -116,24 +128,73 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
 
     let last: View = viewOf(ctrl);
     const sync = () => {
+      // Cheap checks first: the rest text is only rebuilt when something it depends on changed.
+      const p = ctrl.session.progress;
+      if (ctrl.phase === last.phase && ctrl.hud === last.hud && (p?.blocksDone ?? 0) === last.done) return;
       const v = viewOf(ctrl);
-      if (v.phase !== last.phase || v.hud !== last.hud || v.restText !== last.restText || v.done !== last.done) {
-        const wasRunning = last.phase === 'running';
-        last = v;
-        if (v.phase === 'break') {
-          const every = ctrl.session._cfg.session.breakEveryRounds;
-          const recent = ctrl.session.steps.slice(-every);
-          const mean = recent.reduce((s, st) => s + st.score.logS, 0) / Math.max(1, recent.length);
-          setBreakStats({ ...keeper.stretch(), grade: ctrl.session.mode === 'quickab' ? null : gradeFor(mean) });
-        }
-        setView(v);
-        // Between rounds the lock is kept for the countdown (unless auto-continue is off); it is released for
-        // breaks, questions and the end.
-        const release = v.phase === 'break' || v.phase === 'asking' || v.phase === 'finished' || (v.phase === 'rest' && !prefs.autoContinue);
-        if (wasRunning && release && document.pointerLockElement) document.exitPointerLock();
-        if (v.phase === 'finished') cbRef.current.onFinished(ctrl.session, keeper.state);
+      const wasRunning = last.phase === 'running' || last.phase === 'cue';
+      last = v;
+      if (v.phase === 'break') {
+        const every = ctrl.session._cfg.session.breakEveryRounds;
+        const recent = ctrl.session.steps.slice(-every);
+        const mean = recent.reduce((s, st) => s + st.score.logS, 0) / Math.max(1, recent.length);
+        setBreakStats({ ...keeper.stretch(), grade: ctrl.session.mode === 'quickab' ? null : gradeFor(mean) });
+      }
+      setView(v);
+      // Between rounds the lock is kept for the countdown (unless auto-continue is off); it is released for
+      // breaks, questions and the end.
+      const release = v.phase === 'break' || v.phase === 'asking' || v.phase === 'finished' || (v.phase === 'rest' && !prefs.autoContinue);
+      if (wasRunning && release && document.pointerLockElement) document.exitPointerLock();
+      if (v.phase === 'finished') cbRef.current.onFinished(ctrl.session, keeper.state);
+    };
+
+    // Turns runner progress into points, sounds and hit effects (display only). A part that just ended is read one
+    // last time, so its final hits still score.
+    let seen: Runner | null = null;
+    let cursor = 0, kills = 0, lastFrame = performance.now(), lastTick = 0, scoreText = '';
+    let flickAt = { trial: 0, click: 0 };
+    const score = (events: { hit: boolean; ms: number }[]) => {
+      for (const e of events) { if (e.hit) { keeper.hit(e.ms); sounds.hit(keeper.state.streak - 1); } else { keeper.miss(); sounds.miss(); } }
+    };
+    const read = (r: Runner, now: number) => {
+      if (r instanceof FlickRunner && r.log().spec.kind === 'warmup') return; // warm-up: no points
+      if (r instanceof FlickRunner) {
+        const trials = r.log().trials;
+        const { events, next } = flickEvents(trials, flickAt);
+        for (let i = flickAt.trial; i < next.trial; i++) if (trials[i]!.hitT !== null) scene.popAt(trials[i]!.target.aim);
+        flickAt = next;
+        score(events);
+      } else if (r instanceof SwitchRunner) {
+        const log = r.log();
+        const { events, next } = switchEvents(log, cursor);
+        cursor = next;
+        for (; kills < log.kills.length; kills++) scene.popAt(log.kills[kills]!.target);
+        score(events);
+      } else if (r instanceof TrackSwitchRunner) {
+        const log = r.log();
+        const { events, next } = trackSwitchEvents(log, kills);
+        for (; kills < next; kills++) scene.popAt(log.kills[kills]!.aim);
+        score(events);
+        if (r.state.damaging !== null && now - lastTick >= TICK_MS) { sounds.tick(); lastTick = now; }
+      } else {
+        const on = r.state.onTarget && now >= r.state.scoredFrom;
+        keeper.track(now - lastFrame, on);
+        if (on && now - lastTick >= TICK_MS) { sounds.tick(); lastTick = now; }
       }
     };
+    const feedback = (r: Runner | null, now: number) => {
+      if (r !== seen) {
+        if (seen) read(seen, now);
+        seen = r; cursor = 0; kills = 0; flickAt = { trial: 0, click: 0 };
+        const kind = r?.log().spec.kind;
+        if (kind && kind !== 'warmup') sounds.chime(kind);
+      }
+      if (r) read(r, now);
+      const st = keeper.state;
+      const text = `${st.points.toLocaleString()} pts${st.streak >= 2 ? ` · ×${st.streak} streak` : ''}`;
+      if (text !== scoreText && scoreRef.current) { scoreRef.current.textContent = text; scoreText = text; }
+    };
+
     const dispose = startCapture(
       document,
       (s) => { ctrl.onMove(s); sync(); },
@@ -144,35 +205,37 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
 
     if (last.phase === 'finished') cbRef.current.onFinished(ctrl.session, keeper.state);
 
-    // Turns runner progress into points, sounds and hit effects (display only).
-    let seen: Runner | null = null;
-    let cursor = 0, kills = 0, lastFrame = performance.now(), lastTick = 0, scoreText = '';
-    let flickAt = { trial: 0, click: 0 };
-    const feedback = (r: Runner | null, now: number) => {
-      if (r !== seen) { seen = r; cursor = 0; kills = 0; flickAt = { trial: 0, click: 0 }; }
-      if (r instanceof FlickRunner && r.log().spec.kind === 'warmup') {
-        // warm-up: no points
-      } else if (r instanceof FlickRunner) {
-        const trials = r.log().trials;
-        const { events, next } = flickEvents(trials, flickAt);
-        for (let i = flickAt.trial; i < next.trial; i++) if (trials[i]!.hitT !== null) scene.popAt(trials[i]!.target.aim);
-        flickAt = next;
-        for (const e of events) { if (e.hit) { keeper.hit(e.ms); sounds.hit(keeper.state.streak - 1); } else { keeper.miss(); sounds.miss(); } }
-      } else if (r instanceof SwitchRunner) {
-        const log = r.log();
-        const { events, next } = switchEvents(log, cursor);
-        cursor = next;
-        for (; kills < log.kills.length; kills++) scene.popAt(log.kills[kills]!.target);
-        for (const e of events) { if (e.hit) { keeper.hit(e.ms); sounds.hit(keeper.state.streak - 1); } else { keeper.miss(); sounds.miss(); } }
-      } else if (r instanceof TrackingRunner) {
-        const on = r.state.onTarget && now >= r.state.scoredFrom;
-        keeper.track(now - lastFrame, on);
-        if (on && now - lastTick >= TICK_MS) { sounds.tick(); lastTick = now; }
-      }
-      const st = keeper.state;
-      const text = `${st.points.toLocaleString()} pts${st.streak >= 2 ? ` · ×${st.streak} streak` : ''}`;
-      if (text !== scoreText && scoreRef.current) { scoreRef.current.textContent = text; scoreText = text; }
+    let cueTick = -1;
+    const drawCue = (now: number) => {
+      const el = cueRef.current;
+      const cue = ctrl.phase === 'cue' ? ctrl.cue : null;
+      if (!el) return;
+      if (!cue) { el.style.display = 'none'; cueTick = -1; return; }
+      el.style.display = 'flex';
+      const ticks = Math.round(cfg.round.cueMs / cfg.round.cueTickMs);
+      const i = Math.min(ticks - 1, Math.max(0, Math.floor((now - cue.startedAt) / cfg.round.cueTickMs)));
+      if (i !== cueTick) { cueTick = i; sounds.countdown(false); }
+      if (cueTextRef.current) cueTextRef.current.textContent = cueText(cue.kind);
+      if (cueNumRef.current) cueNumRef.current.textContent = String(ticks - i);
     };
+    const drawTimer = (r: Runner | null, now: number) => {
+      const box = timerRef.current;
+      if (!box) return;
+      if (!r) { box.style.display = 'none'; return; }
+      box.style.display = 'flex';
+      const lead = r instanceof TrackingRunner || r instanceof TrackSwitchRunner ? r.state.scoredFrom : null;
+      const ready = lead !== null && now < lead;
+      const left = r.state.endsAt - now;
+      const span = r.state.endsAt - (lead ?? r.state.endsAt - partLength(r));
+      if (timerNameRef.current) timerNameRef.current.textContent = partName(r);
+      if (timerNumRef.current) timerNumRef.current.textContent = ready ? 'get ready' : clock(left);
+      if (timerBarRef.current) {
+        timerBarRef.current.style.width = `${ready ? 100 : Math.max(0, Math.min(100, (100 * left) / span))}%`;
+        timerBarRef.current.classList.toggle('is-ending', !ready && left <= TIMER_ENDING_MS);
+      }
+    };
+    const partLength = (r: Runner): number => (r instanceof FlickRunner
+      ? (r.log().spec.kind === 'warmup' ? cfg.session.warmupMs : cfg.flick.blockMs) : cfg.switch.blockMs);
 
     let raf = 0;
     let disposed = false;
@@ -184,20 +247,23 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
       feedback(r, now);
       sync();
       lastFrame = now;
-      if (holdRef.current) holdRef.current.style.display = r instanceof TrackingRunner && !r.state.held ? 'block' : 'none';
-      if (timerRef.current) {
-        const ready = r instanceof TrackingRunner && now < r.state.scoredFrom;
-        timerRef.current.textContent = r ? `${partName(r)} · ${ready ? 'get ready' : clock(r.state.endsAt - now)}` : '';
+      if (holdRef.current) {
+        const needsHold = (r instanceof TrackingRunner || r instanceof TrackSwitchRunner) && !r.state.held;
+        holdRef.current.style.display = needsHold ? 'block' : 'none';
       }
+      drawTimer(r, now);
+      drawCue(now);
       scene.setFlickTarget(r instanceof FlickRunner ? (r.state.target?.aim ?? null) : null);
       scene.setSwitchTargets(r instanceof SwitchRunner ? r.state.targets : []);
       scene.setTrackingTarget(r instanceof TrackingRunner ? r.state.targetAim : null, r instanceof TrackingRunner && r.state.onTarget);
+      scene.setTrackSwitchTargets(r instanceof TrackSwitchRunner ? r.state.targets : [], r instanceof TrackSwitchRunner ? r.state.damaging : null);
       if (r) {
         scene.setAim(r.state.aim);
         const aim = r.state.aim;
         const target = r instanceof FlickRunner ? (r.state.target?.aim ?? null)
           : r instanceof TrackingRunner ? r.state.targetAim
-          : [...r.state.targets].sort((a, b) => angleBetween(aim, a) - angleBetween(aim, b))[0] ?? null;
+          : r instanceof TrackSwitchRunner ? nearest(aim, r.state.targets.map((x) => x.aim))
+          : nearest(aim, r.state.targets);
         showArrow(aim, target);
       } else {
         showArrow({ yaw: 0, pitch: 0 }, null);
@@ -214,6 +280,7 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
       dispose();
       if (document.pointerLockElement) document.exitPointerLock();
       scene.dispose();
+      sounds.close();
     };
   }, []);
 
@@ -237,8 +304,8 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
   const card = (view.phase === 'rest' && !locked) || view.phase === 'paused';
   const answer = (accept: boolean) => { ctrl.answerExtension(accept); setView(viewOf(ctrl)); };
   const warmup = view.phase === 'rest' && view.hud === 'Warm-up';
-  const rounds = view.total / PER_ROUND;
-  const round = Math.min(Math.floor(view.done / PER_ROUND) + 1, rounds);
+  const rounds = view.total / BLOCKS_PER_STEP;
+  const round = Math.min(Math.floor(view.done / BLOCKS_PER_STEP) + 1, rounds);
   const quit = (
     <button type="button" class={quitArmed ? 'quit quit-armed' : 'quit'}
       onClick={(e) => { e.stopPropagation(); if (quitArmed) onQuit(); else setQuitArmed(true); }}>
@@ -249,9 +316,17 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
   return (
     <div class="run">
       <canvas ref={canvasRef} class="run-canvas" />
-      {view.phase === 'running' && <div class="crosshair" aria-hidden="true" />}
+      {(view.phase === 'running' || view.phase === 'cue') && <div class="crosshair" aria-hidden="true" />}
       <div class="hud">{view.hud}</div>
-      <div ref={timerRef} class="part-timer" aria-live="off" />
+      <div ref={timerRef} class="part-timer" aria-live="off" style={{ display: 'none' }}>
+        <div ref={timerNameRef} class="part-timer-name" />
+        <div ref={timerNumRef} class="part-timer-num" />
+        <div class="part-timer-track"><div ref={timerBarRef} class="part-timer-bar" /></div>
+      </div>
+      <div ref={cueRef} class="cue" aria-live="assertive" style={{ display: 'none' }}>
+        <p ref={cueTextRef} class="cue-text" />
+        <p ref={cueNumRef} class="cue-num" />
+      </div>
       <div ref={scoreRef} class="score-hud" aria-live="off" />
       {view.total > 0 && (
         <div class="progress" role="progressbar" aria-label="Session progress"
@@ -261,9 +336,9 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit }: RunPr
       )}
       {view.total > 0 && view.hud !== 'Warm-up' && <div class="progress-count">Round {round} / ~{rounds}</div>}
       <div ref={arrowRef} class="offscreen-arrow" aria-hidden="true" />
-      <div ref={holdRef} class="hold-prompt" aria-live="polite">Hold the mouse button and track</div>
+      <div ref={holdRef} class="hold-prompt" aria-live="polite">Hold the mouse button</div>
       {countdown !== null && <Countdown text={view.restText} n={countdown} />}
-      {view.phase === 'asking' && <AskCard onAnswer={answer} />}
+      {view.phase === 'asking' && <AskCard reason={ctrl.session.extensionReason ?? 'close'} onAnswer={answer} />}
       {view.phase === 'break' && (
         <div class="rest-overlay">
           <BreakCard stats={breakStats} onContinue={() => void start()} />

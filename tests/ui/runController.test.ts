@@ -4,7 +4,9 @@ import { createSession, nextBlock, submitBlock } from '../../src/core/session';
 import { defaultSimPlayer } from '../../src/core/sim/player';
 import { runSimSession } from '../../src/core/sim/runSession';
 import type { Setup } from '../../src/core/types';
-import { createRunController, hudText, ROUND_REST_TEXT } from '../../src/ui/runController';
+import { createRunController, cueText, hudText, ROUND_REST_TEXT, type RunController } from '../../src/ui/runController';
+import { defaultConfig } from '../../src/core/config';
+import { TrackSwitchRunner } from '../../src/core/run/trackSwitchRunner';
 import { TrackingRunner } from '../../src/core/run/trackingRunner';
 import { SwitchRunner } from '../../src/core/run/switchRunner';
 import { minJerkMoves } from '../helpers/paths';
@@ -44,6 +46,7 @@ describe('run controller', () => {
     let t = 0;
     const seen = new Set<string>();
     for (let i = 0; i < 2000 && !(c.runner instanceof TrackingRunner); i++) {
+      if (c.phase === 'cue') { t = c.cue!.endsAt; c.tick(t); continue; }
       const r = c.runner!;
       seen.add(r.constructor.name);
       const goal = r instanceof FlickRunner ? r.state.target!.aim : (r as SwitchRunner).state.targets[0]!;
@@ -54,11 +57,26 @@ describe('run controller', () => {
       t += 50;
     }
     expect([...seen]).toEqual(['FlickRunner', 'SwitchRunner']);
-    expect(c.phase).toBe('running'); // no rest card between the round's parts
+    expect(c.phase).toBe('running'); // no rest card between the round's parts, only the short cue
     expect(c.runner).toBeInstanceOf(TrackingRunner);
     expect(c.hud).toBe('Calibration · Tracking');
     c.onClick(t + 1);
     c.tick(t + 1e6);
+    expect(c.phase).toBe('rest'); // the idle tracking block is queued for one retry: its own rest text
+    c.begin(t + 2e6);
+    c.onClick(t + 2e6 + 1);
+    for (let k = 1; k < 2000 && c.runner instanceof TrackingRunner; k++) {
+      const r = c.runner;
+      const a = r.state.aim, g = r.state.targetAim;
+      c.onMove({ t: t + 2e6 + k * 10, dx: Math.round((g.yaw - a.yaw) / DPC), dy: Math.round(-(g.pitch - a.pitch) / DPC) });
+    }
+    expect(c.phase).toBe('cue');
+    const tsStart = c.cue!.endsAt;
+    c.tick(tsStart);
+    expect(c.runner).toBeInstanceOf(TrackSwitchRunner);
+    expect(c.hud).toBe('Calibration · Tracking switching');
+    c.onClick(tsStart + 1);
+    c.tick(tsStart + 1e6);
     expect(c.phase).toBe('rest'); // the round is over (here the idle tracking block is queued for one retry)
     expect(c.runner).toBeNull();
     expect(createRunController(createSession(setup, opts)).restText).toBe(ROUND_REST_TEXT);
@@ -169,5 +187,71 @@ describe('breaks between stretches of rounds', () => {
     }
     expect(phases).toEqual(['rest', 'rest', 'break', 'rest']);
     expect(restPhase(s, false)).toBe('rest');
+  });
+});
+
+describe('handover cue between parts', () => {
+  /** Plays the flick part of the first round to its end by hitting every target. */
+  function finishFlicks(c: RunController): number {
+    let t = 0;
+    c.begin(0);
+    while (c.runner instanceof FlickRunner) {
+      const r = c.runner;
+      const moves = minJerkMoves(r.state.aim, r.state.target!.aim, t, 150, 500, DPC);
+      for (const m of moves) c.onMove(m);
+      t = moves[moves.length - 1]!.t + 10;
+      c.onClick(t);
+      t += 50;
+      c.tick(t);
+    }
+    return t;
+  }
+  it('after flicks the phase is cue, then switching starts after cueMs', () => {
+    const c = createRunController(createSession(setup, opts));
+    finishFlicks(c);
+    expect(c.phase).toBe('cue');
+    expect(c.runner).toBeNull();
+    const cue = c.cue!;
+    expect(cue.kind).toBe('switch');
+    expect(cue.endsAt - cue.startedAt).toBe(defaultConfig.round.cueMs);
+    expect(cueText('switch')).toBe('Next: Switching');
+    expect(cueText('trackswitch')).toBe('Next: Tracking switching');
+    c.onClick(cue.startedAt + 10); // input during the cue is ignored
+    c.tick(cue.endsAt - 1);
+    expect(c.phase).toBe('cue');
+    c.tick(cue.endsAt);
+    expect(c.phase).toBe('running');
+    expect(c.runner).toBeInstanceOf(SwitchRunner);
+    expect((c.runner as SwitchRunner).log().clicks).toHaveLength(0);
+  });
+  it('no cue after the last part of a round', () => {
+    const c = createRunController(createSession(setup, opts));
+    finishFlicks(c);
+    expect(c.phase).toBe('cue');
+    // Skip ahead: the round ends with tracking switching, which rests (or breaks) instead of cueing.
+    let guard = 0;
+    while (c.phase !== 'rest' && guard++ < 50) {
+      if (c.phase === 'cue') c.tick(c.cue!.endsAt);
+      else if (c.runner) { const end = c.runner.state.endsAt; c.onClick(end - 1); c.tick(end); }
+      else c.begin(guard * 1e6);
+    }
+    expect(c.phase).toBe('rest');
+    expect(c.cue).toBeNull();
+  });
+  it('Esc during cue pauses; resume restarts the cue', () => {
+    const c = createRunController(createSession(setup, opts));
+    finishFlicks(c);
+    const steps = c.session.steps;
+    const flickLogs = c.session.logs.flick.length;
+    c.onLockLost();
+    expect(c.phase).toBe('paused');
+    expect(c.cue).toBeNull();
+    c.begin(5e6);
+    expect(c.phase).toBe('cue');
+    expect(c.cue!.startedAt).toBe(5e6);
+    expect(c.session.steps).toBe(steps);
+    expect(c.session.logs.flick).toHaveLength(flickLogs);
+    c.tick(5e6 + defaultConfig.round.cueMs);
+    expect(c.runner).toBeInstanceOf(SwitchRunner);
   });
 });
