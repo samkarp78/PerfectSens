@@ -583,3 +583,63 @@ Power is low. Most searches with a real optimum end with "no clear winner", beca
 - **The lead-in (and the Standard warm-up)** now has hit sounds and pops, with no points.
 - **Countdown beeps rise** two semitones per second toward zero; the last second is longer, and the "go" beep is an octave up. This applies to every mode.
 - The §18.13 rates were measured with 3 × 14 s; they need re-measuring with 2 × 20 s.
+
+## 19. Play-Along, simplified: one grade, direction, control (2026-10-28)
+
+The user found §18's mix of a weighted score plus a separate aim-signal nudge too convoluted. Play-Along now runs on three plain ideas. The goal is a sens where the **first movement lands close, quickly, with few corrections**.
+
+### 19.1 The grade: how good was this sens?
+
+One number per test. Each part is scored per item, so its noise is just the spread of its items: SE = sd/√n.
+
+- **Flicks and switching**, per target or switch:
+  - q = −ln(time to hit, s) − |ln(first-move gain ÷ ideal gain for its distance class)| − 0.1 × corrections − 0.2 × misclicks.
+  - The gain term is capped at 1, and a missing first move counts as 1.
+  - Overshoot and undershoot cost the same.
+- **Tracking:** ln(time on target), with its existing chunk-bootstrap SE.
+- **Tracking switching**, per kill:
+  - q = −ln(lock-on time + kill time, s) − |ln(lock-on first-move gain)|.
+  - The lock-on gain is measured against where the target was at the end of that movement.
+
+Each part's mean is taken over all items in the test (both rounds), and compared with the same part in the control's first test. The **test grade** is the plain average of the four part differences (equal weights). Its SE is √(ΣSE²)/4.
+
+### 19.2 Direction: up or down?
+
+These are measured against the normal human pattern, never against the player's own sens. The ideal first-move gain is **1.00 for small flicks, 0.97 for medium and 0.93 for big** (provisional, in config). People land slightly short on long moves on purpose.
+
+- Overshoot: the mean of ln(gain ÷ ideal) over flick and switch items. + means too fast.
+- Tracking ahead/behind: the mean lead/lag in degrees. + (ahead) means too fast.
+- Tracking switching ahead/behind: the same, while dealing damage.
+
+**Signal** = the average of overshoot ÷ 0.10 and each lead/lag ÷ 1°.
+- Above +0.5 → test **lower** (slower).
+- Below −0.5 → test **higher** (faster).
+- Otherwise neutral.
+
+### 19.3 The search
+
+1. The first pair is ±20% around the control.
+2. After that, the centre is the best-graded sens: the snapped fit pick when the fit is usable, else the best test.
+3. The best sens's latest direction shifts the centre half a step that way.
+4. The next pair is half as far apart, down to 4%.
+5. Then the **final check**: the best sens vs the control on the same night, decided on grade by the §17.6/§18.9 rule.
+
+The §18 aim-signal nudge (`aimDrivers` against the default sens) is removed from Play-Along. Standard mode is unchanged for now.
+
+### 19.4 The control
+
+The player's starting sens is a **control** only. It is the ruler that grades are shown against ("+6% vs your sens"), and the opponent in the final check. It never steers, and it is never treated as correct.
+
+### 19.5 End screen: every stat across every sens
+
+Both Play-Along and Standard results get small charts, one per stat. Each chart has the tested sens along the bottom, each sens's value as a dot, and the control marked. The stats are:
+- first-move landing (% of distance, with the ideal line);
+- corrections per target;
+- time to hit;
+- misclick rate;
+- time on target;
+- tracking ahead/behind;
+- tracking-switching lock-on time;
+- tracking-switching ahead/behind.
+
+A user decision to keep in mind: the final check's 1% false-change guarantee must hold with the new grade (simulator re-check, run only when the user isn't gaming).
