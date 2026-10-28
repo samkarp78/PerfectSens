@@ -386,3 +386,24 @@ These thresholds are provisional and live in config:
 - **Tracking-switching rendering:** health rings on the targets, a damage tick and a kill pop. The off-screen arrow points to the nearest target.
 - **Ask card:** the wording depends on why it is asking (§17.6).
 - **Mode labels:** Default about 12 min, Thorough about 16 min, Quick about 6 min.
+
+### 17.9 Build notes and measured rates (2026-10-28)
+
+**Simulator rates:**
+
+| Check | Rate |
+|---|---|
+| Convergence | 88/100 |
+| Familiarity (median pick/optimal) | 1.027 |
+| Edge | 19/20 |
+| Test-retest | 18/20 |
+| Null false change | 0.3% (1/300; keep 1%) |
+
+**Power** (quick A/B, 40 runs, pick = optimum), new rule vs old:
+- At 0.75× current: change 38/40, vs 40/40 before.
+- At 0.85×: 1/40, vs 4/40 before.
+
+**Changes made during the build:**
+- **Flick waves:** 1 target per class (waves of 3). With 14 s parts, 6-target waves lost too much to warm-in and unfinished waves.
+- **Edge flag:** the fit also flags an edge when its peak lies within one final step of a tested edge that performs the same as the best point. Short parts make the far side score at the floor, which bends the quadratic early.
+- **Click-bias scale:** click bias steers per 20°, which puts a 1° bias on a typical flick on the same footing as a 5% gain difference.
