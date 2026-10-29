@@ -104,6 +104,15 @@ export function App() {
   };
 
   const onPaStart = (setup: PaSetup) => { savePa(createPlayAlong(setup, newSeed(), Date.now())); setScreen('playalong'); };
+  // A quick try runs on its own state: never saved, never in History, and it leaves any real saved search alone.
+  const [quickPa, setQuickPa] = useState<PaState | null>(null);
+  const onPaQuick = (setup: PaSetup) => { setQuickPa(createPlayAlong({ ...setup, quick: true }, newSeed(), Date.now())); setScreen('playalong'); };
+  const onQuickFinished = (s: PaState) => {
+    setQuickPa(null);
+    setSaveFailed(false);
+    setDone({ rec: recordFromPlayAlong(s, new Date(), 'quick-try'), fit: null, stats: null, bests: null });
+    setScreen('paResults');
+  };
   const onPaContinue = () => {
     if (!pa) return;
     const s = resume(pa, Date.now());
@@ -167,9 +176,13 @@ export function App() {
       return <PlayAlongSetup fields={paFields} onFields={setPaFields}
         saved={saved ? { rangeText: rangeText(paFit(saved)?.range ?? null, saved.setup.game, saved.setup.dpi), stale: isStale(saved, Date.now()) } : null}
         onCalibrate={(f) => { setPaFields(f); setCalibrateFor('paSetup'); setScreen('calibrate'); }}
-        onStart={onPaStart} onContinue={onPaContinue} onStartFresh={clearPa} onBack={() => setScreen('setup')} />;
+        onStart={onPaStart} onQuickTry={onPaQuick} onQuickTrySaved={() => { if (pa) onPaQuick(pa.setup); }} onContinue={onPaContinue} onStartFresh={clearPa} onBack={() => setScreen('setup')} />;
     }
     case 'playalong':
+      if (quickPa) {
+        return <PlayAlong key={quickPa.seed} state={quickPa} prefs={prefs} onChange={setQuickPa} onFinished={onQuickFinished}
+          onQuit={() => { setQuickPa(null); setScreen('setup'); }} onUnsupported={onUnsupported} />;
+      }
       return pa ? <PlayAlong key={pa.seed} state={pa} prefs={prefs} onChange={savePa} onFinished={onPaFinished}
         onQuit={() => setScreen('setup')} onUnsupported={onUnsupported} /> : null;
     case 'paResults':

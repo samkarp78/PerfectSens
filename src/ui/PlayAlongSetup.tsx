@@ -14,23 +14,27 @@ export interface PlayAlongSetupProps {
   onFields(f: PaFields): void;
   onCalibrate(f: PaFields): void;
   onStart(setup: PaSetup): void;
+  /** A quick try: about 5 minutes, 3 short tests, no match needed, not saved. */
+  onQuickTry(setup: PaSetup): void;
+  /** Quick try with the saved search's settings (the form is hidden while a search is saved). */
+  onQuickTrySaved(): void;
   onContinue(): void;
   onStartFresh(): void;
   onBack(): void;
 }
 
-export function PlayAlongSetup({ fields: f, saved, onFields, onCalibrate, onStart, onContinue, onStartFresh, onBack }: PlayAlongSetupProps) {
+export function PlayAlongSetup({ fields: f, saved, onFields, onCalibrate, onStart, onQuickTry, onQuickTrySaved, onContinue, onStartFresh, onBack }: PlayAlongSetupProps) {
   const [errors, setErrors] = useState<Partial<Record<keyof PaFields, string>>>({});
   const set = (k: keyof PaFields) => (e: Event) => onFields({ ...f, [k]: (e.target as HTMLInputElement).value });
   const finals = f.game === 'finals';
 
-  const submit = (e: Event) => {
-    e.preventDefault();
+  const validated = (go: (setup: PaSetup) => void) => {
     const r = validatePaSetup(f);
     if (!r.ok) { setErrors(r.errors); return; }
     setErrors({});
-    onStart(r.setup);
+    go(r.setup);
   };
+  const submit = (e: Event) => { e.preventDefault(); validated(onStart); };
 
   const field = (k: keyof PaFields, label: string, hint: string) => (
     <label class="field">
@@ -53,6 +57,8 @@ export function PlayAlongSetup({ fields: f, saved, onFields, onCalibrate, onStar
           <div class="actions">
             <button type="button" class="btn btn-primary" onClick={onContinue}>Continue your search</button>
             <button type="button" class="btn" onClick={onStartFresh}>Start fresh</button>
+            <button type="button" class="btn" onClick={onQuickTrySaved}
+              title="About 5 minutes: 3 short tests, no match needed. Not saved and not a real answer.">Quick try (5 min)</button>
           </div>
         </div>
       )}
@@ -89,6 +95,8 @@ export function PlayAlongSetup({ fields: f, saved, onFields, onCalibrate, onStar
           </div>
           <div class="actions">
             <button type="submit" class="btn btn-primary">Start</button>
+            <button type="button" class="btn" onClick={() => validated(onQuickTry)}
+              title="About 5 minutes: 3 short tests, no match needed. Not saved and not a real answer.">Quick try (5 min)</button>
             <button type="button" class="btn" onClick={onBack}>Back</button>
           </div>
         </form>

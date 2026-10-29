@@ -86,7 +86,8 @@ function Waiting({ s, onBack, onQuit }: { s: PaState; onBack(): void; onQuit(): 
   return (
     <main class="page pa">
       {justSaved && <p class="pa-saved" role="status">Test saved.</p>}
-      <p class="pa-label">{t.label}</p>
+      <p class="pa-label">{s.setup.quick ? `Quick try · ${t.label}` : t.label}</p>
+      {s.setup.quick && <p class="field-hint">No need to play a match: hold the button when you're ready.</p>}
       {game === 'finals' ? (
         <h1 class="pa-number">Type <strong>{t.gameSens}</strong> into The Finals</h1>
       ) : (
@@ -95,11 +96,11 @@ function Waiting({ s, onBack, onQuit }: { s: PaState; onBack(): void; onQuit(): 
       <p class="pa-sub">{t.cm360.toFixed(1)} cm/360
         {game === 'other' && <> · sliding the mouse {t.cm360.toFixed(1)} cm turns one full circle</>}</p>
       <div class="panel">
-        <p>Play a match, then come back.</p>
-        <p class="field-hint">After this: a 3-minute test. Tonight: {minutes} min so far.</p>
+        {!s.setup.quick && <p>Play a match, then come back.</p>}
+        <p class="field-hint">{s.setup.quick ? `Quick try: test ${s.tests.length + 1} of ${defaultConfig.playAlong.quick.tests}, about 1 minute.` : `After this: a 3-minute test. Tonight: ${minutes} min so far.`}</p>
         <HoldButton label="Hold: I'm back" holdMs={defaultConfig.playAlong.holdMs} onDone={onBack} />
       </div>
-      <button type="button" class="link" onClick={onQuit}>Save and quit</button>
+      <button type="button" class="link" onClick={onQuit}>{s.setup.quick ? 'Quit quick try' : 'Save and quit'}</button>
     </main>
   );
 }

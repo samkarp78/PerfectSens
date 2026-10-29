@@ -36,7 +36,7 @@ export type Runner = FlickRunner | SwitchRunner | TrackingRunner | TrackSwitchRu
 
 export const WARMUP_REST_TEXT = 'Warm-up — free targets at your current sens, not scored.';
 /** Play-Along: the unscored lead-in before a test. */
-export const LEADIN_REST_TEXT = 'Lead-in — 15 seconds of free targets to settle in, not scored. Then a 3-minute test.';
+export const leadInText = (ms: number): string => `Lead-in — ${Math.round(ms / 1000)} seconds of free targets to settle in, not scored. Then the test.`;
 /** Shown before a round: its four parts follow each other with a short cue in between. */
 export const ROUND_REST_TEXT = 'Next round: flick each target, clear the targets in any order, hold the button and track, then hold on the moving targets to take them down.';
 /** Shown when a single part is retried. */
@@ -161,7 +161,7 @@ export function createRunController(initial: SessionState, cfg: Config = initial
     get restText() {
       const spec = nextBlock(session);
       if (!spec) return '';
-      if (spec.kind === 'warmup') return session.mode === 'fixed' ? LEADIN_REST_TEXT : WARMUP_REST_TEXT;
+      if (spec.kind === 'warmup') return session.mode === 'fixed' ? leadInText(session._cfg.session.warmupMs) : WARMUP_REST_TEXT;
       if (spec.kind === 'switch') return SWITCH_REST_TEXT;
       if (spec.kind === 'tracking') return TRACKING_REST_TEXT;
       return spec.kind === 'trackswitch' ? TRACKSWITCH_REST_TEXT : ROUND_REST_TEXT;

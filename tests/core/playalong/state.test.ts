@@ -396,3 +396,33 @@ describe('no clear winner shows the best guess', () => {
     expect(Math.abs(num(out.result!.recommendedCm360)! - 30)).toBeLessThanOrEqual(1);
   });
 });
+
+describe('quick try (a short demo of the whole flow)', () => {
+  const quickSetup: PaSetup = { ...setup, quick: true };
+
+  it('finishes with a labelled best guess after 3 tests', () => {
+    const clock = { now: 0 };
+    let x = createPlayAlong(quickSetup, 1, 0);
+    for (let i = 0; i < 3; i++) x = play(x, clock, peaked(finals(30)));
+    expect(x.phase).toBe('finished');
+    expect(x.result!.kind).toBe('bestGuess');
+    expect(x.tests).toHaveLength(3);
+  });
+
+  it('uses short tests: one round, a short lead-in, small counts, short tracking', () => {
+    const x = answerFeel(markBack(createPlayAlong(quickSetup, 1, 0), MIN), 'right');
+    const session = testSession(x);
+    const q = defaultConfig.playAlong.quick;
+    expect(session._cfg.session.warmupMs).toBe(q.leadInMs);
+    expect(session._cfg.flick.count).toBe(q.counts.flick);
+    expect(session._cfg.switch.count).toBe(q.counts.switch);
+    expect(session._cfg.trackswitch.count).toBe(q.counts.trackswitch);
+    expect(session._cfg.tracking.durationMs + session._cfg.tracking.leadInMs).toBe(q.trackingMs);
+    expect(session.progress!.totalSteps).toBe(1);
+  });
+
+  it('a normal search is unaffected', () => {
+    const x = answerFeel(markBack(createPlayAlong(setup, 1, 0), MIN), 'right');
+    expect(testSession(x)._cfg.flick.count).toBe(defaultConfig.playAlong.counts.flick);
+  });
+});

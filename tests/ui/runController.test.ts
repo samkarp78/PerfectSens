@@ -4,7 +4,7 @@ import { createSession, nextBlock, submitBlock } from '../../src/core/session';
 import { defaultSimPlayer } from '../../src/core/sim/player';
 import { runSimSession } from '../../src/core/sim/runSession';
 import type { Setup } from '../../src/core/types';
-import { countdownBeep, countLeft, createRunController, cueText, hudText, ROUND_REST_TEXT, type RunController } from '../../src/ui/runController';
+import { countdownBeep, countLeft, createRunController, leadInText, cueText, hudText, ROUND_REST_TEXT, type RunController } from '../../src/ui/runController';
 import { configForPlayAlong, defaultConfig } from '../../src/core/config';
 import { TrackSwitchRunner } from '../../src/core/run/trackSwitchRunner';
 import { TrackingRunner } from '../../src/core/run/trackingRunner';
@@ -342,5 +342,12 @@ describe('countLeft (set-count parts)', () => {
     expect(countLeft(new TrackingRunner(spec('tracking'), 0.02, pa, 0), pa)).toBeNull();
     expect(countLeft(new FlickRunner(spec('warmup'), 0.02, pa, 0), pa)).toBeNull();
     expect(countLeft(new FlickRunner(spec('flick'), 0.02, defaultConfig, 0), defaultConfig)).toBeNull();
+  });
+});
+
+describe('leadInText', () => {
+  it('states the real lead-in length', () => {
+    expect(leadInText(15000)).toBe('Lead-in — 15 seconds of free targets to settle in, not scored. Then the test.');
+    expect(leadInText(5000)).toBe('Lead-in — 5 seconds of free targets to settle in, not scored. Then the test.');
   });
 });

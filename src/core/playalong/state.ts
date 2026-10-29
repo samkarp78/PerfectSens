@@ -13,7 +13,8 @@ import { choosePair, nextStep, type PairDecision } from './steer';
 /** The player's answer to "How did that feel?". */
 export type Feel = 'fast' | 'slow' | 'right';
 export type PaPhase = 'waiting' | 'feel' | 'testing' | 'hourCheck' | 'finished';
-export interface PaSetup { game: GameId; dpi: number; defaultCm360: number; padWidthCm: number; fov: number; fovType: FovType }
+/** quick: a quick try (a short demo of the flow), never saved and never a real answer. */
+export interface PaSetup { game: GameId; dpi: number; defaultCm360: number; padWidthCm: number; fov: number; fovType: FovType; quick?: boolean }
 /** default: the night-1 opener; pair: a higher/lower test; h2h: the head-to-head; anchor: the default re-tested to open a later night. */
 export type TestRole = 'default' | 'pair' | 'h2h' | 'anchor';
 export interface QueueItem { cm360: number; role: TestRole }
@@ -84,8 +85,17 @@ function scoreBaseline(s: PaState): ScoreBaseline | null {
   return st ? { tp: st.flick.tp, switchTp: st.switch.tp, tot: st.tracking.tot, dmg: st.trackSwitch.dmg } : null;
 }
 
+/** The settings a search runs with: a quick try swaps in its short tests (one round, short lead-in, small counts). */
+function paConfig(s: PaState, cfg: Config): Config {
+  if (!s.setup.quick) return cfg;
+  const q = cfg.playAlong.quick;
+  return { ...cfg, playAlong: { ...cfg.playAlong, roundsPerTest: 1, leadInMs: q.leadInMs, partMs: q.trackingMs,
+    counts: { ...cfg.playAlong.counts, ...q.counts } } } as unknown as Config; // the literal-typed config can't express other values
+}
+
 /** The fixed-mode session (lead-in + rounds) for the queue head. */
-export function testSession(s: PaState, cfg: Config = defaultConfig): SessionState {
+export function testSession(s: PaState, base: Config = defaultConfig): SessionState {
+  const cfg = paConfig(s, base);
   const head = s.queue[0];
   if (!head) throw new Error('testSession: nothing queued');
   const { dpi, fov, fovType, padWidthCm } = s.setup;
@@ -121,6 +131,8 @@ export function submitTest(s: PaState, done: SessionState, now: number, cfg: Con
   const next = plan({ ...s, tests: [...s.tests, test], queue: s.queue.slice(1), h2h, pendingFeel: null,
     logs: { ...s.logs, [id]: done.logs } }, cfg);
   if (next.phase === 'finished') return next;
+  // A quick try shows its results after a few tests.
+  if (s.setup.quick && next.tests.length >= cfg.playAlong.quick.tests) return finish({ ...next, queue: [] }, 'bestGuess', null, cfg);
   // Once per night, and never between the two tests of a head-to-head.
   const hour = now - s.nights[night]!.startedAt >= cfg.playAlong.hourCheckMs && s.hourCheckedNight !== night
     && next.queue[0]?.role !== 'h2h';
