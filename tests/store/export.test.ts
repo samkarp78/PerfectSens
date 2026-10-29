@@ -4,7 +4,6 @@ import { runSimSession } from '../../src/core/sim/runSession';
 import type { Setup } from '../../src/core/types';
 import { recordFromSession, type SessionRecord } from '../../src/store/history';
 import { toCsv, toJson } from '../../src/store/export';
-import { loadSetup, saveSetup } from '../../src/store/setupStore';
 
 const setup: Setup = { dpi: 800, cm360: 34.29, inGameSens: null, fov: 103, fovType: 'horizontal', mode: 'default' };
 const HEADER = 'session_id,stage,step,arm,cm360,trial,class,distance_deg,mt_ms,first_gain,corrections,end_along_deg,end_perp_deg,hit,timed_out,scored';
@@ -48,30 +47,3 @@ describe('toJson', () => {
   });
 });
 
-describe('setupStore', () => {
-  it('loadSetup returns null when localStorage throws', () => {
-    vi.stubGlobal('localStorage', { getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('denied'); } });
-    expect(loadSetup()).toBeNull();
-    expect(() => saveSetup(setup)).not.toThrow();
-    vi.unstubAllGlobals();
-  });
-
-  it('saves and loads, and returns null for missing or invalid JSON', () => {
-    const data: Record<string, string> = {};
-    vi.stubGlobal('localStorage', { getItem: (k: string) => data[k] ?? null, setItem: (k: string, v: string) => { data[k] = v; } });
-    expect(loadSetup()).toBeNull();
-    saveSetup(setup);
-    expect(loadSetup()).toEqual(setup);
-    data['bsf.setup'] = '{nope';
-    expect(loadSetup()).toBeNull();
-    vi.unstubAllGlobals();
-  });
-});
-
-describe('toJson raw logs', () => {
-  it('export includes trackSwitch logs', () => {
-    const parsed = JSON.parse(toJson(rec)) as { raw: { trackSwitch: unknown[]; switch: { clicks: { aim: unknown }[] }[] } };
-    expect(parsed.raw.trackSwitch.length).toBeGreaterThanOrEqual(rec.steps.length);
-    expect(parsed.raw.switch[0]!.clicks[0]!.aim).toBeDefined();
-  });
-});

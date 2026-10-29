@@ -11,14 +11,13 @@ export interface HistoryProps {
   history: HistoryStore | null;
   loading?: boolean;
   onBack(): void;
-  onQuickAb(s: SessionSummary): void;
   onOpen(s: SessionSummary): void;
 }
 
 const VERDICT_TEXT = { change: 'Change', keep: 'Keep', none: 'No clear winner' } as const;
 const spanOf = (s: SessionSummary): [number, number] => s.result.range ?? [s.result.recommendedCm360, s.result.recommendedCm360];
 
-export function History({ history, loading = false, onBack, onQuickAb, onOpen }: HistoryProps) {
+export function History({ history, loading = false, onBack, onOpen }: HistoryProps) {
   const [rows, setRows] = useState<SessionSummary[] | null>(null);
 
   useEffect(() => {
@@ -61,9 +60,6 @@ export function History({ history, loading = false, onBack, onQuickAb, onOpen }:
                 </div>
                 <div class="history-actions">
                   <button type="button" class="btn btn-small" onClick={() => onOpen(s)}>View results</button>
-                  {s.mode === 'full' && s.result.verdict === 'change' && (
-                    <button type="button" class="btn btn-small" onClick={() => onQuickAb(s)}>Quick A/B re-check</button>
-                  )}
                 </div>
               </li>
             );

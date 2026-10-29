@@ -1,5 +1,5 @@
 import './styles.css';
-import { UNSUPPORTED_TEXT } from './Setup';
+const UNSUPPORTED_TEXT = "Raw mouse input isn't supported in this browser. Use Chrome or Edge on a desktop computer.";
 
 export interface HomeProps {
   unsupported: boolean;
@@ -8,11 +8,10 @@ export interface HomeProps {
   onPlayAlong(): void;
   onStandard(): void;
   onHistory(): void;
-  onDemo(): void;
 }
 
 /** The first screen: what the app does and which way to use it. */
-export function Home({ unsupported, playAlongSaved, onPlayAlong, onStandard, onHistory, onDemo }: HomeProps) {
+export function Home({ unsupported, playAlongSaved, onPlayAlong, onStandard, onHistory }: HomeProps) {
   return (
     <main class="page">
       <h1 class="title">Blind Sens Finder</h1>
@@ -38,7 +37,6 @@ export function Home({ unsupported, playAlongSaved, onPlayAlong, onStandard, onH
 
       <div class="actions">
         <button type="button" class="btn" onClick={onHistory}>History</button>
-        <button type="button" class="link" onClick={onDemo}>Watch a demo</button>
       </div>
     </main>
   );
