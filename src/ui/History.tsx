@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { History as HistoryStore, SessionSummary } from '../store/history';
-import { fmt, fmtDate } from './format';
+import { exportAll } from '../store/export';
+import { download, fmt, fmtDate } from './format';
 
 export const HISTORY_UNAVAILABLE = "History isn't available in this browser window.";
 const MARGIN = 0.05;
@@ -74,7 +75,14 @@ export function History({ history, loading = false, onBack, onOpen }: HistoryPro
     <main class="page page-wide">
       <h1 class="title">History</h1>
       <section class="panel">{body}</section>
-      <div class="actions"><button type="button" class="btn" onClick={onBack}>Back</button></div>
+      <div class="actions">
+        {history && rows && rows.length > 0 && (
+          <button type="button" class="btn btn-primary" title="One file with every session, to send in as feedback"
+            onClick={() => void exportAll(history).then((json) => download(`bsf-all-${new Date().toISOString().slice(0, 10)}.json`, json, 'application/json'))}>
+            Export all</button>
+        )}
+        <button type="button" class="btn" onClick={onBack}>Back</button>
+      </div>
     </main>
   );
 }

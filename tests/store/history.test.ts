@@ -4,6 +4,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultSimPlayer } from '../../src/core/sim/player';
 import { runPlayAlongSim } from '../../src/core/sim/runPlayAlong';
 import { openHistory, recordFromPlayAlong, type SessionRecord } from '../../src/store/history';
+import { exportAll } from '../../src/store/export';
 import type { FlickBlockLog } from '../../src/core/types';
 
 const setup = { game: 'finals' as const, dpi: 800, defaultCm360: 34.29, padWidthCm: 60, fov: 103, fovType: 'horizontal' as const, quick: true };
@@ -87,5 +88,15 @@ describe('history', () => {
     vi.stubGlobal('indexedDB', { open: () => { throw new Error('blocked'); } });
     await expect(openHistory()).resolves.toBeNull();
     vi.unstubAllGlobals();
+  });
+});
+
+describe('exportAll', () => {
+  it('puts every saved session, with its raw data, in one file', async () => {
+    const h = (await openHistory())!;
+    for (const i of [1, 2]) await h.save(make(i));
+    const all = JSON.parse(await exportAll(h)) as SessionRecord[];
+    expect(all.map((r) => r.id).sort()).toEqual(['s1', 's2']);
+    expect(all[0]!.raw!.flick).toHaveLength(1);
   });
 });

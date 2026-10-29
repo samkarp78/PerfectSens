@@ -124,9 +124,6 @@ p { line-height: 1.5; }
 .bar-track { position: relative; height: 8px; margin-top: 8px; background: var(--bg); border-radius: 4px; }
 .bar { position: absolute; top: 0; bottom: 0; background: var(--accent); opacity: 0.7; border-radius: 4px; }
 
-  background: rgba(14, 17, 23, 0.85); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
-  background: rgba(14, 17, 23, 0.92); border: 1px solid var(--line); border-radius: 10px; }
-  text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); }
 
 /* Revision 2: part timer, live score, breaks, calibration. */
 .part-timer { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 2; display: flex; flex-direction: column;
