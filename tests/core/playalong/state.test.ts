@@ -226,7 +226,6 @@ describe('Play-Along search', () => {
     const x = answerFeel(markBack(play(s, clock, () => 0), clock.now + MIN), 'right');
     const session = testSession(x);
     const first = nextBlock(session)!;
-    expect(session.mode).toBe('fixed');
     expect(first.kind).toBe('flick');
     expect(first.cm360).toBe(x.queue[0]!.cm360);
     expect(session._cfg.flick.warmWave).toBe(true);

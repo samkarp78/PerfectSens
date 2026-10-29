@@ -14,7 +14,7 @@ import { FlickRunner } from '../../src/core/run/flickRunner';
 
 const CURRENT = 40;
 const setup: Setup = { dpi: 800, cm360: CURRENT, inGameSens: 33, fov: 103, fovType: 'horizontal', mode: 'default' };
-const opts = { seed: 7, warmup: false, quickAbCm360: null };
+const opts = { seed: 7, warmup: false, rounds: 3, scoreBaseline: null };
 const DPC = degPerCount(setup.dpi, CURRENT);
 
 describe('run controller', () => {
@@ -59,7 +59,7 @@ describe('run controller', () => {
     expect([...seen]).toEqual(['FlickRunner', 'SwitchRunner']);
     expect(c.phase).toBe('running'); // no rest card between the round's parts, only the short cue
     expect(c.runner).toBeInstanceOf(TrackingRunner);
-    expect(c.hud).toBe('Calibration · Tracking');
+    expect(c.hud).toBe('Test · Round 1 of 3 · Tracking');
     c.onClick(t + 1);
     c.tick(t + 1e6);
     expect(c.phase).toBe('rest'); // the idle tracking block is queued for one retry: its own rest text
@@ -74,30 +74,12 @@ describe('run controller', () => {
     const tsStart = c.cue!.endsAt;
     c.tick(tsStart);
     expect(c.runner).toBeInstanceOf(TrackSwitchRunner);
-    expect(c.hud).toBe('Calibration · Tracking switching');
+    expect(c.hud).toBe('Test · Round 1 of 3 · Tracking switching');
     c.onClick(tsStart + 1);
     c.tick(tsStart + 1e6);
     expect(c.phase).toBe('rest'); // the round is over (here the idle tracking block is queued for one retry)
     expect(c.runner).toBeNull();
     expect(createRunController(createSession(setup, opts)).restText).toBe(ROUND_REST_TEXT);
-  });
-
-  it('asks before the extra A/B round and resumes or finishes on the answer', () => {
-    let waiting = null as ReturnType<typeof runSimSession>['state'] | null;
-    for (let seed = 1; seed <= 40 && !waiting; seed++) {
-      const { state } = runSimSession(setup, defaultSimPlayer(CURRENT), { ...opts, seed, askBeforeExtending: true });
-      if (state.awaitingExtension) waiting = state;
-    }
-    expect(waiting).not.toBeNull();
-    const yes = createRunController(waiting!);
-    expect(yes.phase).toBe('asking');
-    yes.answerExtension(true);
-    expect(yes.phase).toBe('rest');
-    expect(nextBlock(yes.session)!.stage).toBe('ab');
-    const no = createRunController(waiting!);
-    no.answerExtension(false);
-    expect(no.phase).toBe('finished');
-    expect(no.session.result!.verdict).toBe('none');
   });
 
   it('onLockLost outside running is a no-op', () => {
@@ -121,30 +103,6 @@ describe('run controller', () => {
   });
 });
 
-describe('hudText', () => {
-  it('never leaks cm/360 and numbers the recheck as a normal step', () => {
-    const { blocks } = runSimSession(setup, defaultSimPlayer(CURRENT), opts);
-    let s = createSession(setup, opts);
-    const huds: string[] = [];
-    const cms = new Set<string>();
-    for (const b of blocks) {
-      if (s.progress) huds.push(hudText(s.progress));
-      cms.add(String(b.spec.cm360));
-      s = submitBlock(s, b.log);
-    }
-    expect(huds.length).toBeGreaterThan(10);
-    for (const h of huds) {
-      expect(h).not.toMatch(/cm/i);
-      for (const v of cms) if (v.length > 2) expect(h).not.toContain(v);
-    }
-    expect(huds).toContain('Dial-in 3 of 6 · Flicks');
-    expect(huds).toContain('Dial-in 3 of 6 · Switching');
-    expect(huds).toContain('Dial-in 3 of 6 · Tracking');
-    expect(huds).toContain('Calibration · Flicks');
-    expect(huds.some((h) => h.startsWith('Final Showdown'))).toBe(true);
-  });
-});
-
 describe('run controller: tracking needs the mouse button', () => {
   it('a press during tracking holds, a release lets go', async () => {
     const { createSession, nextBlock, submitBlock } = await import('../../src/core/session');
@@ -154,7 +112,7 @@ describe('run controller: tracking needs the mouse button', () => {
     const { defaultConfig } = await import('../../src/core/config');
     const { TrackingRunner } = await import('../../src/core/run/trackingRunner');
     const setup = { dpi: 800, cm360: 34, inGameSens: null, fov: 103, fovType: 'horizontal' as const, mode: 'default' as const };
-    let s = createSession(setup, { seed: 1, warmup: false, quickAbCm360: null });
+    let s = createSession(setup, { seed: 1, warmup: false, rounds: 2, scoreBaseline: null });
     for (let i = 0; i < 2; i++) { // play the round's flick and switching parts with the simulated player
       const spec = nextBlock(s)!;
       s = submitBlock(s, simulateBlock(spec, setup, defaultSimPlayer(34), { adaptedCm360: 34, blocksDone: i }, createRng(1 + i), defaultConfig, 0).log);
@@ -168,25 +126,6 @@ describe('run controller: tracking needs the mouse button', () => {
     expect(r.state.held).toBe(true);
     c.onRelease(20);
     expect(r.state.held).toBe(false);
-  });
-});
-
-describe('breaks between stretches of rounds', () => {
-  it('rests normally after most rounds and takes a break after every breakEveryRounds-th round', async () => {
-    const { restPhase } = await import('../../src/ui/runController');
-    const { simulateBlock } = await import('../../src/core/sim/simulate');
-    const { createRng } = await import('../../src/core/rng');
-    const { defaultConfig } = await import('../../src/core/config');
-    let s = createSession(setup, opts);
-    const phases: string[] = [];
-    for (let i = 0; s.steps.length < 4; i++) {
-      const before = s.steps.length;
-      const spec = nextBlock(s)!;
-      s = submitBlock(s, simulateBlock(spec, setup, defaultSimPlayer(CURRENT), { adaptedCm360: CURRENT, blocksDone: i }, createRng(i), defaultConfig, 0).log);
-      if (s.steps.length > before) phases.push(restPhase(s, true));
-    }
-    expect(phases).toEqual(['rest', 'rest', 'break', 'rest']);
-    expect(restPhase(s, false)).toBe('rest');
   });
 });
 
@@ -322,7 +261,7 @@ describe('countdownBeep', () => {
 describe('hudText in fixed mode', () => {
   it('numbers the rounds of a test and never shows a sens', () => {
     const p = { stage: 'baseline' as const, stepIndex: 1, totalSteps: 3, kind: 'flick' as const, blocksDone: 4, blocksTotal: 12 };
-    expect(hudText(p, 'fixed')).toBe('Test · Round 2 of 3 · Flicks');
+    expect(hudText(p)).toBe('Test · Round 2 of 3 · Flicks');
   });
 });
 

@@ -39,7 +39,7 @@ export const defaultConfig = {
   fit: { driftPriorSd: 0.03, familiarityPriorSd: 0.03, bootstrapSamples: 300, rangeFraction: 0.5, gridPoints: 101, minDistinctX: 4 },
   /** A/B: 'change' needs both rounds and delta > z·SE (target false change ≤ 1%). */
   ab: { minEffect: 0.03, z: 2.5 },
-  session: { dialinSteps: { default: 5, thorough: 8, quick: 3 }, warmupMs: 60000, maxRetries: 1, breakEveryRounds: 3,
+  session: { warmupMs: 60000, maxRetries: 1,
     invalidTimeoutFraction: 0.3, invalidMinTot: 0.05, invalidMinDmg: 0.05 },
   diagnose: { spreadRatioMax: 1.0, correctionsMax: 1.0, smallGainMax: 1.08, bigGainMin: 0.8,
     refTp: 5, refTot: 0.7, imbalance: 0.15, minSwitchAccuracy: 0.8,
@@ -67,10 +67,6 @@ export const defaultConfig = {
     sensitive: { yawBound: 180,
       distancesDeg: [6,8,10,12,14,15,17,18,20,21, 23,24,26,27,28,29,31,32,33,34, 40,46,52,55,58,62,66,90,120,150] },
     sim: { matchMs: 600_000, familiarityShrink: 0.5, nightSd: 0.03, maxNights: 4 } },
-  demo: { player: { optimalRatio: 0.75 } },
-  /** Quick test mode (about 5 min, for trying the tool out): shorter blocks; too little data for a reliable answer. */
-  quick: { distancesDeg: [8,12,17,21, 23,27,31,34, 40,49,58,66], flickBlockMs: 8000, wavePerClass: 1, switchBlockMs: 8000, trackingDurationMs: 7000, trackingLeadInMs: 1000,
-    trackswitchBlockMs: 8000, trackswitchLeadInMs: 1000 },
   sim: { sampleHz: 500, blockGapMs: 1000,
     player: { optimalRatio: 0.88, curvature: 2, familiarityBonus: 0.02, adaptationRate: 0.15, gainExponent: 1, motorNoise: 1,
       driftPerBlock: 0.002, familiarityTolLn: 1e-9 },
@@ -97,9 +93,9 @@ export function partMs(kind: PartKind, cfg: Config): number {
   return cfg.tracking.leadInMs + cfg.tracking.durationMs;
 }
 
-/** The config a Play-Along test block runs with: the warm-up is the short lead-in, there are no breaks, every part is
- *  playAlong.partMs long, flicks score from the first wave (the match and the lead-in already warmed the player up), and
- *  it adds the big turns (playAlong.sensitive). */
+/** The config a Play-Along test block runs with: flicks, switching and tracking switching end at set counts (the first
+ *  flick wave and switching kills are the uncounted warm-up), tracking runs playAlong.partMs, and the flicks include the
+ *  big turns (playAlong.sensitive). */
 export function configForPlayAlong(cfg: Config = defaultConfig): Config {
   const ms = cfg.playAlong.partMs;
   const hard = cfg.playAlong.sensitive;
@@ -111,20 +107,6 @@ export function configForPlayAlong(cfg: Config = defaultConfig): Config {
     switch: { ...cfg.switch, blockMs: n.switch > 0 ? n.countCapMs : ms, count: n.switch },
     tracking: { ...cfg.tracking, durationMs: ms - cfg.tracking.leadInMs },
     trackswitch: { ...cfg.trackswitch, blockMs: n.trackswitch > 0 ? n.countCapMs : ms, count: n.trackswitch },
-    session: { ...cfg.session, breakEveryRounds: Number.MAX_SAFE_INTEGER },
   } as unknown as Config;
 }
 
-/** The config a session in this mode runs with: quick mode swaps in the shorter block sizes. */
-export function configForMode(mode: 'default' | 'thorough' | 'quick', cfg: Config = defaultConfig): Config {
-  if (mode !== 'quick') return cfg;
-  const q = cfg.quick;
-  // The literal-typed config can't express a shorter distance list, hence the single cast.
-  return {
-    ...cfg,
-    flick: { ...cfg.flick, distancesDeg: q.distancesDeg, blockMs: q.flickBlockMs, wavePerClass: q.wavePerClass },
-    switch: { ...cfg.switch, blockMs: q.switchBlockMs },
-    tracking: { ...cfg.tracking, durationMs: q.trackingDurationMs, leadInMs: q.trackingLeadInMs },
-    trackswitch: { ...cfg.trackswitch, blockMs: q.trackswitchBlockMs, leadInMs: q.trackswitchLeadInMs },
-  } as unknown as Config;
-}

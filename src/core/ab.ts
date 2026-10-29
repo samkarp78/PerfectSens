@@ -1,24 +1,8 @@
 import type { Config } from './config';
-import type { Rng } from './rng';
 import type { Arm } from './types';
 
 export interface AbBlock { arm: Arm; logS: number; se: number }
 export interface AbDecision { decision: 'change' | 'keep' | 'none' | 'continue'; delta: number; se: number; look: 1 | 2 }
-
-const COIN_HALF = 0.5;
-
-const swap = (a: Arm): Arm => (a === 'P' ? 'C' : 'P');
-
-/** Arms in one ABBA / BAAB round. */
-export const AB_ROUND_LENGTH = 4;
-
-export function abSequence(rng: Rng): Arm[] {
-  return rng.next() < COIN_HALF ? ['P', 'C', 'C', 'P'] : ['C', 'P', 'P', 'C'];
-}
-
-export function extendSequence(first: Arm[]): Arm[] {
-  return first.map(swap);
-}
 
 /** Change needs both rounds: look 1 returns keep, none or continue (a would-be change continues), and look 2 says change
  *  only if look 1's delta (look1Delta) was positive too. */

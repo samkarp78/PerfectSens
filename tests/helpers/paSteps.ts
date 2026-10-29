@@ -9,7 +9,7 @@ const ITEMS = 20;
  * A finished fixed-mode test block whose Play-Along grade comes out at `grade` (relative to a block made with 0) with
  * standard error about `se`. Only the flicks vary: 20 small flicks with times spread around e^(−4·grade) s, since the
  * test grade averages four parts. gains.small sets every flick's first-move gain (1 = lands on target). Test-only: the
- * cast fills just the fields Play-Along reads (steps, logs, result). track.lead sets the tracking lead/lag (° , + = ahead).
+ * cast fills just the fields Play-Along reads (steps, logs, done). track.lead sets the tracking lead/lag (° , + = ahead).
  */
 export function fakeDone(cm360: number, grade: number, se = 0.02, rounds = 2, gains: { small?: number } = {},
   track: { lead?: number } = {}): SessionState {
@@ -22,5 +22,5 @@ export function fakeDone(cm360: number, grade: number, se = 0.02, rounds = 2, ga
     order: i, stage: 'baseline', arm: null, cm360, trials: i === 0 ? trials : [], flick: flickSummary(), switch: switchSummary(),
     tracking: trackingSummary({ logTotSe: 0, leadLagDeg: track.lead ?? 0 }), trackSwitch: trackSwitchSummary({ leadLagDeg: null }), score: { logS: grade, se },
   }));
-  return { steps, logs: { flick: [], switch: [], tracking: [], trackSwitch: [] }, result: {}, mode: 'fixed' } as unknown as SessionState;
+  return { steps, logs: { flick: [], switch: [], tracking: [], trackSwitch: [] }, done: true } as unknown as SessionState;
 }

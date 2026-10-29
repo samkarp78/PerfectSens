@@ -10,44 +10,25 @@ export const POINTS = {
   trackPerSecond: 100,
 };
 
-/** Grade thresholds on a stretch's mean score vs the calibration round (log ratio). */
-const GRADES: [number, string][] = [[0.06, 'S'], [0.02, 'A'], [-0.02, 'B'], [-0.06, 'C']];
-export function gradeFor(logS: number): string {
-  for (const [min, g] of GRADES) if (logS >= min) return g;
-  return 'D';
-}
-
 export interface ScoreState { points: number; streak: number; bestStreak: number; hits: number; shots: number }
-export interface Stretch { points: number; bestStreak: number; hits: number; shots: number }
 export interface ScoreKeeper {
   readonly state: ScoreState;
   hit(ms: number): void;
   miss(): void;
   track(dtMs: number, onTarget: boolean): void;
-  /** The totals since the previous call (one stretch between breaks), then starts a new stretch. */
-  stretch(): Stretch;
 }
 
 export function createScoreKeeper(): ScoreKeeper {
   const s: ScoreState = { points: 0, streak: 0, bestStreak: 0, hits: 0, shots: 0 };
-  let mark = { points: 0, hits: 0, shots: 0 };
-  let stretchBest = 0;
   return {
     get state() { return { ...s }; },
     hit(ms) {
       s.points += Math.round((POINTS.hit + POINTS.speedBonus(ms)) * POINTS.multiplier(s.streak));
       s.streak++; s.hits++; s.shots++;
       s.bestStreak = Math.max(s.bestStreak, s.streak);
-      stretchBest = Math.max(stretchBest, s.streak);
     },
     miss() { s.streak = 0; s.shots++; },
     track(dtMs, onTarget) { if (onTarget) s.points += Math.round((POINTS.trackPerSecond * dtMs) / 1000); },
-    stretch() {
-      const out = { points: s.points - mark.points, bestStreak: stretchBest, hits: s.hits - mark.hits, shots: s.shots - mark.shots };
-      mark = { points: s.points, hits: s.hits, shots: s.shots };
-      stretchBest = s.streak;
-      return out;
-    },
   };
 }
 

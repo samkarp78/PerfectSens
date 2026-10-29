@@ -1,31 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { defaultConfig } from '../../src/core/config';
 import { createRng } from '../../src/core/rng';
-import { abSequence, decideAB, extendSequence, type AbBlock } from '../../src/core/ab';
+import { decideAB, type AbBlock } from '../../src/core/ab';
 import type { Arm } from '../../src/core/types';
 
 const mk = (p: number, c: number, se: number): AbBlock[] => [
   { arm: 'P', logS: p, se }, { arm: 'C', logS: c, se }, { arm: 'C', logS: c, se }, { arm: 'P', logS: p, se },
 ];
-
-describe('abSequence', () => {
-  it('is one of the two ABBA patterns', () => {
-    for (let seed = 1; seed < 20; seed++) {
-      const s = abSequence(createRng(seed)).join('');
-      expect(['PCCP', 'CPPC']).toContain(s);
-    }
-  });
-  it('produces both patterns across seeds', () => {
-    const seen = new Set(Array.from({ length: 40 }, (_, i) => abSequence(createRng(i + 1)).join('')));
-    expect(seen.size).toBe(2);
-  });
-  it('extended sequence balances positions', () => {
-    const s = abSequence(createRng(3));
-    const all: Arm[] = [...s, ...extendSequence(s)];
-    const sum = (a: Arm) => all.reduce((acc, x, i) => acc + (x === a ? i : 0), 0);
-    expect(sum('P')).toBe(sum('C'));
-  });
-});
 
 describe('decideAB', () => {
   const cfg = defaultConfig;

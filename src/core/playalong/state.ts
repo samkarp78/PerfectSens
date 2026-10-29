@@ -105,8 +105,8 @@ export function testSession(s: PaState, base: Config = defaultConfig): SessionSt
   // sameTargets: one seed for every test, so every sens is measured on the identical target list.
   const seed = Math.floor(rootFork(s, cfg.playAlong.sameTargets ? 'test' : `test-${s.tests.length}`).next() * SEED_RANGE);
   // No lead-in: the first wave of flicks (and the first switching kills) are the uncounted warm-up.
-  return createSession(setup, { seed, warmup: false, quickAbCm360: null,
-    fixed: { rounds: cfg.playAlong.roundsPerTest, scoreBaseline: scoreBaseline(s) } }, configForPlayAlong(cfg));
+  return createSession(setup, { seed, warmup: false, rounds: cfg.playAlong.roundsPerTest, scoreBaseline: scoreBaseline(s) },
+    configForPlayAlong(cfg));
 }
 
 export function abandonTest(s: PaState, now: number): PaState {
@@ -118,7 +118,7 @@ export function abandonTest(s: PaState, now: number): PaState {
 
 export function submitTest(s: PaState, done: SessionState, now: number, cfg: Config = defaultConfig): PaState {
   if (s.phase !== 'testing') throw new Error(`submitTest: phase is ${s.phase}`);
-  if (!done.result || done.steps.length === 0) throw new Error('submitTest: the test block is not finished');
+  if (!done.done || done.steps.length === 0) throw new Error('submitTest: the test block is not finished');
   const head = s.queue[0]!;
   const night = s.nights.length - 1;
   const id = `t${s.tests.length}`;

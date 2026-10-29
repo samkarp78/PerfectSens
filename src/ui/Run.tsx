@@ -11,9 +11,9 @@ import { offscreenArrow } from '../scene/camera';
 import { angleBetween, vfovDeg } from '../core/geometry';
 import type { Aim } from '../core/types';
 import { COUNTDOWN_BEEPS_FROM_S, countdownBeep, countLeft, createRunController, cueText, type Runner, type RunController, type RunPhase } from './runController';
-import { createScoreKeeper, flickEvents, gradeFor, switchEvents, trackSwitchEvents, type ScoreState } from './scoreKeeper';
+import { createScoreKeeper, flickEvents, switchEvents, trackSwitchEvents, type ScoreState } from './scoreKeeper';
 import { createSounds } from './sound';
-import { AskCard, BreakCard, Countdown, type BreakStats } from './RunCards';
+import { Countdown } from './RunCards';
 import type { Prefs } from '../store/prefs';
 
 export interface RunProps {
@@ -76,7 +76,6 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit, hideSco
   const [quitArmed, setQuitArmed] = useState(false);
   const [locked, setLocked] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const [breakStats, setBreakStats] = useState<BreakStats | null>(null);
 
   // While the mouse stays locked between rounds, count down and start the next round on its own.
   useEffect(() => {
@@ -135,16 +134,9 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit, hideSco
       const v = viewOf(ctrl);
       const wasRunning = last.phase === 'running' || last.phase === 'cue';
       last = v;
-      if (v.phase === 'break') {
-        const every = ctrl.session._cfg.session.breakEveryRounds;
-        const recent = ctrl.session.steps.slice(-every);
-        const mean = recent.reduce((s, st) => s + st.score.logS, 0) / Math.max(1, recent.length);
-        setBreakStats({ ...keeper.stretch(), grade: ctrl.session.mode === 'quickab' ? null : gradeFor(mean) });
-      }
       setView(v);
-      // Between rounds the lock is kept for the countdown (unless auto-continue is off); it is released for
-      // breaks, questions and the end.
-      const release = v.phase === 'break' || v.phase === 'asking' || v.phase === 'finished' || (v.phase === 'rest' && !prefs.autoContinue);
+      // Between rounds the lock is kept for the countdown (unless auto-continue is off); it is released at the end.
+      const release = v.phase === 'finished' || (v.phase === 'rest' && !prefs.autoContinue);
       if (wasRunning && release && document.pointerLockElement) document.exitPointerLock();
       if (v.phase === 'finished') cbRef.current.onFinished(ctrl.session, keeper.state);
     };
@@ -329,7 +321,6 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit, hideSco
   };
 
   const card = (view.phase === 'rest' && !locked) || view.phase === 'paused';
-  const answer = (accept: boolean) => { ctrl.answerExtension(accept); setView(viewOf(ctrl)); };
   const warmup = view.phase === 'rest' && view.hud === 'Warm-up';
   const lead = view.hud === 'Warm-up' || view.hud === 'Lead-in';
   const rounds = view.total / BLOCKS_PER_STEP;
@@ -366,14 +357,6 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit, hideSco
       <div ref={arrowRef} class="offscreen-arrow" aria-hidden="true" />
       <div ref={holdRef} class="hold-prompt" aria-live="polite">Hold the mouse button</div>
       {countdown !== null && <Countdown text={view.restText} n={countdown} />}
-      {view.phase === 'asking' && <AskCard reason={ctrl.session.extensionReason ?? 'close'} onAnswer={answer} />}
-      {view.phase === 'break' && (
-        <div class="rest-overlay">
-          <BreakCard stats={breakStats} onContinue={() => void start()} />
-          {denied && <p class="rest-warn">{LOCK_DENIED_TEXT}</p>}
-          {quit}
-        </div>
-      )}
       {card && (
         <div class="rest-overlay">
           <div class="rest-card" role="button" tabIndex={0} onClick={start}

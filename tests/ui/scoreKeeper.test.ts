@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createScoreKeeper, gradeFor, flickEvents, switchEvents, trackSwitchEvents, POINTS } from '../../src/ui/scoreKeeper';
+import { createScoreKeeper, flickEvents, switchEvents, trackSwitchEvents, POINTS } from '../../src/ui/scoreKeeper';
 import type { FlickTrial } from '../../src/core/types';
 
 const trial = (o: Partial<FlickTrial>): FlickTrial => ({
@@ -28,15 +28,6 @@ describe('ScoreKeeper', () => {
     k.track(500, true); k.track(500, false);
     expect(k.state.points).toBe(Math.round(POINTS.trackPerSecond * 0.5));
   });
-  it('stretch() returns and resets the stretch totals while the session totals keep growing', () => {
-    const k = createScoreKeeper();
-    k.hit(300); k.hit(300); k.miss();
-    const s = k.stretch();
-    expect(s.bestStreak).toBe(2);
-    expect(s.points).toBe(k.state.points);
-    k.hit(300);
-    expect(k.stretch().points).toBeLessThan(k.state.points);
-  });
 });
 
 describe('event diffs', () => {
@@ -55,16 +46,6 @@ describe('event diffs', () => {
   it('switch: new clicks map to hits (with the interval since the previous kill) and misses', () => {
     const log = { t0: 0, kills: [{ t: 400, target: { yaw: 0, pitch: 0 }, from: { yaw: 0, pitch: 0 } }], clicks: [{ t: 300, aim: { yaw: 0, pitch: 0 }, hit: false }, { t: 400, aim: { yaw: 0, pitch: 0 }, hit: true }] };
     expect(switchEvents(log, 0)).toEqual({ events: [{ hit: false, ms: 0 }, { hit: true, ms: 400 }], next: 2 });
-  });
-});
-
-describe('gradeFor', () => {
-  it('grades a stretch by its score relative to the calibration round', () => {
-    expect(gradeFor(0.08)).toBe('S');
-    expect(gradeFor(0.03)).toBe('A');
-    expect(gradeFor(0)).toBe('B');
-    expect(gradeFor(-0.04)).toBe('C');
-    expect(gradeFor(-0.2)).toBe('D');
   });
 });
 

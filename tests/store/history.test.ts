@@ -2,34 +2,24 @@ import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultSimPlayer } from '../../src/core/sim/player';
-import { runSimSession } from '../../src/core/sim/runSession';
-import type { Setup } from '../../src/core/types';
-import { openHistory, recordFromSession, type SessionRecord } from '../../src/store/history';
+import { runPlayAlongSim } from '../../src/core/sim/runPlayAlong';
+import { openHistory, recordFromPlayAlong, type SessionRecord } from '../../src/store/history';
+import type { FlickBlockLog } from '../../src/core/types';
 
-const setup: Setup = { dpi: 800, cm360: 34.29, inGameSens: null, fov: 103, fovType: 'horizontal', mode: 'default' };
+const setup = { game: 'finals' as const, dpi: 800, defaultCm360: 34.29, padWidthCm: 60, fov: 103, fovType: 'horizontal' as const, quick: true };
 let base: SessionRecord;
 
 beforeAll(() => {
-  const { state } = runSimSession(setup, defaultSimPlayer(34.29), { seed: 3, warmup: false, quickAbCm360: null });
-  base = recordFromSession(state, new Date('2026-10-27T10:00:00Z'), 'base');
+  const { state } = runPlayAlongSim(setup, defaultSimPlayer(34.29), 3);
+  base = recordFromPlayAlong(state, new Date('2026-10-27T10:00:00Z'), 'base');
 });
 
-// Full raw logs make fake-indexeddb's structured clone slow; a small slice is enough to tell raw from null.
+// A stand-in raw log is enough to tell raw from null (the simulator keeps no raw logs).
 const make = (i: number): SessionRecord => ({
-  ...base, steps: base.steps.slice(0, 1), raw: { flick: base.raw!.flick.slice(0, 1), switch: [], tracking: [], trackSwitch: [] }, id: `s${i}`, createdAt: new Date(Date.UTC(2026, 9, 1 + i)).toISOString(),
+  ...base, steps: base.steps.slice(0, 1), raw: { flick: [{ t0: 0 } as unknown as FlickBlockLog], switch: [], tracking: [], trackSwitch: [] }, id: `s${i}`, createdAt: new Date(Date.UTC(2026, 9, 1 + i)).toISOString(),
 });
 
 beforeEach(() => { globalThis.indexedDB = new IDBFactory(); });
-
-describe('recordFromSession', () => {
-  it('builds a record and throws without a result', () => {
-    const { state } = runSimSession(setup, defaultSimPlayer(34.29), { seed: 3, warmup: false, quickAbCm360: null });
-    const r = recordFromSession(state, new Date('2026-10-27T10:00:00Z'), 'x');
-    expect(r.createdAt).toBe('2026-10-27T10:00:00.000Z');
-    expect(r.raw).toEqual(state.logs);
-    expect(() => recordFromSession({ ...state, result: null }, new Date(), 'y')).toThrow();
-  });
-});
 
 describe('history', () => {
   it('lists newest first without raw or steps', async () => {
@@ -83,7 +73,7 @@ describe('history', () => {
 
   it('rejects when even the save without raw fails', async () => {
     const h = (await openHistory())!;
-    const bad = { ...make(1), setup: (() => 1) as unknown as Setup } as SessionRecord;
+    const bad = { ...make(1), setup: (() => 1) as unknown as SessionRecord['setup'] } as SessionRecord;
     await expect(h.save(bad)).rejects.toBeTruthy();
   });
 

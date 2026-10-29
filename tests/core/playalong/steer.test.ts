@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { defaultConfig } from '../../../src/core/config';
 import { finalsToCm360, gameSensOf } from '../../../src/core/playalong/gameSens';
 import { choosePair, nextStep, type PairContext } from '../../../src/core/playalong/steer';
-import { maxTestCm360 } from '../../../src/core/steer';
 
 const finals = (sens: number): number => finalsToCm360(sens, 800);
 const ctx = (o: Partial<PairContext>): PairContext => ({
@@ -18,7 +17,7 @@ describe('choosePair', () => {
 
   it('too slow for the pad moves to the slowest sens that fits', () => {
     const c = ctx({ game: 'other', defaultCm360: 30, centerCm360: 30, padWidthCm: 18, testedCm360: [30] });
-    const cap = maxTestCm360(30, 18, defaultConfig);
+    const cap = 2 * defaultConfig.pad.turnFraction * 18;
     const d = choosePair(c);
     expect(d.targets).toHaveLength(2);
     expect(d.targets[1]).toBeCloseTo(cap, 9);
@@ -26,7 +25,7 @@ describe('choosePair', () => {
   });
 
   it('a clamped side already tested is skipped', () => {
-    const cap = maxTestCm360(30, 18, defaultConfig);
+    const cap = 2 * defaultConfig.pad.turnFraction * 18;
     const d = choosePair(ctx({ game: 'other', defaultCm360: 30, centerCm360: 30, padWidthCm: 18, testedCm360: [30, cap] }));
     expect(d.targets).toHaveLength(1);
     expect(d.targets[0]).toBeCloseTo(25, 9);

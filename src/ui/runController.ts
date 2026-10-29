@@ -4,13 +4,11 @@ import { FlickRunner } from '../core/run/flickRunner';
 import { SwitchRunner } from '../core/run/switchRunner';
 import { TrackingRunner } from '../core/run/trackingRunner';
 import { TrackSwitchRunner } from '../core/run/trackSwitchRunner';
-import { extendAb, nextBlock, submitBlock, type SessionState } from '../core/session';
+import { nextBlock, submitBlock, type SessionState } from '../core/session';
 import type { MoveSample } from '../core/types';
 
-/** 'asking': the first A/B round was too close to call and the player chooses whether to play the second. */
-/** 'break': a longer pause after every few rounds (the player clicks to go on). */
 /** 'cue': the short unscored handover between two parts of a round (mouse stays locked, input ignored). */
-export type RunPhase = 'rest' | 'running' | 'cue' | 'paused' | 'break' | 'asking' | 'finished';
+export type RunPhase = 'rest' | 'running' | 'cue' | 'paused' | 'finished';
 export interface Cue { kind: PartKind; startedAt: number; endsAt: number }
 
 export interface RunController {
@@ -25,7 +23,6 @@ export interface RunController {
   tick(t: number): void;
   onLockLost(): void;
   skipWarmup(): void;
-  answerExtension(accept: boolean): void;
   readonly runner: Runner | null;
   /** The handover in progress (phase 'cue'), else null. */
   readonly cue: Cue | null;
@@ -53,16 +50,9 @@ const follows = (prev: string, next: string | undefined): boolean => {
   return i >= 0 && i + 1 < PART_KINDS.length && PART_KINDS[i + 1] === next;
 };
 
-/** HUD label for a block. Never contains a sensitivity value; the recheck reads as a normal step. */
-export function hudText(p: Progress, mode: SessionState['mode'] = 'full'): string {
-  if (mode === 'fixed') return `Test · Round ${p.stepIndex + 1} of ${p.totalSteps} · ${kindLabel(p)}`;
-  switch (p.stage) {
-    case 'warmup': return 'Warm-up';
-    case 'baseline': return `Calibration · ${kindLabel(p)}`;
-    case 'dialin':
-    case 'recheck': return `Dial-in ${p.stepIndex + 1} of ${p.totalSteps} · ${kindLabel(p)}`;
-    case 'ab': return `Final Showdown · ${kindLabel(p)}`;
-  }
+/** HUD label for a block. Never contains a sensitivity value. */
+export function hudText(p: Progress): string {
+  return p.stage === 'warmup' ? 'Warm-up' : `Test · Round ${p.stepIndex + 1} of ${p.totalSteps} · ${kindLabel(p)}`;
 }
 
 /** Targets (or kills) left in a set-count part (spec 21), or null for a timed part (tracking, the lead-in, Standard). */
@@ -95,19 +85,14 @@ export function countdownBeep(prevLeftMs: number, leftMs: number): number | null
   return now < was && now >= 1 && now <= COUNTDOWN_BEEPS_FROM_S ? now : null;
 }
 
-/** Where the run goes once no block is running: the end, the A/B question, a break after every
- *  session.breakEveryRounds-th completed round, or a normal rest. */
-export function restPhase(session: SessionState, completedRound: boolean): RunPhase {
-  if (session.result) return 'finished';
-  if (session.awaitingExtension) return 'asking';
-  const every = session._cfg.session.breakEveryRounds;
-  if (completedRound && session.steps.length % every === 0 && nextBlock(session)) return 'break';
-  return 'rest';
+/** Where the run goes once no block is running: the end, or a rest before the next round or part. */
+export function restPhase(session: SessionState): RunPhase {
+  return session.done ? 'finished' : 'rest';
 }
 
 export function createRunController(initial: SessionState, cfg: Config = initial._cfg): RunController {
   let session = initial;
-  let phase: RunPhase = session.result ? 'finished' : session.awaitingExtension ? 'asking' : 'rest';
+  let phase: RunPhase = restPhase(session);
   let runner: Runner | null = null;
   let cue: Cue | null = null;
   /** The part whose cue was interrupted by a pause; resuming replays that cue. */
@@ -116,10 +101,10 @@ export function createRunController(initial: SessionState, cfg: Config = initial
    *  counts as held from the start of the next hold part. */
   let buttonDown = false;
 
-  const settle = (completedRound = false): void => {
+  const settle = (): void => {
     runner = null;
     cue = null;
-    phase = restPhase(session, completedRound);
+    phase = restPhase(session);
   };
 
   const start = (t: number): void => {
@@ -144,9 +129,8 @@ export function createRunController(initial: SessionState, cfg: Config = initial
   const checkDone = (t: number): void => {
     if (!runner || !runner.state.done) return;
     const kind = runner.log().spec.kind;
-    const rounds = session.steps.length;
     session = submitBlock(session, runner.log());
-    settle(session.steps.length > rounds);
+    settle();
     const next = nextBlock(session)?.kind;
     if (follows(kind, next) && phase === 'rest') startCue(t, next as PartKind);
   };
@@ -156,7 +140,7 @@ export function createRunController(initial: SessionState, cfg: Config = initial
     get session() { return session; },
     get runner() { return runner; },
     get cue() { return cue; },
-    get hud() { return session.progress ? hudText(session.progress, session.mode) : ''; },
+    get hud() { return session.progress ? hudText(session.progress) : ''; },
     get restText() {
       const spec = nextBlock(session);
       if (!spec) return '';
@@ -166,7 +150,7 @@ export function createRunController(initial: SessionState, cfg: Config = initial
       return spec.kind === 'trackswitch' ? TRACKSWITCH_REST_TEXT : ROUND_REST_TEXT;
     },
     begin(t) {
-      if (phase !== 'rest' && phase !== 'paused' && phase !== 'break') return;
+      if (phase !== 'rest' && phase !== 'paused') return;
       const replay = phase === 'paused' ? pausedCue : null;
       pausedCue = null;
       if (replay) startCue(t, replay);
@@ -206,11 +190,6 @@ export function createRunController(initial: SessionState, cfg: Config = initial
       if (phase !== 'rest') return;
       if (nextBlock(session)?.kind !== 'warmup') return;
       session = submitBlock(session, null);
-      settle();
-    },
-    answerExtension(accept) {
-      if (phase !== 'asking') return;
-      session = extendAb(session, accept);
       settle();
     },
   };

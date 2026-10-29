@@ -2,7 +2,6 @@ import { defaultConfig, type Config } from '../core/config';
 import type { AbDecision } from '../core/ab';
 import type { SessionResult } from '../core/result';
 import type { SessionState } from '../core/session';
-import type { SteerDecision } from '../core/steer';
 import type { Setup, StepResult } from '../core/types';
 import { gameSensOf } from '../core/playalong/gameSens';
 import type { DiscardedTest, PaResult, PaSetup, PaState, PaTest } from '../core/playalong/state';
@@ -12,7 +11,7 @@ export type RecordMode = 'full' | 'quickab' | 'playalong';
 /** playAlong: the search's own setup, tests and result (Play-Along records only). */
 export interface SessionRecord {
   id: string; createdAt: string; mode: RecordMode; setup: Setup; result: SessionResult;
-  steps: StepResult[]; steerLog: SteerDecision[]; abDecisions: AbDecision[]; raw: SessionState['logs'] | null;
+  steps: StepResult[]; raw: SessionState['logs'] | null;
   playAlong?: { setup: PaSetup; tests: PaTest[]; result: PaResult; nights: { startedAt: number }[]; steerLog: PairDecision[];
     discarded: DiscardedTest[] };
 }
@@ -53,19 +52,11 @@ export function recordFromPlayAlong(s: PaState, now: Date, id: string): SessionR
   };
   return {
     id, createdAt: now.toISOString(), mode: 'playalong', setup, result, steps: s.tests.flatMap((t) => t.steps),
-    steerLog: [], abDecisions: r.h2h ? [r.h2h] : [], raw,
+    raw,
     playAlong: { setup: s.setup, tests: s.tests, result: r, nights: s.nights, steerLog: s.steerLog, discarded: s.discarded ?? [] },
   };
 }
 
-export function recordFromSession(s: SessionState, now: Date, id: string): SessionRecord {
-  if (!s.result) throw new Error('Session has no result yet');
-  if (s.mode === 'fixed') throw new Error('A Play-Along test block is saved with its search, not on its own');
-  return {
-    id, createdAt: now.toISOString(), mode: s.mode, setup: s.setup, result: s.result,
-    steps: s.steps, steerLog: s.steerLog, abDecisions: s.abDecisions, raw: s.logs,
-  };
-}
 
 const wrap = <T>(req: IDBRequest<T>): Promise<T> =>
   new Promise((resolve, reject) => { req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); });
