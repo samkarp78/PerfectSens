@@ -61,7 +61,7 @@ export const defaultConfig = {
     sameTargets: false as boolean,
     /** Quick try: a short demo of the whole flow, never a real answer. tests: then it shows the results; each test is one
      *  round with a short lead-in, small counts and short tracking (trackingMs, lead-in included). */
-    quick: { tests: 3, leadInMs: 5000, trackingMs: 8000, counts: { flick: 7, switch: 10, trackswitch: 4 } },
+    quick: { tests: 3, leadInMs: 5000, trackingMs: 8000, counts: { flick: 6, switch: 10, trackswitch: 4 } }, // flicks in sets of 3
     sensitive: { yawBound: 180,
       distancesDeg: [6,8,10,12,14,15,17,18,20,21, 23,24,26,27,28,29,31,32,33,34, 40,46,52,55,58,62,66,90,120,150] },
     sim: { matchMs: 600_000, familiarityShrink: 0.5, nightSd: 0.03, maxNights: 4 } },

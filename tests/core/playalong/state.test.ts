@@ -426,3 +426,27 @@ describe('quick try (a short demo of the whole flow)', () => {
     expect(testSession(x)._cfg.flick.count).toBe(defaultConfig.playAlong.counts.flick);
   });
 });
+
+describe('quick-try fixes', () => {
+  it('a near-tie best guess goes to the sens that felt about right', () => {
+    const clock = { now: 0 };
+    let x = createPlayAlong({ ...setup, quick: true }, 1, 0);
+    // 27 scores a hair better than 33 (well within noise) but felt too slow; 33 felt right; 40 is clearly worse.
+    const score = (cm: number): number => (num(cm) === 40 ? -0.15 : num(cm) === 27 ? 0.02 : 0);
+    const feel = (cm: number): Feel => (num(cm) === 33 ? 'right' : num(cm) === 27 ? 'slow' : 'fast');
+    for (let i = 0; i < 3; i++) x = play(x, clock, score, feel, MIN, 0.05);
+    expect(x.result!.kind).toBe('bestGuess');
+    expect(num(x.result!.recommendedCm360)).toBe(33);
+  });
+
+  it('the saved direction compares lag with the player own average, not zero', () => {
+    const { s, clock } = fresh();
+    let x = s;
+    for (let i = 0; i < 3; i++) {
+      const head = x.queue[0]!;
+      clock.now += MIN;
+      x = submitTest(answerFeel(markBack(x, clock.now), 'right'), fakeDone(head.cm360, 0, 0.03, 2, {}, { lead: -1.5 }), clock.now);
+    }
+    expect(x.tests.every((t) => t.direction.dir === 'none')).toBe(true);
+  });
+});

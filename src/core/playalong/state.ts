@@ -128,7 +128,8 @@ export function submitTest(s: PaState, done: SessionState, now: number, cfg: Con
     logS: grade.logS, se: grade.se, parts, direction: directionSignal(directionInputs(done, cfg), cfg),
   };
   const h2h = s.h2h && head.role === 'h2h' ? { ...s.h2h, testIds: [...s.h2h.testIds, id] } : s.h2h;
-  const next = plan({ ...s, tests: [...s.tests, test], queue: s.queue.slice(1), h2h, pendingFeel: null,
+  const tests = relativeDirections([...s.tests, test], cfg);
+  const next = plan({ ...s, tests, queue: s.queue.slice(1), h2h, pendingFeel: null,
     logs: { ...s.logs, [id]: done.logs } }, cfg);
   if (next.phase === 'finished') return next;
   // A quick try shows its results after a few tests.
@@ -165,6 +166,22 @@ function shuffled<T>(s: PaState, items: T[], label: string): T[] {
  * Direction (spec 19.2): the centre's latest test says which way to go. Overshooting or running ahead (too fast) moves
  * the centre half a step slower (a higher cm/360); undershooting or trailing, half a step faster.
  */
+/** Each test keeps its raw lag measurements, but its direction (dir, signal) is judged against the player's own average
+ *  lag across the search, recomputed as tests are added. */
+function relativeDirections(tests: PaTest[], cfg: Config): PaTest[] {
+  const avgOf = (key: 'leadDeg' | 'tsLeadDeg'): number => {
+    const v = tests.map((t) => t.direction[key]).filter((x): x is number => x !== null);
+    return v.length === 0 ? 0 : mean(v);
+  };
+  const lead = avgOf('leadDeg'), ts = avgOf('tsLeadDeg');
+  return tests.map((t) => {
+    const d = t.direction;
+    const rel = directionSignal({ overshoot: d.overshoot, leadDeg: d.leadDeg === null ? null : d.leadDeg - lead,
+      tsLeadDeg: d.tsLeadDeg === null ? null : d.tsLeadDeg - ts }, cfg);
+    return { ...t, direction: { ...d, signal: rel.signal, dir: rel.dir } };
+  });
+}
+
 export function directionNudge(s: PaState, center: number, step: number = s.step, cfg: Config = defaultConfig): { cm360: number; reason: string } {
   const at = testsAt(s, center);
   const raw = at[at.length - 1]?.direction;
@@ -253,9 +270,17 @@ export function feelFlagsOf(tests: PaTest[], game: GameId): { cm360: number; fee
   return flags;
 }
 
+/** Without a range: the best-scoring test, but among the tests within noise of it, one that felt 'About right' wins. */
+function nearTiePick(s: PaState, cfg: Config): number {
+  const best = s.tests.reduce((a, t) => (t.logS > a.logS ? t : a));
+  const tied = s.tests.filter((t) => t.logS >= best.logS - Math.hypot(best.se, t.se) && allRight(testsAt(s, t.cm360)));
+  if (tied.length === 0) return leader(s, cfg);
+  return tied.reduce((a, t) => (t.logS > a.logS ? t : a)).cm360;
+}
+
 function bestGuess(s: PaState, fit: FitResult | null, cfg: Config): number {
   const range = fit?.range;
-  if (!range) return leader(s, cfg);
+  if (!range) return nearTiePick(s, cfg);
   const [lo, hi] = range;
   const inRange = s.tests.filter((t) => t.cm360 >= lo && t.cm360 <= hi && allRight(testsAt(s, t.cm360)));
   if (inRange.length > 0) {
