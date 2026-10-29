@@ -713,3 +713,17 @@ Re-check after the edge rule and wider limits: null false change **0/300** (keep
 - **The stated range** holds the true best in 91% of runs, with a median width of 33%.
 
 With realistic noise, 3 nights pin a sens down to about ±15%, not ±5%, unless the sweet spot is sharp. Precision grows only with √(tests), so ±5% would take roughly 9× the data. The bigger lever is a more sensitive test.
+
+## 20. A more sensitive test, Play-Along only (2026-10-29)
+
+Real data showed the test barely separates sens: about ±15% precision after 3 nights, even with a correct search. To make a wrong sens cost more per minute, Play-Along (`playAlong.sensitive`) changes the targets:
+- **Head-sized targets:** flick and switching radius 0.8° (was 1.5°); tracking and tracking-switching radius 1.2° (was 2°). A too-fast sens should show as misses and corrections.
+- **Big turns:** three of the long flicks are 90°, 120° and 150° turns (yaw bound ±180°). A too-slow sens should show as slow, short turns. Placement tries a level turn when every tilted direction would leave the pitch bounds.
+
+**Standard keeps the original targets.** With harder targets, Standard's one short round per sens got too noisy for its tuned thresholds: false change went to 1.7%, convergence to 72/100 and test-retest to 12/20. Restored, it passes again (convergence 89/100, test-retest 18/20, null 0.3%).
+
+**Fixed:** the run screen drew targets at the default size instead of the session's. Play-Along would have shown 1.5° targets while hits only counted within 0.8°.
+
+**Play-Along with the sensitive test:** null false change 0.3%; convergence 76/80 within ±8%.
+
+**Not verifiable by bots:** whether the sensitive test separates sens better for real players. The simulator has no "fast sens hurts small-target precision" effect. It needs real Play-Along data.

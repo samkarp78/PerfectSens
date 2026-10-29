@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import './styles.css';
-import { defaultConfig } from '../core/config';
 import { BLOCKS_PER_STEP, type SessionState } from '../core/session';
 import { FlickRunner } from '../core/run/flickRunner';
 import { SwitchRunner } from '../core/run/switchRunner';
@@ -109,9 +108,9 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit, hideSco
     const { setup } = ctrl.session;
     const cfg = ctrl.session._cfg;
     const scene = createScene(canvas, {
-      fov: setup.fov, fovType: setup.fovType, targetRadiusDeg: defaultConfig.flick.targetRadiusDeg,
-      trackingRadiusDeg: defaultConfig.tracking.targetRadiusDeg, switchRadiusDeg: defaultConfig.switch.targetRadiusDeg,
-      trackSwitchRadiusDeg: defaultConfig.trackswitch.targetRadiusDeg,
+      fov: setup.fov, fovType: setup.fovType, targetRadiusDeg: cfg.flick.targetRadiusDeg,
+      trackingRadiusDeg: cfg.tracking.targetRadiusDeg, switchRadiusDeg: cfg.switch.targetRadiusDeg,
+      trackSwitchRadiusDeg: cfg.trackswitch.targetRadiusDeg,
     });
     const showArrow = (aim: Aim, target: Aim | null) => {
       const el = arrowRef.current;

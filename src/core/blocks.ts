@@ -36,12 +36,13 @@ function nextAim(prev: Aim, distance: number, rng: Rng, cfg: Config): Aim {
     -theta,                // mirror vertically
     theta + HALF_TURN_DEG, // both
     Math.atan2(-prev.pitch, -prev.yaw) * DEG, // toward centre
+    0, HALF_TURN_DEG,      // level, either way (big turns: any tilt over 150° leaves the pitch bounds)
   ];
   for (const c of candidates) {
     const a = offsetAim(prev, distance, c);
     if (inBounds(a, cfg.flick.bounds)) return a;
   }
-  return offsetAim(prev, distance, at(candidates, candidates.length - 1));
+  return offsetAim(prev, distance, at(candidates, 4)); // toward centre
 }
 
 export function makeFlickTargets(spec: BlockSpec, cfg: Config): FlickTarget[] {

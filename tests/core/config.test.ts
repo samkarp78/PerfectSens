@@ -29,3 +29,14 @@ test('Play-Along: 2 rounds of equal 20 s parts, flicks scored from the first wav
   expect(defaultConfig.flick.warmWave).toBe(true);
   expect(partMs('flick', defaultConfig)).toBe(14000);
 });
+
+test('Play-Along uses the more sensitive test; Standard keeps the original targets (spec 20)', () => {
+  const pa = configForPlayAlong();
+  expect(pa.flick.targetRadiusDeg).toBe(0.8);
+  expect(pa.switch.targetRadiusDeg).toBe(0.8);
+  expect(pa.tracking.targetRadiusDeg).toBe(1.2);
+  expect(pa.trackswitch.targetRadiusDeg).toBe(1.2);
+  for (const d of [90, 120, 150]) expect(pa.flick.distancesDeg).toContain(d);
+  expect(defaultConfig.flick.targetRadiusDeg).toBe(1.5);
+  expect(defaultConfig.flick.distancesDeg).not.toContain(150);
+});
