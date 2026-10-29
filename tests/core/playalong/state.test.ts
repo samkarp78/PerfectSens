@@ -467,3 +467,16 @@ describe('one-sitting test (Play-Along without the matches)', () => {
     expect(x.tests.length).toBeLessThanOrEqual(defaultConfig.playAlong.sitting.tests);
   });
 });
+
+describe('keep rule', () => {
+  it('when the starting sens is inside the "performs the same" range, the answer is keep', () => {
+    const clock = { now: 0 };
+    let x = createPlayAlong({ ...setup, sitting: true }, 1, 0);
+    for (let i = 0; i < 8 && x.phase !== 'finished'; i++) x = play(x, clock, peaked(DEFAULT, 0.5), 'right', MIN, 0.04);
+    const range = x.result!.rangeCm360!;
+    expect(DEFAULT).toBeGreaterThanOrEqual(Math.min(...range));
+    expect(DEFAULT).toBeLessThanOrEqual(Math.max(...range));
+    expect(x.result!.kind).toBe('keep');
+    expect(x.result!.recommendedCm360).toBe(DEFAULT);
+  });
+});

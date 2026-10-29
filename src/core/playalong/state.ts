@@ -305,6 +305,11 @@ function finish(s: PaState, kind: PaResult['kind'], h2h: AbDecision | null, cfg:
     // No clear winner: show the best guess (labelled not confirmed); a feel tie-break picks the leader instead.
     if (allRight(testsAt(s, lead)) && !allRight(testsAt(s, def))) { rec = lead; tieBrokenByFeel = true; } else rec = bestGuess(s, fit, cfg);
   } else if (kind === 'bestGuess') rec = bestGuess(s, fit, cfg);
+  // Keep rule: an unconfirmed answer never moves the player when their own sens performs as well as anything else the
+  // data can see (it lies inside the "performs about the same" range).
+  const range = fit?.range;
+  if ((kind === 'bestGuess' || (kind === 'none' && !tieBrokenByFeel)) && range
+    && def >= Math.min(...range) && def <= Math.max(...range)) { kind = 'keep'; rec = def; }
   const at = testsAt(s, rec).flatMap((t) => t.steps);
   const findings = diagnose(at.map((st) => st.flick), at.map((st) => st.tracking), cfg, at.map((st) => st.switch));
   const result: PaResult = {

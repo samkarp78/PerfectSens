@@ -756,3 +756,5 @@ In Play-Along, flicks, switching and tracking switching now end after a set numb
 - flat: 14% / 38%.
 
 Null false change was 0/300. The simulator treats each test as fully adapted to its sens, so it doesn't model the one-sitting test's cold switching; real accuracy is likely somewhat lower.
+
+**Keep rule (2026-10-29):** an unconfirmed answer (a best guess, or no clear winner without a feel tie-break) becomes "keep your sens" when the starting sens lies inside the final "performs about the same" range. On realistic bots, answers that ended further from the best than the start went from 3/60 to 0/60 in Play-Along and from 7/60 to 2/60 in the one-sitting test, with no wrong-way moves in either mode. The cost: medium-sweet-spot bots within ±5% of the best went from 52% to 33% in Play-Along, as some small real improvements now get "keep". Sharp bots were unaffected (94%).
