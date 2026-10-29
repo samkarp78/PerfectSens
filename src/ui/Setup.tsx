@@ -17,11 +17,8 @@ export interface SetupProps {
   onPrefs(p: Prefs): void;
   onCalibrate(fields: Fields): void;
   onStart(setup: SetupValues, warmup: boolean): void;
-  onDemo(): void;
   onHistory(): void;
-  /** Opens Play-Along mode; playAlongSaved: a search is in progress. */
-  onPlayAlong(): void;
-  playAlongSaved?: boolean;
+  onBack(): void;
 }
 
 export type Fields = { dpi: string; cm360: string; inGameSens: string; fov: string; fovType: string; mode: string; padWidthCm: string };
@@ -44,7 +41,7 @@ function fitWarning(f: Fields): string | null {
   return `A 180° turn at your sens needs ${half.toFixed(1)} cm, more than your ${pad} cm play area comfortably allows.`;
 }
 
-export function Setup({ unsupported, prefs, draft, onPrefs, onCalibrate, onStart, onDemo, onHistory, onPlayAlong, playAlongSaved = false }: SetupProps) {
+export function Setup({ unsupported, prefs, draft, onPrefs, onCalibrate, onStart, onHistory, onBack }: SetupProps) {
   const [f, setF] = useState<Fields>(() => draft ?? initialFields());
   const [warmup, setWarmup] = useState(true);
   const [errors, setErrors] = useState<Partial<Record<keyof Fields, string>>>({});
@@ -77,8 +74,8 @@ export function Setup({ unsupported, prefs, draft, onPrefs, onCalibrate, onStart
 
   return (
     <main class="page">
-      <h1 class="title">Blind Sens Finder</h1>
-      <p class="lede">Find the mouse sensitivity that works best for you, tested blind. You won't see which sens is being tested until the end.</p>
+      <h1 class="title">One-sitting test</h1>
+      <p class="lede">About 12 minutes of short rounds, each on a hidden sens. You won't see which sens is being tested until the end.</p>
       {unsupported && (
         <div class="notice" role="alert">
           <p>{UNSUPPORTED_TEXT}</p>
@@ -125,11 +122,9 @@ export function Setup({ unsupported, prefs, draft, onPrefs, onCalibrate, onStart
         <div class="actions">
           <button type="submit" class="btn btn-primary">Start</button>
           <button type="button" class="btn" onClick={onHistory}>History</button>
-          {!unsupported && <button type="button" class="btn" onClick={onPlayAlong}>{playAlongSaved ? 'Continue Play-Along' : 'Play-Along mode'}</button>}
-          {unsupported && <button type="button" class="btn" onClick={onDemo}>Try the demo</button>}
+          <button type="button" class="btn" onClick={onBack}>Back</button>
         </div>
       </form>
-      {!unsupported && <button type="button" class="link" onClick={onDemo}>Try the demo</button>}
     </main>
   );
 }

@@ -13,6 +13,7 @@ import type { ScoreState } from './scoreKeeper';
 import { Calibrate } from './Calibrate';
 import { Demo } from './Demo';
 import { History } from './History';
+import { Home } from './Home';
 import { Results } from './Results';
 import { Run } from './Run';
 import { DEFAULT_SETUP, Setup, type Fields } from './Setup';
@@ -27,7 +28,7 @@ import { PlayAlongResults } from './PlayAlongResults';
 import { PlayAlongSetup, type PaFields } from './PlayAlongSetup';
 import { rangeText } from './playAlongText';
 
-type Screen = 'setup' | 'run' | 'results' | 'history' | 'demo' | 'calibrate' | 'paSetup' | 'playalong' | 'paResults';
+type Screen = 'home' | 'setup' | 'run' | 'results' | 'history' | 'demo' | 'calibrate' | 'paSetup' | 'playalong' | 'paResults';
 
 /** A saved search the player can continue: unfinished, or a best guess waiting for its head-to-head. */
 const resumable = (s: PaState | null): s is PaState => s !== null && (s.phase !== 'finished' || s.result?.kind === 'bestGuess');
@@ -63,7 +64,7 @@ function paSimResult(): Done | null {
 
 export function App() {
   const [sim] = useState(() => simResult() ?? paSimResult());
-  const [screen, setScreen] = useState<Screen>(sim ? (sim.rec.mode === 'playalong' ? 'paResults' : 'results') : 'setup');
+  const [screen, setScreen] = useState<Screen>(sim ? (sim.rec.mode === 'playalong' ? 'paResults' : 'results') : 'home');
   const [session, setSession] = useState<SessionState | null>(null);
   const [done, setDone] = useState<Done | null>(sim);
   const [unsupported, setUnsupported] = useState(false);
@@ -166,33 +167,33 @@ export function App() {
     });
   };
 
-  const onUnsupported = () => { setUnsupported(true); setScreen('setup'); };
+  const onUnsupported = () => { setUnsupported(true); setScreen('home'); };
 
   switch (screen) {
     case 'run':
-      return session ? <Run key={session._seed} session={session} prefs={prefs} onFinished={onFinished} onUnsupported={onUnsupported} onQuit={() => setScreen('setup')} /> : null;
+      return session ? <Run key={session._seed} session={session} prefs={prefs} onFinished={onFinished} onUnsupported={onUnsupported} onQuit={() => setScreen('home')} /> : null;
     case 'paSetup': {
       const saved = resumable(pa) ? pa : null;
       return <PlayAlongSetup fields={paFields} onFields={setPaFields}
         saved={saved ? { rangeText: rangeText(paFit(saved)?.range ?? null, saved.setup.game, saved.setup.dpi), stale: isStale(saved, Date.now()) } : null}
         onCalibrate={(f) => { setPaFields(f); setCalibrateFor('paSetup'); setScreen('calibrate'); }}
-        onStart={onPaStart} onQuickTry={onPaQuick} onQuickTrySaved={() => { if (pa) onPaQuick(pa.setup); }} onContinue={onPaContinue} onStartFresh={clearPa} onBack={() => setScreen('setup')} />;
+        onStart={onPaStart} onQuickTry={onPaQuick} onQuickTrySaved={() => { if (pa) onPaQuick(pa.setup); }} onContinue={onPaContinue} onStartFresh={clearPa} onBack={() => setScreen('home')} />;
     }
     case 'playalong':
       if (quickPa) {
         return <PlayAlong key={quickPa.seed} state={quickPa} prefs={prefs} onChange={setQuickPa} onFinished={onQuickFinished}
-          onQuit={() => { setQuickPa(null); setScreen('setup'); }} onUnsupported={onUnsupported} />;
+          onQuit={() => { setQuickPa(null); setScreen('home'); }} onUnsupported={onUnsupported} />;
       }
       return pa ? <PlayAlong key={pa.seed} state={pa} prefs={prefs} onChange={savePa} onFinished={onPaFinished}
-        onQuit={() => setScreen('setup')} onUnsupported={onUnsupported} /> : null;
+        onQuit={() => setScreen('home')} onUnsupported={onUnsupported} /> : null;
     case 'paResults':
-      return done ? <PlayAlongResults rec={done.rec} onAgain={() => setScreen('setup')} onHistory={() => setScreen('history')} /> : null;
+      return done ? <PlayAlongResults rec={done.rec} onAgain={() => setScreen('home')} onHistory={() => setScreen('history')} /> : null;
     case 'results':
-      return done ? <Results rec={done.rec} fit={done.fit} stats={done.stats} bests={done.bests} saveFailed={saveFailed} onAgain={() => setScreen('setup')} onHistory={() => setScreen('history')} /> : null;
+      return done ? <Results rec={done.rec} fit={done.fit} stats={done.stats} bests={done.bests} saveFailed={saveFailed} onAgain={() => setScreen('home')} onHistory={() => setScreen('history')} /> : null;
     case 'history':
-      return <History history={history} loading={!historyReady} onBack={() => setScreen(done ? (done.rec.mode === 'playalong' ? 'paResults' : 'results') : 'setup')} onQuickAb={onQuickAb} onOpen={onOpen} />;
+      return <History history={history} loading={!historyReady} onBack={() => setScreen(done ? (done.rec.mode === 'playalong' ? 'paResults' : 'results') : 'home')} onQuickAb={onQuickAb} onOpen={onOpen} />;
     case 'demo':
-      return <Demo onExit={() => setScreen('setup')} onHistory={() => setScreen('history')} />;
+      return <Demo onExit={() => setScreen('home')} onHistory={() => setScreen('history')} />;
     case 'calibrate':
       if (calibrateFor === 'paSetup') {
         return <Calibrate dpi={Number(paFields.dpi) || DEFAULT_SETUP.dpi} onUnsupported={onUnsupported}
@@ -204,9 +205,11 @@ export function App() {
           onDone={(cm) => { setDraft({ ...draft, padWidthCm: String(cm) }); setScreen('setup'); }}
           onCancel={() => setScreen('setup')} />
       ) : null;
+    case 'home':
+      return <Home unsupported={unsupported} playAlongSaved={resumable(pa)} onPlayAlong={() => setScreen('paSetup')}
+        onStandard={() => setScreen('setup')} onHistory={() => setScreen('history')} onDemo={() => setScreen('demo')} />;
     default:
-      return <Setup unsupported={unsupported} prefs={prefs} draft={draft} onPrefs={onPrefs}
-        onCalibrate={(fields) => { setDraft(fields); setCalibrateFor('setup'); setScreen('calibrate'); }} onStart={onStart} onDemo={() => setScreen('demo')} onHistory={() => setScreen('history')}
-        onPlayAlong={() => setScreen('paSetup')} playAlongSaved={resumable(pa)} />;
+      return <Setup onBack={() => setScreen('home')} unsupported={unsupported} prefs={prefs} draft={draft} onPrefs={onPrefs}
+        onCalibrate={(fields) => { setDraft(fields); setCalibrateFor('setup'); setScreen('calibrate'); }} onStart={onStart} onHistory={() => setScreen('history')} />;
   }
 }

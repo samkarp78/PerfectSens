@@ -193,3 +193,7 @@ p { line-height: 1.5; }
 .stat-dot-control { fill: var(--panel); stroke: var(--accent); stroke-width: 2; }
 .stat-val { fill: var(--text); font-size: 10px; }
 .stat-axis { fill: var(--muted); font-size: 10px; }
+/* Home */
+.home-card h2 { margin: 0 0 8px; }
+.home-card p { margin: 0 0 12px; }
+.home-card-main { border-color: var(--accent); }

@@ -49,7 +49,7 @@ export function PlayAlongSetup({ fields: f, saved, onFields, onCalibrate, onStar
   return (
     <main class="page">
       <h1 class="title">Play-Along mode</h1>
-      <p class="lede">Play a match on a sens, come back for a 3-minute test, repeat. The app narrows in on your best sens over about an hour, and you can continue on another night.</p>
+      <p class="lede">Play a match on the sens the app suggests, come back for a 3-minute test, repeat. Expect about 3 evenings to a confident answer; you can stop at any check-in with a best guess. Quick try shows the whole flow in about 5 minutes.</p>
       {saved && (
         <div class="panel">
           <p>You have a search in progress: <strong>{saved.rangeText}</strong>.</p>
@@ -71,7 +71,7 @@ export function PlayAlongSetup({ fields: f, saved, onFields, onCalibrate, onStar
           </fieldset>
           {field('dpi', 'Mouse DPI', 'Whole number, from your mouse software.')}
           {finals
-            ? field('sens', 'Your The Finals sens', 'Whole number, as in your game settings.')
+            ? field('sens', 'Your sens in The Finals', 'Whole number, as in your game settings.')
             : field('sens', 'Your current cm/360', 'Distance your mouse travels for a full turn.')}
           <div class="row">
             {field('fov', 'FOV', 'Your in-game field of view.')}
