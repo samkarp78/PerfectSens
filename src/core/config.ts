@@ -5,6 +5,8 @@ export const defaultConfig = {
     // Wave 0 is unscored warm-in (unless warmWave is false); only complete waves are scored, so every scored wave has the
     // same class mix.
     blockMs: 14000, wavePerClass: 1, waveOrderJitter: 0.15, maxBlockTargets: 240, warmWave: true as boolean,
+    /** count > 0: the block ends after this many targets (blockMs is then only a safety cap); 0 = timed. */
+    count: 0 as number,
     warmupTargets: 300, targetRadiusDeg: 1.5, timeoutMs: 4000,
     smallMaxDeg: 22, bigMinDeg: 35, directionSpreadDeg: 30, bounds: { yaw: 75, pitch: 30 },
   },
@@ -15,11 +17,13 @@ export const defaultConfig = {
     turnMinDeg: 90, turnReactFraction: 0.5, settleMs: 100 },
   /** Target switching: `active` static targets up at once; hitting one replaces it at a seeded spot in the forward region.
    *  The first `warmKills` kills are unscored warm-in. */
-  switch: { blockMs: 14000, active: 3, targetRadiusDeg: 1.5, region: { yaw: 35, pitch: 15 }, minSeparationDeg: 8, warmKills: 2,
+  /** count > 0: the block ends after this many scored kills (blockMs is then only a safety cap); 0 = timed. */
+  switch: { count: 0 as number, blockMs: 14000, active: 3, targetRadiusDeg: 1.5, region: { yaw: 35, pitch: 15 }, minSeparationDeg: 8, warmKills: 2,
     maxTargets: 200, placeTries: 50 },
   /** Tracking switching: `active` moving targets; holding the button on one deals damage until healthMs of damage kills it,
    *  then the next seeded target spawns. The first leadInMs is unscored. */
-  trackswitch: { blockMs: 14000, leadInMs: 1500, active: 3, targetRadiusDeg: 2, healthMs: 700, region: { yaw: 35, pitch: 15 },
+  /** count > 0: the block ends after this many kills after the lead-in (blockMs is then only a safety cap); 0 = timed. */
+  trackswitch: { count: 0 as number, blockMs: 14000, leadInMs: 1500, active: 3, targetRadiusDeg: 2, healthMs: 700, region: { yaw: 35, pitch: 15 },
     speedDegPerSec: { min: 10, max: 25 }, segmentMs: { min: 700, max: 2000 }, directionSpreadDeg: 45, minSeparationDeg: 8,
     maxTargets: 200, placeTries: 50 },
   /** Every part of a round has the same length (partMs); between parts a cueMs handover with ticks cueTickMs apart. */
@@ -51,6 +55,10 @@ export const defaultConfig = {
     direction: { idealGain: { small: 1, medium: 0.97, big: 0.93 }, gainScale: 0.1, leadScaleDeg: 1, threshold: 0.5 },
     /** Play-Along only (spec 20): three of the long flicks are big turns (90–150°), where a too-slow sens shows. Target
      *  sizes stay the original ones (smaller targets were dropped as too frustrating). */
+    /** Set-count parts (0 = timed): flicks, scored switching kills, tracking-switching kills; countCapMs is the safety
+     *  cap per part. sameTargets: every test uses the identical target list (only the sens differs). */
+    counts: { flick: 21, switch: 28, trackswitch: 10, countCapMs: 120_000 },
+    sameTargets: false as boolean,
     sensitive: { yawBound: 180,
       distancesDeg: [6,8,10,12,14,15,17,18,20,21, 23,24,26,27,28,29,31,32,33,34, 40,46,52,55,58,62,66,90,120,150] },
     sim: { matchMs: 600_000, familiarityShrink: 0.5, nightSd: 0.03, maxNights: 4 } },
@@ -90,12 +98,14 @@ export function partMs(kind: PartKind, cfg: Config): number {
 export function configForPlayAlong(cfg: Config = defaultConfig): Config {
   const ms = cfg.playAlong.partMs;
   const hard = cfg.playAlong.sensitive;
+  const n = cfg.playAlong.counts;
   return {
     ...cfg,
-    flick: { ...cfg.flick, blockMs: ms, warmWave: false, distancesDeg: hard.distancesDeg, bounds: { ...cfg.flick.bounds, yaw: hard.yawBound } },
-    switch: { ...cfg.switch, blockMs: ms },
+    flick: { ...cfg.flick, blockMs: n.flick > 0 ? n.countCapMs : ms, count: n.flick, warmWave: false, distancesDeg: hard.distancesDeg,
+      bounds: { ...cfg.flick.bounds, yaw: hard.yawBound } },
+    switch: { ...cfg.switch, blockMs: n.switch > 0 ? n.countCapMs : ms, count: n.switch },
     tracking: { ...cfg.tracking, durationMs: ms - cfg.tracking.leadInMs },
-    trackswitch: { ...cfg.trackswitch, blockMs: ms },
+    trackswitch: { ...cfg.trackswitch, blockMs: n.trackswitch > 0 ? n.countCapMs : ms, count: n.trackswitch },
     session: { ...cfg.session, warmupMs: cfg.playAlong.leadInMs, breakEveryRounds: Number.MAX_SAFE_INTEGER },
   } as unknown as Config;
 }

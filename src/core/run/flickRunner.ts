@@ -8,7 +8,8 @@ export class FlickRunner {
   private readonly targets: FlickTarget[];
   private readonly trials: FlickTrial[] = [];
   private readonly path: AimSample[] = [];
-  /** Blocks end at a time limit (warm-up: warmupMs, flick: blockMs) or when the targets run out. */
+  /** Blocks end at a time limit (warm-up: warmupMs, flick: blockMs), after flick.count targets (when set), or when the
+   *  targets run out. */
   private readonly endAt: number;
   private resolved = 0;
   private finished = false;
@@ -37,7 +38,8 @@ export class FlickRunner {
 
   private advance(t: number): void {
     this.resolved++;
-    if (this.resolved >= this.targets.length) this.finished = true;
+    const counted = this.spec.kind !== 'warmup' && this.cfg.flick.count > 0 && this.resolved >= this.cfg.flick.count;
+    if (counted || this.resolved >= this.targets.length) this.finished = true;
     else this.spawn(t);
   }
 

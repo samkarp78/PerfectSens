@@ -10,7 +10,7 @@ import { createScene } from '../scene/scene';
 import { offscreenArrow } from '../scene/camera';
 import { angleBetween, vfovDeg } from '../core/geometry';
 import type { Aim } from '../core/types';
-import { countdownBeep, createRunController, cueText, type Runner, type RunController, type RunPhase } from './runController';
+import { COUNTDOWN_BEEPS_FROM_S, countdownBeep, countLeft, createRunController, cueText, type Runner, type RunController, type RunPhase } from './runController';
 import { createScoreKeeper, flickEvents, gradeFor, switchEvents, trackSwitchEvents, type ScoreState } from './scoreKeeper';
 import { createSounds } from './sound';
 import { AskCard, BreakCard, Countdown, type BreakStats } from './RunCards';
@@ -212,7 +212,9 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit, hideSco
     const beep = (r: Runner | null, now: number) => {
       if (r !== beepRunner) { beepRunner = r; prevLeft = Infinity; }
       if (!r) return;
-      const left = r.state.endsAt - now;
+      // Set-count parts beep on the last 5 targets instead of the last 5 seconds.
+      const c = countLeft(r, cfg);
+      const left = c ? c.left * 1000 : r.state.endsAt - now;
       const beep = countdownBeep(prevLeft, left);
       if (beep !== null) sounds.countdown(false, beep);
       prevLeft = left;
@@ -238,6 +240,17 @@ export function Run({ session, prefs, onFinished, onUnsupported, onQuit, hideSco
       box.style.display = 'flex';
       const lead = r instanceof TrackingRunner || r instanceof TrackSwitchRunner ? r.state.scoredFrom : null;
       const ready = lead !== null && now < lead;
+      const c = countLeft(r, cfg);
+      if (c) {
+        // Set-count part: targets left, and a bar that drains as they go.
+        if (timerNameRef.current) timerNameRef.current.textContent = partName(r);
+        if (timerNumRef.current) timerNumRef.current.textContent = ready ? 'get ready' : `${c.left} left`;
+        if (timerBarRef.current) {
+          timerBarRef.current.style.width = `${ready ? 100 : (100 * c.left) / c.total}%`;
+          timerBarRef.current.classList.toggle('is-ending', !ready && c.left <= COUNTDOWN_BEEPS_FROM_S);
+        }
+        return;
+      }
       const left = r.state.endsAt - now;
       const span = r.state.endsAt - (lead ?? r.state.endsAt - partLength(r));
       if (timerNameRef.current) timerNameRef.current.textContent = partName(r);

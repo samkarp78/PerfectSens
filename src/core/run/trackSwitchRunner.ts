@@ -25,7 +25,7 @@ export class TrackSwitchRunner {
   private readonly kills: TrackSwitchKill[] = [];
   private readonly path: AimSample[] = [];
   private readonly holds: HoldEvent[] = [];
-  private readonly endT: number;
+  private endT: number;
   private lastT: number;
   private held = false;
   private damaging: number | null = null;
@@ -77,6 +77,9 @@ export class TrackSwitchRunner {
           this.kills.push({ t: until, index: slot.target.index, aim: { ...this.aim } });
           this.slots[i] = { target: this.spawn(until), damage: 0 };
           this.damaging = null;
+          // Count mode: end after trackswitch.count kills after the lead-in.
+          const ts = this.cfg.trackswitch, from = this.t0 + ts.leadInMs;
+          if (ts.count > 0 && this.kills.filter((k) => k.t >= from).length >= ts.count) { this.finished = true; this.endT = until; this.lastT = until; return; }
         }
       }
       this.lastT = until;

@@ -130,7 +130,8 @@ function simulateSwitch(spec: BlockSpec, setup: Setup, player: SimPlayer, state:
     if (hitT === null) runner.tick(runner.state.endsAt);
     adapted = adaptToward(player, adapted, spec.cm360);
   }
-  return { log: runner.log(), state: { adaptedCm360: adapted, blocksDone: state.blocksDone + 1 }, endT: t0 + cfg.switch.blockMs };
+  const log = runner.log();
+  return { log, state: { adaptedCm360: adapted, blocksDone: state.blocksDone + 1 }, endT: cfg.switch.count > 0 ? log.endT : t0 + cfg.switch.blockMs };
 }
 
 /** When the runner finished: the last hit, the last target's timeout, or the block's time limit with a target still up. */
@@ -179,7 +180,7 @@ function simulateTrackSwitch(spec: BlockSpec, setup: Setup, player: SimPlayer, s
   let move: { from: number; n: number; dYaw: number; dPitch: number; prev: number } | null = null;
   for (let i = 1; ; i++) {
     const ts = t0 + i * stepMs;
-    if (ts >= endT) break;
+    if (ts >= endT || runner.state.done) break;
     while (ts >= nextAdapt) { adapted = adaptToward(player, adapted, spec.cm360); nextAdapt += sc.trackingAdaptMs; }
     const gain = moveGain(player, adapted, spec.cm360);
     if (cur && cur.killT !== null) {
@@ -211,7 +212,8 @@ function simulateTrackSwitch(spec: BlockSpec, setup: Setup, player: SimPlayer, s
     em.emit(ts, d.dYaw, d.dPitch);
   }
   runner.tick(endT);
-  return { log: runner.log(), state: { adaptedCm360: adapted, blocksDone: state.blocksDone + 1 }, endT };
+  const tsLog = runner.log();
+  return { log: tsLog, state: { adaptedCm360: adapted, blocksDone: state.blocksDone + 1 }, endT: tsLog.endT };
 }
 
 function simulateTracking(spec: BlockSpec, setup: Setup, player: SimPlayer, state: SimState, rng: Rng, cfg: Config, t0: number): SimBlockResult {

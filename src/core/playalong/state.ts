@@ -90,7 +90,8 @@ export function testSession(s: PaState, cfg: Config = defaultConfig): SessionSta
   if (!head) throw new Error('testSession: nothing queued');
   const { dpi, fov, fovType, padWidthCm } = s.setup;
   const setup: Setup = { dpi, cm360: head.cm360, inGameSens: null, fov, fovType, mode: 'default', padWidthCm };
-  const seed = Math.floor(rootFork(s, `test-${s.tests.length}`).next() * SEED_RANGE);
+  // sameTargets: one seed for every test, so every sens is measured on the identical target list.
+  const seed = Math.floor(rootFork(s, cfg.playAlong.sameTargets ? 'test' : `test-${s.tests.length}`).next() * SEED_RANGE);
   return createSession(setup, { seed, warmup: true, quickAbCm360: null,
     fixed: { rounds: cfg.playAlong.roundsPerTest, scoreBaseline: scoreBaseline(s) } }, configForPlayAlong(cfg));
 }

@@ -13,7 +13,7 @@ export class SwitchRunner {
   private readonly kills: SwitchKill[] = [];
   private readonly clicks: SwitchClick[] = [];
   private readonly path: AimSample[] = [];
-  private readonly endT: number;
+  private endT: number;
   private finished = false;
 
   constructor(private readonly spec: BlockSpec, private readonly dpc: number, private readonly cfg: Config, private readonly t0: number) {
@@ -50,6 +50,9 @@ export class SwitchRunner {
       this.kills.push({ t, target, from: this.lastKillAim });
       this.lastKillAim = { ...this.aim };
       this.active[i] = this.nextTarget(i);
+      // Count mode: end after switch.count scored kills (the warm-in kills come first).
+      const sc = this.cfg.switch;
+      if (sc.count > 0 && this.kills.length >= sc.count + sc.warmKills) { this.finished = true; this.endT = t; }
     }
     return { hit };
   }

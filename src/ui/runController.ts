@@ -67,6 +67,25 @@ export function hudText(p: Progress, mode: SessionState['mode'] = 'full'): strin
   }
 }
 
+/** Targets (or kills) left in a set-count part (spec 21), or null for a timed part (tracking, the lead-in, Standard). */
+export function countLeft(r: Runner, cfg: Config): { left: number; total: number } | null {
+  if (r instanceof FlickRunner) {
+    const n = cfg.flick.count;
+    return r.log().spec.kind === 'warmup' || n <= 0 ? null : { left: Math.max(0, n - r.state.trialIndex), total: n };
+  }
+  if (r instanceof SwitchRunner) {
+    const n = cfg.switch.count;
+    return n <= 0 ? null : { left: Math.max(0, Math.min(n, n + cfg.switch.warmKills - r.state.kills)), total: n };
+  }
+  if (r instanceof TrackSwitchRunner) {
+    const n = cfg.trackswitch.count;
+    if (n <= 0) return null;
+    const from = r.state.scoredFrom;
+    return { left: Math.max(0, n - r.log().kills.filter((k) => k.t >= from).length), total: n };
+  }
+  return null;
+}
+
 /** Seconds counted down with a beep at the end of every part (sound only; nothing is drawn). */
 export const COUNTDOWN_BEEPS_FROM_S = 5;
 

@@ -4,8 +4,8 @@ import { createSession, nextBlock, submitBlock } from '../../src/core/session';
 import { defaultSimPlayer } from '../../src/core/sim/player';
 import { runSimSession } from '../../src/core/sim/runSession';
 import type { Setup } from '../../src/core/types';
-import { countdownBeep, createRunController, cueText, hudText, ROUND_REST_TEXT, type RunController } from '../../src/ui/runController';
-import { defaultConfig } from '../../src/core/config';
+import { countdownBeep, countLeft, createRunController, cueText, hudText, ROUND_REST_TEXT, type RunController } from '../../src/ui/runController';
+import { configForPlayAlong, defaultConfig } from '../../src/core/config';
 import { TrackSwitchRunner } from '../../src/core/run/trackSwitchRunner';
 import { TrackingRunner } from '../../src/core/run/trackingRunner';
 import { SwitchRunner } from '../../src/core/run/switchRunner';
@@ -324,5 +324,23 @@ describe('hudText in fixed mode', () => {
     const p = { stage: 'baseline' as const, stepIndex: 1, totalSteps: 3, kind: 'flick' as const, blocksDone: 4, blocksTotal: 12 };
     expect(hudText(p, 'fixed')).toBe('Test · Round 2 of 3 · Flicks');
     expect(hudText({ ...p, stage: 'warmup', kind: 'warmup', stepIndex: 0 }, 'fixed')).toBe('Lead-in');
+  });
+});
+
+describe('countLeft (set-count parts)', () => {
+  const pa = configForPlayAlong();
+  const spec = (kind: 'flick' | 'switch' | 'trackswitch' | 'tracking' | 'warmup') =>
+    ({ id: kind, stage: 'baseline' as const, kind, cm360: 30, seed: 3, stepIndex: 0, arm: null });
+
+  it('counts down the targets of a count part', () => {
+    expect(countLeft(new FlickRunner(spec('flick'), 0.02, pa, 0), pa)).toEqual({ left: 21, total: 21 });
+    expect(countLeft(new SwitchRunner(spec('switch'), 0.02, pa, 0), pa)).toEqual({ left: 28, total: 28 });
+    expect(countLeft(new TrackSwitchRunner(spec('trackswitch'), 0.02, pa, 0), pa)).toEqual({ left: 10, total: 10 });
+  });
+
+  it('is null for timed parts: tracking, the lead-in, and Standard', () => {
+    expect(countLeft(new TrackingRunner(spec('tracking'), 0.02, pa, 0), pa)).toBeNull();
+    expect(countLeft(new FlickRunner(spec('warmup'), 0.02, pa, 0), pa)).toBeNull();
+    expect(countLeft(new FlickRunner(spec('flick'), 0.02, defaultConfig, 0), defaultConfig)).toBeNull();
   });
 });

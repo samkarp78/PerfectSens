@@ -727,3 +727,19 @@ Real data showed the test barely separates sens: about ±15% precision after 3 n
 **Play-Along with the sensitive test:** null false change 0.3%; convergence 76/80 within ±8%.
 
 **Not verifiable by bots:** whether the sensitive test separates sens better for real players. The simulator has no "fast sens hurts small-target precision" effect. It needs real Play-Along data.
+
+**Update:** the smaller targets were dropped as too frustrating. Play-Along keeps the original target sizes, and only the big turns remain from this section.
+
+## 21. Set-count parts in Play-Along (2026-10-29)
+
+In Play-Along, flicks, switching and tracking switching now end after a set number of targets instead of a set time. Tracking stays timed (20 s).
+- **The counts are 21 flicks, 28 scored switching kills (after the 2 warm-in kills) and 10 tracking-switching kills (after the lead-in).** They're sized from the real player's speed so a test stays about 3 minutes; this is the smallest of the three sizes tried.
+- **The time limit is now only a safety cap,** 120 s per part.
+- **The on-screen timer shows "N left",** and its bar drains as targets go. The countdown beeps sound on the last 5 targets.
+- **Standard stays timed** (`count` 0).
+
+**Why:** every sens is judged on the same number of targets, and speed is still measured as time per target. On realistic bots (two runs, 20 and 40 bots, 4 repeats each), set counts versus timed parts gave within ±5% of the best 58–66% vs 54–59%, a repeat spread of 10.5% vs 13%, and a test length of 178 s vs 191 s. Larger counts (39/52/18) were more accurate (75%) but 70 s longer per test.
+
+**Same targets every test** (`playAlong.sameTargets`) helped bots slightly (+3 points). It stays off: real players would learn a repeated target sequence, so later tests would score better from practice and skew the results.
+
+**Safety:** null false change 0/300; convergence 73/74 within ±8%.

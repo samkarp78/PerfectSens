@@ -20,10 +20,10 @@ test('all parts are equal length (default and quick)', () => {
   expect(defaultConfig.round.cueTickMs).toBe(600);
 });
 
-test('Play-Along: 2 rounds of equal 20 s parts, flicks scored from the first wave', () => {
+test('Play-Along: 2 rounds, 20 s tracking, flicks scored from the first wave', () => {
   const c = configForPlayAlong();
   expect(c.playAlong.roundsPerTest).toBe(2);
-  for (const k of PART_KINDS) expect(partMs(k, c)).toBe(20000);
+  expect(partMs('tracking', c)).toBe(20000); // the other parts end at a set count (spec 21)
   expect(c.tracking.leadInMs).toBe(2000);
   expect(c.flick.warmWave).toBe(false);
   expect(defaultConfig.flick.warmWave).toBe(true);
@@ -38,4 +38,14 @@ test('Play-Along keeps the original target sizes and adds big turns (spec 20)', 
   expect(pa.trackswitch.targetRadiusDeg).toBe(defaultConfig.trackswitch.targetRadiusDeg);
   for (const d of [90, 120, 150]) expect(pa.flick.distancesDeg).toContain(d);
   expect(defaultConfig.flick.distancesDeg).not.toContain(150);
+});
+
+test('Play-Along flicks, switching and tracking switching end at a set count (spec 21); tracking stays timed', () => {
+  const pa = configForPlayAlong();
+  expect(pa.flick.count).toBe(21);
+  expect(pa.switch.count).toBe(28);
+  expect(pa.trackswitch.count).toBe(10);
+  expect(pa.tracking.durationMs + pa.tracking.leadInMs).toBe(defaultConfig.playAlong.partMs);
+  expect(defaultConfig.flick.count).toBe(0);
+  expect(defaultConfig.playAlong.sameTargets).toBe(false);
 });
