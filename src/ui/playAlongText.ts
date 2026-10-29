@@ -11,7 +11,7 @@ export function verdictText(r: PaResult, game: GameId, dpi: number): string {
   switch (r.kind) {
     case 'change': return `Change to ${n}`;
     case 'keep': return 'Keep your sens';
-    case 'none': return r.tieBrokenByFeel ? `No clear winner — ${n} felt better (tie broken by feel)` : 'No clear winner — keep your sens';
+    case 'none': return r.tieBrokenByFeel ? `No clear winner — ${n} felt better (tie broken by feel)` : `No clear winner — best guess ${n}, not confirmed`;
     case 'bestGuess': return `Best guess, not confirmed yet: ${n}`;
   }
 }

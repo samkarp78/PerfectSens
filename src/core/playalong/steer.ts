@@ -1,9 +1,10 @@
 import { defaultConfig, type Config } from '../config';
 import { cm360ToFinals, finalsToCm360, sameSens, snapCm360, type GameId } from './gameSens';
 
-/** Inputs for one higher/lower pair. testedCm360: every sens tested so far (the centre included). */
+/** Inputs for one higher/lower pair. testedCm360: every sens tested so far (the centre included). allowRetest: while
+ *  narrowing, sens already tested may be tested again (more data near the best). */
 export interface PairContext { game: GameId; dpi: number; defaultCm360: number; padWidthCm: number;
-  centerCm360: number; step: number; testedCm360: number[] }
+  centerCm360: number; step: number; testedCm360: number[]; allowRetest?: boolean }
 /** targets: faster side first, then slower (the caller randomises the play order); exhausted when none are left. */
 export interface PairDecision { targets: number[]; step: number; exhausted: boolean; reason: string }
 
@@ -17,7 +18,7 @@ export function nextStep(step: number, cfg: Config = defaultConfig): number {
 export function choosePair(ctx: PairContext, cfg: Config = defaultConfig): PairDecision {
   const { game, dpi, centerCm360: center, step } = ctx;
   const same = (a: number, b: number): boolean => sameSens(game, a, b);
-  const used = (v: number): boolean => same(v, center) || ctx.testedCm360.some((t) => same(v, t));
+  const used = (v: number): boolean => same(v, center) || (!ctx.allowRetest && ctx.testedCm360.some((t) => same(v, t)));
   // Play-Along tests from half to double the starting cm/360 (playAlong.limits), never slower than the pad allows.
   const limits = cfg.playAlong.limits;
   const padMax = 2 * cfg.pad.turnFraction * ctx.padWidthCm;

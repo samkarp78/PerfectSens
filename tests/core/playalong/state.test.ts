@@ -3,7 +3,7 @@ import { defaultConfig } from '../../../src/core/config';
 import { nextBlock } from '../../../src/core/session';
 import { finalsToCm360, gameSensOf } from '../../../src/core/playalong/gameSens';
 import {
-  abandonTest, answerFeel, directionNudge, answerHourCheck, createPlayAlong, currentTarget, feelFlagsOf, isStale, markBack, resume, startNight,
+  abandonTest, answerFeel, directionNudge, answerHourCheck, createPlayAlong, currentTarget, feelFlagsOf, paFit, isStale, markBack, resume, startNight,
   submitTest, testSession, type Feel, type PaSetup, type PaState, type TestRole,
 } from '../../../src/core/playalong/state';
 import { fakeDone } from '../../helpers/paSteps';
@@ -87,7 +87,7 @@ describe('Play-Along search', () => {
 
   it('leader equal to default finishes keep without a head-to-head', () => {
     const { s, clock } = fresh();
-    const out = playUntil(s, clock, peaked(DEFAULT));
+    const out = playUntil(s, clock, peaked(DEFAULT, 40));
     expect(out.phase).toBe('finished');
     expect(out.result!.kind).toBe('keep');
     expect(out.tests.some((t) => t.role === 'h2h')).toBe(false);
@@ -337,7 +337,62 @@ describe('edge rule (keep walking toward a far-away best)', () => {
 
   it('can reach a best sens far from the start', () => {
     const { s, clock } = fresh();
-    const out = playUntil(s, clock, peaked(finals(50), 2), (y) => y.queue[0]?.role === 'h2h');
+    const out = playUntil(s, clock, peaked(finals(50), 40), (y) => y.queue[0]?.role === 'h2h');
     expect(num(out.h2h!.leaderCm360)!).toBeGreaterThanOrEqual(48);
+  });
+});
+
+describe('direction uses the player own average lag, not zero', () => {
+  it('a steady lag on every sens gives no direction', () => {
+    const { s, clock } = fresh();
+    let x = s;
+    for (let i = 0; i < 3; i++) {
+      const head = x.queue[0]!;
+      clock.now += MIN;
+      x = submitTest(answerFeel(markBack(x, clock.now), 'right'), fakeDone(head.cm360, 0, 0.03, 2, {}, { lead: -1.5 }), clock.now);
+    }
+    expect(directionNudge(x, finals(40)).cm360).toBe(finals(40));
+  });
+
+  it('lagging more than usual on one sens points faster', () => {
+    const { s, clock } = fresh();
+    let x = s;
+    for (let i = 0; i < 3; i++) {
+      const head = x.queue[0]!;
+      clock.now += MIN;
+      const lead = num(head.cm360) === 27 ? -3.5 : -1.5;
+      x = submitTest(answerFeel(markBack(x, clock.now), 'right'), fakeDone(head.cm360, 0, 0.03, 2, {}, { lead }), clock.now);
+    }
+    expect(directionNudge(x, finals(27)).cm360).toBeLessThan(finals(27));
+  });
+});
+
+describe('narrowing until the range is tight', () => {
+  it('a sharp, clear optimum goes to the final check once the range is tight', () => {
+    const { s, clock } = fresh();
+    const out = playUntil(s, clock, peaked(finals(30), 40), (y) => y.queue[0]?.role === 'h2h');
+    expect(out.queue[0]?.role).toBe('h2h');
+    const range = paFit(out)!.range!;
+    expect(Math.max(...range) / Math.min(...range)).toBeLessThanOrEqual(1 + defaultConfig.playAlong.tightRange + 1e-9);
+  });
+
+  it('a flat player keeps being tested near the best instead of stopping early', () => {
+    const { s, clock } = fresh();
+    let x = s;
+    for (let i = 0; i < 14; i++) x = play(x, clock, () => 0, 'right');
+    expect(x.phase).not.toBe('finished');
+    expect(x.tests.some((t) => t.role === 'h2h')).toBe(false);
+    expect(x.queue.length).toBeGreaterThan(0);
+  });
+});
+
+describe('no clear winner shows the best guess', () => {
+  it('recommends the best guess instead of the starting sens', () => {
+    const { s, clock } = fresh();
+    // A clear optimum at 30, but the final check comes out even: no clear winner.
+    const base = peaked(finals(30), 40);
+    const out = playUntil(s, clock, (cm, role) => (role === 'h2h' ? 0 : base(cm)));
+    expect(out.result!.kind).toBe('none');
+    expect(Math.abs(num(out.result!.recommendedCm360)! - 30)).toBeLessThanOrEqual(1);
   });
 });

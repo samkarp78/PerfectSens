@@ -19,8 +19,8 @@ const RUNS = 5;
 const STARTS = [20, 33, 50];
 /** Best sens as a multiple of the starting Finals number (1.6 = much faster). */
 const BEST_RATIOS = [0.6, 0.8, 1, 1.25, 1.6];
-const REAL_SIM = { amplitudeNoise: 0.2, trackingDelayMs: 350, trackingNoiseDegPerSec: 10 };
-const BOTS: Record<string, { player: Partial<SimPlayer>; sim: Partial<Config['sim']> }> = {
+const REAL_SIM: Record<string, number> = { amplitudeNoise: 0.2, trackingDelayMs: 350, trackingNoiseDegPerSec: 10 };
+const BOTS: Record<string, { player: Partial<SimPlayer>; sim: Record<string, number> }> = {
   realistic: { player: { curvature: 0.3, motorNoise: 1.6 }, sim: REAL_SIM },
   sharp: { player: { curvature: 1, motorNoise: 1.6 }, sim: REAL_SIM },
   typical: { player: {}, sim: {} },

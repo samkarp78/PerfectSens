@@ -13,7 +13,7 @@ describe('verdictText', () => {
   it('names the Finals number for each verdict', () => {
     expect(verdictText(result({}), 'finals', 800)).toBe('Change to 30');
     expect(verdictText(result({ kind: 'keep' }), 'finals', 800)).toBe('Keep your sens');
-    expect(verdictText(result({ kind: 'none' }), 'finals', 800)).toBe('No clear winner — keep your sens');
+    expect(verdictText(result({ kind: 'none' }), 'finals', 800)).toBe('No clear winner — best guess 30, not confirmed');
     expect(verdictText(result({ kind: 'none', tieBrokenByFeel: true }), 'finals', 800)).toBe('No clear winner — 30 felt better (tie broken by feel)');
     expect(verdictText(result({ kind: 'bestGuess' }), 'finals', 800)).toBe('Best guess, not confirmed yet: 30');
   });

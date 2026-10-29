@@ -671,3 +671,28 @@ Re-run (5 simulated players each, up to 6 nights):
 | 33 → 33 | keep 4/5, none 1/5 | unchanged |
 
 Re-check after the edge rule and wider limits: null false change **0/300** (keep 52, none 230, best guess 18 when the 4-night simulator cap was reached). Convergence: 18/18 change answers within ±8%; kinds: change 18, none 76, keep 6. Median 3 nights, 4 tests per night.
+
+### 19.8 Accuracy work on realistic bots (2026-10-29)
+
+**Bots:** noise and tracking lag from the real player's sessions, each varied ±30%; sweet-spot sharpness from flat to sharp; random start (Finals 20–50) and best (0.6–1.6×). There are separate "tune" and "check" sets (`tests/stats/accuracy.test.ts`).
+
+**Three changes:**
+1. **Lag reference:** ahead/behind counts only beyond the player's own average lag across the search. Everyone trails a moving target by about 1°, and measured against zero that read as "too slow".
+2. **Narrow until tight:** at the smallest step, the final check runs only once the range is within about ±5% (`tightRange` 0.1). Until then, pairs keep testing next to the best and may re-test nearby sens. The player stops any night at the hour check.
+3. **No clear winner** now shows the best guess ("best guess N, not confirmed") instead of "keep your sens".
+
+**Final answer within ±5% / ±10% of the true best** (60 bots per set, 6 nights):
+
+| Sweet spot | Before (tune) | After (tune) | After (check) |
+|---|---|---|---|
+| Flat | 14% / 29% | 29% / 57% | 36% / 54% |
+| Medium | 19% / 43% | 57% / 86% | 65% / 82% |
+| Sharp | 56% / 67% | 78% / 94% | 60% / 100% |
+
+**By nights played** (tune set, sharp bots): 2 nights gives 56% / 83%, 3 nights 72% / 94%, 4 nights 72% / 94%. Accuracy mostly levels off by night 3.
+
+**Confidently wrong** ("change" more than 10% off): 2 of 120 bots. Both were real improvements over the start, just not exact (24 → 32 with the best at 36; 38 → 29 with the best at 23).
+
+**Change by luck:** 0/300. Most searches with no real difference now run until the player stops and end with a labelled best guess.
+
+**Known limit:** for flat players the range rarely tightens, so the answer stays a best guess.

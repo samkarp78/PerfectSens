@@ -152,18 +152,27 @@ function shuffled<T>(s: PaState, items: T[], label: string): T[] {
  * Direction (spec 19.2): the centre's latest test says which way to go. Overshooting or running ahead (too fast) moves
  * the centre half a step slower (a higher cm/360); undershooting or trailing, half a step faster.
  */
-export function directionNudge(s: PaState, center: number, step: number = s.step): { cm360: number; reason: string } {
+export function directionNudge(s: PaState, center: number, step: number = s.step, cfg: Config = defaultConfig): { cm360: number; reason: string } {
   const at = testsAt(s, center);
-  const d = at[at.length - 1]?.direction;
-  if (!d || d.dir === 'none') return { cm360: center, reason: '' };
+  const raw = at[at.length - 1]?.direction;
+  if (!raw) return { cm360: center, reason: '' };
+  // Everyone trails a moving target a little; lag only counts beyond this player's own average across the search.
+  const avgOf = (key: 'leadDeg' | 'tsLeadDeg'): number => {
+    const v = s.tests.map((t) => t.direction[key]).filter((x): x is number => x !== null);
+    return v.length === 0 ? 0 : mean(v);
+  };
+  const d = directionSignal({
+    overshoot: raw.overshoot,
+    leadDeg: raw.leadDeg === null ? null : raw.leadDeg - avgOf('leadDeg'),
+    tsLeadDeg: raw.tsLeadDeg === null ? null : raw.tsLeadDeg - avgOf('tsLeadDeg'),
+  }, cfg);
+  if (d.dir === 'none') return { cm360: center, reason: '' };
   const k = d.dir === 'lower' ? 1 : -1;
   const why = d.dir === 'lower' ? 'Overshooting or running ahead on the best sens' : 'Undershooting or trailing on the best sens';
   return { cm360: center * (1 + step / 2) ** k, reason: `${why} → centre moved ${d.dir === 'lower' ? 'slower' : 'faster'}` };
 }
 
-function queuePair(s: PaState, center: number, step: number, cfg: Config, note = ''): PaState | null {
-  const d = choosePair({ game: s.setup.game, dpi: s.setup.dpi, defaultCm360: s.setup.defaultCm360, padWidthCm: s.setup.padWidthCm,
-    centerCm360: center, step, testedCm360: s.tests.map((t) => t.cm360) }, cfg);
+function queuePair(s: PaState, center: number, step: number, cfg: Config, note = '', allowRetest = false): PaState | null {  const d = choosePair({ game: s.setup.game, dpi: s.setup.dpi, defaultCm360: s.setup.defaultCm360, padWidthCm: s.setup.padWidthCm,    centerCm360: center, step, testedCm360: s.tests.map((t) => t.cm360), allowRetest }, cfg);
   if (d.exhausted) return null;
   const queue = shuffled(s, d.targets.map((cm360): QueueItem => ({ cm360, role: 'pair' })), `order-${s.tests.length}`);
   return { ...s, step, queue, steerLog: [...s.steerLog, note ? { ...d, reason: `${note}; ${d.reason}` } : d] };
@@ -206,9 +215,15 @@ function plan(s: PaState, cfg: Config): PaState {
   const lead = leader(s, cfg);
   const tested = s.tests.map((t) => t.cm360);
   const atEdge = same(s, lead, Math.min(...tested)) || same(s, lead, Math.max(...tested));
-  if (!atEdge && s.step <= cfg.playAlong.minStep) return startH2h(s, cfg);
+  if (!atEdge && s.step <= cfg.playAlong.minStep) {
+    // At the smallest step: run the final check once the range is tight (about ±5%); until then keep testing next to
+    // the best, re-testing nearby sens for more data. The player can stop any night at the hour check.
+    const range = paFit(s, cfg)?.range;
+    if (range && Math.max(...range) / Math.min(...range) - 1 <= cfg.playAlong.tightRange) return startH2h(s, cfg);
+    return queuePair(s, lead, s.step, cfg, 'Range still wide: testing next to the best', true) ?? startH2h(s, cfg);
+  }
   const step = atEdge ? s.step : nextStep(s.step, cfg);
-  const nudge = directionNudge(s, lead, step);
+  const nudge = directionNudge(s, lead, step, cfg);
   return queuePair(s, nudge.cm360, step, cfg, nudge.reason) ?? startH2h({ ...s, step }, cfg);
 }
 
@@ -245,7 +260,8 @@ function finish(s: PaState, kind: PaResult['kind'], h2h: AbDecision | null, cfg:
   if (kind === 'change') rec = s.h2h!.leaderCm360;
   else if (kind === 'none' && s.h2h) {
     const lead = s.h2h.leaderCm360;
-    if (allRight(testsAt(s, lead)) && !allRight(testsAt(s, def))) { rec = lead; tieBrokenByFeel = true; }
+    // No clear winner: show the best guess (labelled not confirmed); a feel tie-break picks the leader instead.
+    if (allRight(testsAt(s, lead)) && !allRight(testsAt(s, def))) { rec = lead; tieBrokenByFeel = true; } else rec = bestGuess(s, fit, cfg);
   } else if (kind === 'bestGuess') rec = bestGuess(s, fit, cfg);
   const at = testsAt(s, rec).flatMap((t) => t.steps);
   const findings = diagnose(at.map((st) => st.flick), at.map((st) => st.tracking), cfg, at.map((st) => st.switch));
