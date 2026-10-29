@@ -45,7 +45,7 @@ export const defaultConfig = {
   store: { keepRawSessions: 5 },
   /** Play-Along mode (§18): real game matches between short tests. finalsK: The Finals cm/360 = finalsK / (sens × DPI). */
   playAlong: { roundsPerTest: 2, partMs: 20000, limits: { min: 0.5, max: 2 }, tightRange: 0.1, leadInMs: 15000, firstStep: 0.2, minStep: 0.04, hourCheckMs: 3_000_000, staleDays: 14,
-    maxH2hPerNight: 2, h2hBlocksPerSide: 1, z: 2.5, nightPriorSd: 0.03, finalsK: 914_400, holdMs: 1000, testTimeScale: 0.25, sameNightMs: 10_800_000,
+    maxH2hPerNight: 2, h2hBlocksPerSide: 1, z: 2.5, nightPriorSd: 0.2, finalsK: 914_400, holdMs: 1000, testTimeScale: 0.25, sameNightMs: 10_800_000,
     /** The grade (spec 19.1): per-item costs. Direction (19.2): ideal first-move gains by distance class and signal scales. */
     grade: { correctionCost: 0.1, missCost: 0.2, maxGainCost: 1 },
     direction: { idealGain: { small: 1, medium: 0.97, big: 0.93 }, gainScale: 0.1, leadScaleDeg: 1, threshold: 0.5 },

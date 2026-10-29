@@ -27,6 +27,17 @@ export function rangeText(range: [number, number] | null, game: GameId, dpi: num
   return `Likely between ${a!.toFixed(1)} and ${b!.toFixed(1)} cm/360`;
 }
 
+/** How sure the answer is, in plain words: the sens that perform about the same as the best, low to high. */
+export function spreadText(range: [number, number] | null, game: GameId, dpi: number): string {
+  if (!range) return 'Not enough data to say how sure this is yet';
+  if (game === 'finals') {
+    const [a, b] = range.map((cm) => gameSensOf(game, cm, dpi)!).sort((x, y) => x - y);
+    return a === b ? `${a} is clearly your best` : `Anything from ${a} to ${b} performs about the same for you`;
+  }
+  const [a, b] = [...range].sort((x, y) => x - y);
+  return `Anything from ${a!.toFixed(1)} to ${b!.toFixed(1)} cm/360 performs about the same for you`;
+}
+
 export function feelFlagText(flag: { cm360: number; feel: 'fast' | 'slow' }, game: GameId, dpi: number): string {
   return `${sensText(flag.cm360, game, dpi)} felt too ${flag.feel} both times`;
 }

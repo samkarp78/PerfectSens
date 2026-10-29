@@ -170,3 +170,17 @@ describe('per-night offset', () => {
     expect(Math.abs(Math.log(unlabelled.pickCm360 / 30))).toBeGreaterThan(Math.abs(Math.log(fit.pickCm360 / 30)));
   });
 });
+
+describe('per-night offset for a really bad night', () => {
+  it('a 0.2 drop on one night does not move the peak', () => {
+    const q = (u: number): number => -2 * u * u;
+    const pts: FitPoint[] = us.flatMap((u, i) => {
+      const out: FitPoint[] = [];
+      if (u <= 0) out.push({ x: x0 + u, y: q(u) - 0.2, se: 0.01, t: i / 6, isCurrent: u === 0, night: 0 });
+      if (u >= 0) out.push({ x: x0 + u, y: q(u), se: 0.01, t: i / 6, isCurrent: u === 0, night: 1 });
+      return out;
+    });
+    const fit = fitCurve(pts, x0, defaultConfig, createRng(1));
+    expect(Math.abs(Math.log(fit.pickCm360 / 30))).toBeLessThan(0.01);
+  });
+});

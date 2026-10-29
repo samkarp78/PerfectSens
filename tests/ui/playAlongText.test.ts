@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { finalsToCm360 } from '../../src/core/playalong/gameSens';
 import type { PaResult } from '../../src/core/playalong/state';
-import { feelFlagText, rangeText, verdictText } from '../../src/ui/playAlongText';
+import { feelFlagText, rangeText, spreadText, verdictText } from '../../src/ui/playAlongText';
 
 const f = (n: number): number => finalsToCm360(n, 800);
 const result = (o: Partial<PaResult>): PaResult => ({
@@ -38,5 +38,18 @@ describe('feelFlagText', () => {
   it('describes a repeated feel answer', () => {
     expect(feelFlagText({ cm360: f(30), feel: 'slow' }, 'finals', 800)).toBe('30 felt too slow both times');
     expect(feelFlagText({ cm360: 28, feel: 'fast' }, 'other', 800)).toBe('28.0 cm/360 felt too fast both times');
+  });
+});
+
+describe('spreadText', () => {
+  it('says plainly which sens perform about the same', () => {
+    expect(spreadText([f(44), f(38)], 'finals', 800)).toBe('Anything from 38 to 44 performs about the same for you');
+    expect(spreadText([28.12, 33.0], 'other', 800)).toBe('Anything from 28.1 to 33.0 cm/360 performs about the same for you');
+  });
+  it('a single sens reads as a clear answer', () => {
+    expect(spreadText([f(40), f(40)], 'finals', 800)).toBe('40 is clearly your best');
+  });
+  it('says so when there is no range', () => {
+    expect(spreadText(null, 'finals', 800)).toBe('Not enough data to say how sure this is yet');
   });
 });

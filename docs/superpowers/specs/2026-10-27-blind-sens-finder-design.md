@@ -696,3 +696,20 @@ Re-check after the edge rule and wider limits: null false change **0/300** (keep
 **Change by luck:** 0/300. Most searches with no real difference now run until the player stops and end with a labelled best guess.
 
 **Known limit:** for flat players the range rarely tightens, so the answer stays a best guess.
+
+### 19.9 Robustness (2026-10-29)
+
+`tests/stats/robustness.test.ts` runs 20 realistic bots for 3 nights. Each bot is run 5 times, from 3 starting sens, with extra familiarity, and with a bad first night (15% worse).
+
+**Changes:**
+- The per-night offset prior was widened from 0.03 to 0.2, so a really bad night is absorbed.
+- Play-Along results now state the spread plainly: "Anything from 38 to 44 performs about the same for you".
+
+**Results after the changes:**
+- **Consistency:** sharp bots' repeat answers spread about 8%, medium 13% and flat 20%. 45% of repeat-answer pairs agree within ±5%.
+- **Starting sens:** answers move 7–14% across starts for medium and sharp bots, and about 30% for flat ones.
+- **Bad first night:** no effect for sharp bots (73% → 73%), but it still costs flat and medium bots.
+- **Familiarity:** a mild pull toward the starting sens.
+- **The stated range** holds the true best in 91% of runs, with a median width of 33%.
+
+With realistic noise, 3 nights pin a sens down to about ±15%, not ±5%, unless the sweet spot is sharp. Precision grows only with √(tests), so ±5% would take roughly 9× the data. The bigger lever is a more sensitive test.

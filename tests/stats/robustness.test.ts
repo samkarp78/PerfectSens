@@ -25,12 +25,20 @@ const AGREE = Math.log(1.05);
 
 interface Bot { curvature: number; bestN: number; startN: number; noise: number; cfg: Config }
 
+/** Every run's range (low, high Finals numbers), for the range checks. */
+const ranges: { bestN: number; lo: number; hi: number }[] = [];
+
 const runOnce = (bot: Bot, seed: number, o: { startN?: number; player?: Partial<SimPlayer>; nightForms?: (number | undefined)[] } = {}): number => {
   const startN = o.startN ?? bot.startN;
   const setup: PaSetup = { game: 'finals', dpi: 800, defaultCm360: finalsToCm360(startN, 800), padWidthCm: 60, fov: 103, fovType: 'horizontal' };
   const player = defaultSimPlayer(setup.defaultCm360, { optimalCm360: finalsToCm360(bot.bestN, 800), curvature: bot.curvature,
     motorNoise: bot.noise, ...o.player });
   const r = runPlayAlongSim(setup, player, seed, bot.cfg, { nightForms: o.nightForms });
+  const range = r.state.result!.rangeCm360;
+  if (range) {
+    const [lo, hi] = range.map((cm) => gameSensOf('finals', cm, 800)!).sort((a, b) => a - b);
+    ranges.push({ bestN: bot.bestN, lo: lo!, hi: hi! });
+  }
   return gameSensOf('finals', r.state.result!.recommendedCm360, 800)!;
 };
 
@@ -83,6 +91,8 @@ it('Play-Along robustness', () => {
       + `  4 bad first night: within ±5% of best ${pct(g.flatMap((o) => o.bad).filter((n, k) => near(n, g[Math.floor(k / 3)]!.b.bestN)).length / (3 * g.length))}`
       + ` vs normal ${pct(g.flatMap((o) => o.repeat.slice(0, 3)).filter((n, k) => near(n, g[Math.floor(k / 3)]!.b.bestN)).length / (3 * g.length))}`);
   }
+  const holds = ranges.filter((r) => r.bestN >= r.lo && r.bestN <= r.hi).length;
+  report('robust ranges', `stated range holds the true best in ${pct(holds / Math.max(1, ranges.length))} of ${ranges.length} runs · median width ${median(ranges.map((r) => Math.round(100 * (r.hi / r.lo - 1))))}%`);
   for (const o of outs) {
     report('robust bot', `best ${o.b.bestN} start ${o.b.startN} (${bucket(o.b.curvature)}): repeat ${o.repeat.join(' ')} | starts ${o.starts.join(' ')} | familiar ${o.familiar.join(' ')} | bad night ${o.bad.join(' ')}`);
   }

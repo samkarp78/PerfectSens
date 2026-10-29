@@ -4,7 +4,7 @@ import type { PaTest } from '../core/playalong/state';
 import type { SessionRecord } from '../store/history';
 import { toJson } from '../store/export';
 import { download, fmt } from './format';
-import { feelFlagText, rangeText, sensText, verdictText } from './playAlongText';
+import { feelFlagText, sensText, spreadText, verdictText } from './playAlongText';
 import { gameSensOf } from '../core/playalong/gameSens';
 import { StatCharts } from './StatCharts';
 
@@ -28,7 +28,7 @@ export function PlayAlongResults({ rec, onAgain, onHistory }: PlayAlongResultsPr
     <main class="page">
       <p class="pa-label">Play-Along · {pa.nights.length} night{pa.nights.length === 1 ? '' : 's'}</p>
       <h1 class="title">{verdictText(r, game, dpi)}</h1>
-      <p class="lede">{rangeText(r.rangeCm360, game, dpi)}{game === 'finals' && <> · {fmt(r.recommendedCm360)} cm/360</>}</p>
+      <p class="lede">{spreadText(r.rangeCm360, game, dpi)}.{game === 'finals' && <> Recommended: {fmt(r.recommendedCm360)} cm/360.</>}</p>
       {r.kind === 'bestGuess' && (
         <div class="notice"><p>Confirm it next time: Play-Along will start with a head-to-head between this sens and your own.</p></div>
       )}
