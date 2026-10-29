@@ -105,6 +105,19 @@ function Waiting({ s, onBack, onQuit }: { s: PaState; onBack(): void; onQuit(): 
   );
 }
 
+function NextTest({ s, onNext, onQuit }: { s: PaState; onNext(): void; onQuit(): void }) {
+  const n = s.tests.length + 1;
+  return (
+    <main class="page pa">
+      <p class="pa-label">One-sitting test</p>
+      <h1 class="title">Test {n} of {defaultConfig.playAlong.sitting.tests}</h1>
+      <p class="pa-sub">About 1½ minutes. The sens is hidden until the end.</p>
+      <button type="button" class="btn btn-primary" onClick={onNext}>{n === 1 ? 'Start' : 'Next test'}</button>
+      <div><button type="button" class="link" onClick={onQuit}>Quit</button></div>
+    </main>
+  );
+}
+
 function FeelCard({ onAnswer }: { onAnswer(f: Feel): void }) {
   return (
     <main class="page pa">
@@ -148,6 +161,8 @@ export function PlayAlong({ state, prefs, onChange, onFinished, onQuit, onUnsupp
 
   switch (s.phase) {
     case 'waiting':
+      // One-sitting test: tests run back to back, so just a button between them (no match, no feel question).
+      if (s.setup.sitting) return <NextTest s={s} onNext={() => update(answerFeel(markBack(s, Date.now()), 'right'))} onQuit={onQuit} />;
       return <Waiting s={s} onBack={() => update(markBack(s, Date.now()))} onQuit={onQuit} />;
     case 'feel':
       return <FeelCard onAnswer={(f) => update(answerFeel(s, f))} />;

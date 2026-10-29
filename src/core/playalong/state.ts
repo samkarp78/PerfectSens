@@ -13,8 +13,9 @@ import { choosePair, nextStep, type PairDecision } from './steer';
 /** The player's answer to "How did that feel?". */
 export type Feel = 'fast' | 'slow' | 'right';
 export type PaPhase = 'waiting' | 'feel' | 'testing' | 'hourCheck' | 'finished';
-/** quick: a quick try (a short demo of the flow), never saved and never a real answer. */
-export interface PaSetup { game: GameId; dpi: number; defaultCm360: number; padWidthCm: number; fov: number; fovType: FovType; quick?: boolean }
+/** quick: a quick try (a short demo of the flow), never saved and never a real answer. sitting: the one-sitting test,
+ *  Play-Along without the matches (one round per test, tests back to back). */
+export interface PaSetup { game: GameId; dpi: number; defaultCm360: number; padWidthCm: number; fov: number; fovType: FovType; quick?: boolean; sitting?: boolean }
 /** default: the night-1 opener; pair: a higher/lower test; h2h: the head-to-head; anchor: the default re-tested to open a later night. */
 export type TestRole = 'default' | 'pair' | 'h2h' | 'anchor';
 export interface QueueItem { cm360: number; role: TestRole }
@@ -87,6 +88,7 @@ function scoreBaseline(s: PaState): ScoreBaseline | null {
 
 /** The settings a search runs with: a quick try swaps in its short tests (one round, short lead-in, small counts). */
 function paConfig(s: PaState, cfg: Config): Config {
+  if (s.setup.sitting) return { ...cfg, playAlong: { ...cfg.playAlong, roundsPerTest: 1 } } as unknown as Config;
   if (!s.setup.quick) return cfg;
   const q = cfg.playAlong.quick;
   return { ...cfg, playAlong: { ...cfg.playAlong, roundsPerTest: 1, partMs: q.trackingMs,
@@ -133,8 +135,9 @@ export function submitTest(s: PaState, done: SessionState, now: number, cfg: Con
   const next = plan({ ...s, tests, queue: s.queue.slice(1), h2h, pendingFeel: null,
     logs: { ...s.logs, [id]: done.logs } }, cfg);
   if (next.phase === 'finished') return next;
-  // A quick try shows its results after a few tests.
-  if (s.setup.quick && next.tests.length >= cfg.playAlong.quick.tests) return finish({ ...next, queue: [] }, 'bestGuess', null, cfg);
+  // A quick try and the one-sitting test give their answer after a set number of tests.
+  const cap = s.setup.quick ? cfg.playAlong.quick.tests : s.setup.sitting ? cfg.playAlong.sitting.tests : Infinity;
+  if (next.tests.length >= cap) return finish({ ...next, queue: [] }, 'bestGuess', null, cfg);
   // Once per night, and never between the two tests of a head-to-head.
   const hour = now - s.nights[night]!.startedAt >= cfg.playAlong.hourCheckMs && s.hourCheckedNight !== night
     && next.queue[0]?.role !== 'h2h';

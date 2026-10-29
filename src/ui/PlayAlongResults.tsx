@@ -26,10 +26,10 @@ export function PlayAlongResults({ rec, onAgain, onHistory }: PlayAlongResultsPr
   }
   return (
     <main class="page">
-      <p class="pa-label">{pa.setup.quick ? 'Quick try · not a real answer' : <>Play-Along · {pa.nights.length} night{pa.nights.length === 1 ? '' : 's'}</>}</p>
+      <p class="pa-label">{pa.setup.quick ? 'Quick try · not a real answer' : pa.setup.sitting ? `One-sitting test · ${pa.tests.length} tests` : <>Play-Along · {pa.nights.length} night{pa.nights.length === 1 ? '' : 's'}</>}</p>
       <h1 class="title">{verdictText(r, game, dpi)}</h1>
       <p class="lede">{spreadText(r.rangeCm360, game, dpi)}.{game === 'finals' && <> Recommended: {fmt(r.recommendedCm360)} cm/360.</>}</p>
-      {r.kind === 'bestGuess' && !pa.setup.quick && (
+      {r.kind === 'bestGuess' && !pa.setup.quick && !pa.setup.sitting && (
         <div class="notice"><p>Confirm it next time: Play-Along will start with a head-to-head between this sens and your own.</p></div>
       )}
       {r.feelFlags.length > 0 && (

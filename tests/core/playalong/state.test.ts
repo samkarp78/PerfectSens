@@ -449,3 +449,22 @@ describe('quick-try fixes', () => {
     expect(x.tests.every((t) => t.direction.dir === 'none')).toBe(true);
   });
 });
+
+describe('one-sitting test (Play-Along without the matches)', () => {
+  const sittingSetup: PaSetup = { ...setup, sitting: true };
+
+  it('runs one-round tests with the normal counts', () => {
+    const x = answerFeel(markBack(createPlayAlong(sittingSetup, 1, 0), MIN), 'right');
+    const session = testSession(x);
+    expect(session.progress!.totalSteps).toBe(1);
+    expect(session._cfg.flick.count).toBe(defaultConfig.playAlong.counts.flick);
+  });
+
+  it('gives its answer after 8 tests', () => {
+    const clock = { now: 0 };
+    let x = createPlayAlong(sittingSetup, 1, 0);
+    for (let i = 0; i < defaultConfig.playAlong.sitting.tests && x.phase !== 'finished'; i++) x = play(x, clock, peaked(finals(30), 2));
+    expect(x.phase).toBe('finished');
+    expect(x.tests.length).toBeLessThanOrEqual(defaultConfig.playAlong.sitting.tests);
+  });
+});

@@ -21,9 +21,11 @@ export interface PlayAlongSetupProps {
   onContinue(): void;
   onStartFresh(): void;
   onBack(): void;
+  /** The one-sitting test uses this same setup (no saved search, no quick try). */
+  sitting?: boolean;
 }
 
-export function PlayAlongSetup({ fields: f, saved, onFields, onCalibrate, onStart, onQuickTry, onQuickTrySaved, onContinue, onStartFresh, onBack }: PlayAlongSetupProps) {
+export function PlayAlongSetup({ fields: f, saved, onFields, onCalibrate, onStart, onQuickTry, onQuickTrySaved, onContinue, onStartFresh, onBack, sitting = false }: PlayAlongSetupProps) {
   const [errors, setErrors] = useState<Partial<Record<keyof PaFields, string>>>({});
   const set = (k: keyof PaFields) => (e: Event) => onFields({ ...f, [k]: (e.target as HTMLInputElement).value });
   const finals = f.game === 'finals';
@@ -48,9 +50,11 @@ export function PlayAlongSetup({ fields: f, saved, onFields, onCalibrate, onStar
 
   return (
     <main class="page">
-      <h1 class="title">Play-Along mode</h1>
-      <p class="lede">Play a match on the sens the app suggests, come back for a 3-minute test, repeat. Expect about 3 evenings to a confident answer; you can stop at any check-in with a best guess. Quick try shows the whole flow in about 5 minutes.</p>
-      {saved && (
+      <h1 class="title">{sitting ? 'One-sitting test' : 'Play-Along mode'}</h1>
+      <p class="lede">{sitting
+        ? 'About 12 minutes in one go, no game needed: 8 short tests back to back, each on a hidden sens, scored the same way as Play-Along. Quicker, but less reliable, because there is no match to settle into each sens.'
+        : 'Play a match on the sens the app suggests, come back for a 3-minute test, repeat. Expect about 3 evenings to a confident answer; you can stop at any check-in with a best guess. Quick try shows the whole flow in about 5 minutes.'}</p>
+      {saved && !sitting && (
         <div class="panel">
           <p>You have a search in progress: <strong>{saved.rangeText}</strong>.</p>
           {saved.stale && <p class="field-warn">It's been over two weeks since your last test. Your aim may have changed since then.</p>}
@@ -62,7 +66,7 @@ export function PlayAlongSetup({ fields: f, saved, onFields, onCalibrate, onStar
           </div>
         </div>
       )}
-      {!saved && (
+      {(!saved || sitting) && (
         <form class="panel" onSubmit={submit} noValidate>
           <fieldset class="field fieldset">
             <legend class="field-label">Game</legend>
@@ -95,8 +99,8 @@ export function PlayAlongSetup({ fields: f, saved, onFields, onCalibrate, onStar
           </div>
           <div class="actions">
             <button type="submit" class="btn btn-primary">Start</button>
-            <button type="button" class="btn" onClick={() => validated(onQuickTry)}
-              title="About 5 minutes: 3 short tests, no match needed. Not saved and not a real answer.">Quick try (5 min)</button>
+            {!sitting && <button type="button" class="btn" onClick={() => validated(onQuickTry)}
+              title="About 5 minutes: 3 short tests, no match needed. Not saved and not a real answer.">Quick try (5 min)</button>}
             <button type="button" class="btn" onClick={onBack}>Back</button>
           </div>
         </form>
