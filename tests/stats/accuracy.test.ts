@@ -42,7 +42,8 @@ it(`Play-Along accuracy (${SET})`, () => {
       sim: { ...defaultConfig.sim, amplitudeNoise: vary(REAL.amplitudeNoise), trackingDelayMs: vary(REAL.trackingDelayMs),
         trackingNoiseDegPerSec: vary(REAL.trackingNoiseDegPerSec) },
       playAlong: { ...defaultConfig.playAlong, tightRange: TIGHT, sim: { ...defaultConfig.playAlong.sim, maxNights: NIGHTS } } } as unknown as Config;
-    const setup: PaSetup = { game: 'finals', dpi: 800, defaultCm360: finalsToCm360(start, 800), padWidthCm: 60, fov: 103, fovType: 'horizontal' };
+    const setup: PaSetup = { game: 'finals', dpi: 800, defaultCm360: finalsToCm360(start, 800), padWidthCm: 60, fov: 103, fovType: 'horizontal',
+      sitting: env.SITTING === '1' };
     const player = defaultSimPlayer(setup.defaultCm360, { optimalCm360: bestCm, curvature, motorNoise: vary(REAL.motorNoise) });
     const r = runPlayAlongSim(setup, player, (SET === 'tune' ? 300_000 : 400_000) + i, cfg);
     const res = r.state.result!;

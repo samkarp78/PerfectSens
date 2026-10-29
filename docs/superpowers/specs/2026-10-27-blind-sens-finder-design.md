@@ -743,3 +743,16 @@ In Play-Along, flicks, switching and tracking switching now end after a set numb
 **Same targets every test** (`playAlong.sameTargets`) helped bots slightly (+3 points). It stays off: real players would learn a repeated target sequence, so later tests would score better from practice and skew the results.
 
 **Safety:** null false change 0/300; convergence 73/74 within ±8%.
+
+## 22. One engine for both modes (2026-10-29)
+
+- **No lead-in in either mode.** Each test starts straight away. The first wave of flicks (3) and the first 2 switching kills are uncounted and come on top of the counts, so the scored data is unchanged.
+- **The one-sitting test is Play-Along without the matches.** It runs 8 one-round tests back to back with a "Next test" button between them, and no waiting screen or feel question. It uses the same grade, search, final check and results, then gives its answer (usually a labelled best guess with the spread). Results go to History.
+- **The old one-sitting screens are removed:** the Standard setup form, the old results page, the demo, personal bests and Quick A/B. The core session code keeps its old modes for now, because Play-Along's test blocks run through the same file.
+
+**Bot check, one-sitting** (realistic bots, within ±5% / ±10%):
+- sharp: 67% / 89%;
+- medium: 43% / 71%;
+- flat: 14% / 38%.
+
+Null false change was 0/300. The simulator treats each test as fully adapted to its sens, so it doesn't model the one-sitting test's cold switching; real accuracy is likely somewhat lower.

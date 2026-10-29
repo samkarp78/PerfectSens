@@ -6,7 +6,8 @@ import type { PaSetup } from '../../src/core/playalong/state';
 import { median, report, uniforms } from './sim';
 
 const DEFAULT = finalsToCm360(33, 800);
-const setup: PaSetup = { game: 'finals', dpi: 800, defaultCm360: DEFAULT, padWidthCm: 60, fov: 103, fovType: 'horizontal' };
+const setup: PaSetup = { game: 'finals', dpi: 800, defaultCm360: DEFAULT, padWidthCm: 60, fov: 103, fovType: 'horizontal',
+  sitting: (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.SITTING === '1' };
 /** Searches per check; PA_N overrides it for quick timing runs. */
 const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};
 const N = (n: number): number => Number(env.PA_N ?? n);
