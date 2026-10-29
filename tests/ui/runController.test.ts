@@ -4,7 +4,7 @@ import { createSession, nextBlock, submitBlock } from '../../src/core/session';
 import { defaultSimPlayer } from '../../src/core/sim/player';
 import { runSimSession } from '../../src/core/sim/runSession';
 import type { Setup } from '../../src/core/types';
-import { countdownBeep, countLeft, createRunController, leadInText, cueText, hudText, ROUND_REST_TEXT, type RunController } from '../../src/ui/runController';
+import { countdownBeep, countLeft, createRunController, cueText, hudText, ROUND_REST_TEXT, type RunController } from '../../src/ui/runController';
 import { configForPlayAlong, defaultConfig } from '../../src/core/config';
 import { TrackSwitchRunner } from '../../src/core/run/trackSwitchRunner';
 import { TrackingRunner } from '../../src/core/run/trackingRunner';
@@ -323,7 +323,6 @@ describe('hudText in fixed mode', () => {
   it('numbers the rounds of a test and never shows a sens', () => {
     const p = { stage: 'baseline' as const, stepIndex: 1, totalSteps: 3, kind: 'flick' as const, blocksDone: 4, blocksTotal: 12 };
     expect(hudText(p, 'fixed')).toBe('Test · Round 2 of 3 · Flicks');
-    expect(hudText({ ...p, stage: 'warmup', kind: 'warmup', stepIndex: 0 }, 'fixed')).toBe('Lead-in');
   });
 });
 
@@ -333,7 +332,7 @@ describe('countLeft (set-count parts)', () => {
     ({ id: kind, stage: 'baseline' as const, kind, cm360: 30, seed: 3, stepIndex: 0, arm: null });
 
   it('counts down the targets of a count part', () => {
-    expect(countLeft(new FlickRunner(spec('flick'), 0.02, pa, 0), pa)).toEqual({ left: 21, total: 21 });
+    expect(countLeft(new FlickRunner(spec('flick'), 0.02, pa, 0), pa)).toEqual({ left: 24, total: 24 }); // 21 scored + 3 warm-up
     expect(countLeft(new SwitchRunner(spec('switch'), 0.02, pa, 0), pa)).toEqual({ left: 28, total: 28 });
     expect(countLeft(new TrackSwitchRunner(spec('trackswitch'), 0.02, pa, 0), pa)).toEqual({ left: 10, total: 10 });
   });
@@ -345,9 +344,3 @@ describe('countLeft (set-count parts)', () => {
   });
 });
 
-describe('leadInText', () => {
-  it('states the real lead-in length', () => {
-    expect(leadInText(15000)).toBe('Lead-in — 15 seconds of free targets to settle in, not scored. Then the test.');
-    expect(leadInText(5000)).toBe('Lead-in — 5 seconds of free targets to settle in, not scored. Then the test.');
-  });
-});

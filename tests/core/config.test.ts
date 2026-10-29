@@ -20,12 +20,12 @@ test('all parts are equal length (default and quick)', () => {
   expect(defaultConfig.round.cueTickMs).toBe(600);
 });
 
-test('Play-Along: 2 rounds, 20 s tracking, flicks scored from the first wave', () => {
+test('Play-Along: 2 rounds, 20 s tracking, first flick wave is the uncounted warm-up', () => {
   const c = configForPlayAlong();
   expect(c.playAlong.roundsPerTest).toBe(2);
   expect(partMs('tracking', c)).toBe(20000); // the other parts end at a set count (spec 21)
   expect(c.tracking.leadInMs).toBe(2000);
-  expect(c.flick.warmWave).toBe(false);
+  expect(c.flick.warmWave).toBe(true);
   expect(defaultConfig.flick.warmWave).toBe(true);
   expect(partMs('flick', defaultConfig)).toBe(14000);
 });

@@ -89,7 +89,7 @@ function scoreBaseline(s: PaState): ScoreBaseline | null {
 function paConfig(s: PaState, cfg: Config): Config {
   if (!s.setup.quick) return cfg;
   const q = cfg.playAlong.quick;
-  return { ...cfg, playAlong: { ...cfg.playAlong, roundsPerTest: 1, leadInMs: q.leadInMs, partMs: q.trackingMs,
+  return { ...cfg, playAlong: { ...cfg.playAlong, roundsPerTest: 1, partMs: q.trackingMs,
     counts: { ...cfg.playAlong.counts, ...q.counts } } } as unknown as Config; // the literal-typed config can't express other values
 }
 
@@ -102,7 +102,8 @@ export function testSession(s: PaState, base: Config = defaultConfig): SessionSt
   const setup: Setup = { dpi, cm360: head.cm360, inGameSens: null, fov, fovType, mode: 'default', padWidthCm };
   // sameTargets: one seed for every test, so every sens is measured on the identical target list.
   const seed = Math.floor(rootFork(s, cfg.playAlong.sameTargets ? 'test' : `test-${s.tests.length}`).next() * SEED_RANGE);
-  return createSession(setup, { seed, warmup: true, quickAbCm360: null,
+  // No lead-in: the first wave of flicks (and the first switching kills) are the uncounted warm-up.
+  return createSession(setup, { seed, warmup: false, quickAbCm360: null,
     fixed: { rounds: cfg.playAlong.roundsPerTest, scoreBaseline: scoreBaseline(s) } }, configForPlayAlong(cfg));
 }
 

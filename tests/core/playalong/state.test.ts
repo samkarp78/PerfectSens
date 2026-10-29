@@ -221,15 +221,15 @@ describe('Play-Along search', () => {
     expect(isStale(s, 15 * DAY)).toBe(true);
   });
 
-  it('testSession plays the queue head with the fixed-mode lead-in', () => {
+  it('testSession starts straight on the test, no lead-in (the first targets are the warm-up)', () => {
     const { s, clock } = fresh();
     const x = answerFeel(markBack(play(s, clock, () => 0), clock.now + MIN), 'right');
     const session = testSession(x);
     const first = nextBlock(session)!;
     expect(session.mode).toBe('fixed');
-    expect(first.kind).toBe('warmup');
+    expect(first.kind).toBe('flick');
     expect(first.cm360).toBe(x.queue[0]!.cm360);
-    expect(session._cfg.session.warmupMs).toBe(defaultConfig.playAlong.leadInMs);
+    expect(session._cfg.flick.warmWave).toBe(true);
   });
 });
 
@@ -409,11 +409,10 @@ describe('quick try (a short demo of the whole flow)', () => {
     expect(x.tests).toHaveLength(3);
   });
 
-  it('uses short tests: one round, a short lead-in, small counts, short tracking', () => {
+  it('uses short tests: one round, small counts, short tracking', () => {
     const x = answerFeel(markBack(createPlayAlong(quickSetup, 1, 0), MIN), 'right');
     const session = testSession(x);
     const q = defaultConfig.playAlong.quick;
-    expect(session._cfg.session.warmupMs).toBe(q.leadInMs);
     expect(session._cfg.flick.count).toBe(q.counts.flick);
     expect(session._cfg.switch.count).toBe(q.counts.switch);
     expect(session._cfg.trackswitch.count).toBe(q.counts.trackswitch);

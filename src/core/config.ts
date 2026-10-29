@@ -48,7 +48,7 @@ export const defaultConfig = {
   pad: { turnFraction: 0.9 },
   store: { keepRawSessions: 5 },
   /** Play-Along mode (§18): real game matches between short tests. finalsK: The Finals cm/360 = finalsK / (sens × DPI). */
-  playAlong: { roundsPerTest: 2, partMs: 20000, limits: { min: 0.5, max: 2 }, tightRange: 0.1, leadInMs: 15000, firstStep: 0.2, minStep: 0.04, hourCheckMs: 3_000_000, staleDays: 14,
+  playAlong: { roundsPerTest: 2, partMs: 20000, limits: { min: 0.5, max: 2 }, tightRange: 0.1, firstStep: 0.2, minStep: 0.04, hourCheckMs: 3_000_000, staleDays: 14,
     maxH2hPerNight: 2, h2hBlocksPerSide: 1, z: 2.5, nightPriorSd: 0.2, finalsK: 914_400, holdMs: 1000, testTimeScale: 0.25, sameNightMs: 10_800_000,
     /** The grade (spec 19.1): per-item costs. Direction (19.2): ideal first-move gains by distance class and signal scales. */
     grade: { correctionCost: 0.1, missCost: 0.2, maxGainCost: 1 },
@@ -60,8 +60,8 @@ export const defaultConfig = {
     counts: { flick: 21, switch: 28, trackswitch: 10, countCapMs: 120_000 },
     sameTargets: false as boolean,
     /** Quick try: a short demo of the whole flow, never a real answer. tests: then it shows the results; each test is one
-     *  round with a short lead-in, small counts and short tracking (trackingMs, lead-in included). */
-    quick: { tests: 3, leadInMs: 5000, trackingMs: 8000, counts: { flick: 6, switch: 10, trackswitch: 4 } }, // flicks in sets of 3
+     *  round with small counts and short tracking (trackingMs, its 2 s start included). */
+    quick: { tests: 3, trackingMs: 8000, counts: { flick: 6, switch: 10, trackswitch: 4 } }, // flicks in sets of 3
     sensitive: { yawBound: 180,
       distancesDeg: [6,8,10,12,14,15,17,18,20,21, 23,24,26,27,28,29,31,32,33,34, 40,46,52,55,58,62,66,90,120,150] },
     sim: { matchMs: 600_000, familiarityShrink: 0.5, nightSd: 0.03, maxNights: 4 } },
@@ -104,12 +104,12 @@ export function configForPlayAlong(cfg: Config = defaultConfig): Config {
   const n = cfg.playAlong.counts;
   return {
     ...cfg,
-    flick: { ...cfg.flick, blockMs: n.flick > 0 ? n.countCapMs : ms, count: n.flick, warmWave: false, distancesDeg: hard.distancesDeg,
+    flick: { ...cfg.flick, blockMs: n.flick > 0 ? n.countCapMs : ms, count: n.flick, warmWave: true, distancesDeg: hard.distancesDeg,
       bounds: { ...cfg.flick.bounds, yaw: hard.yawBound } },
     switch: { ...cfg.switch, blockMs: n.switch > 0 ? n.countCapMs : ms, count: n.switch },
     tracking: { ...cfg.tracking, durationMs: ms - cfg.tracking.leadInMs },
     trackswitch: { ...cfg.trackswitch, blockMs: n.trackswitch > 0 ? n.countCapMs : ms, count: n.trackswitch },
-    session: { ...cfg.session, warmupMs: cfg.playAlong.leadInMs, breakEveryRounds: Number.MAX_SAFE_INTEGER },
+    session: { ...cfg.session, breakEveryRounds: Number.MAX_SAFE_INTEGER },
   } as unknown as Config;
 }
 

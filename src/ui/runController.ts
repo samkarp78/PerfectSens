@@ -35,8 +35,6 @@ type Progress = NonNullable<SessionState['progress']>;
 export type Runner = FlickRunner | SwitchRunner | TrackingRunner | TrackSwitchRunner;
 
 export const WARMUP_REST_TEXT = 'Warm-up — free targets at your current sens, not scored.';
-/** Play-Along: the unscored lead-in before a test. */
-export const leadInText = (ms: number): string => `Lead-in — ${Math.round(ms / 1000)} seconds of free targets to settle in, not scored. Then the test.`;
 /** Shown before a round: its four parts follow each other with a short cue in between. */
 export const ROUND_REST_TEXT = 'Next round: flick each target, clear the targets in any order, hold the button and track, then hold on the moving targets to take them down.';
 /** Shown when a single part is retried. */
@@ -57,7 +55,7 @@ const follows = (prev: string, next: string | undefined): boolean => {
 
 /** HUD label for a block. Never contains a sensitivity value; the recheck reads as a normal step. */
 export function hudText(p: Progress, mode: SessionState['mode'] = 'full'): string {
-  if (mode === 'fixed') return p.stage === 'warmup' ? 'Lead-in' : `Test · Round ${p.stepIndex + 1} of ${p.totalSteps} · ${kindLabel(p)}`;
+  if (mode === 'fixed') return `Test · Round ${p.stepIndex + 1} of ${p.totalSteps} · ${kindLabel(p)}`;
   switch (p.stage) {
     case 'warmup': return 'Warm-up';
     case 'baseline': return `Calibration · ${kindLabel(p)}`;
@@ -70,8 +68,9 @@ export function hudText(p: Progress, mode: SessionState['mode'] = 'full'): strin
 /** Targets (or kills) left in a set-count part (spec 21), or null for a timed part (tracking, the lead-in, Standard). */
 export function countLeft(r: Runner, cfg: Config): { left: number; total: number } | null {
   if (r instanceof FlickRunner) {
-    const n = cfg.flick.count;
-    return r.log().spec.kind === 'warmup' || n <= 0 ? null : { left: Math.max(0, n - r.state.trialIndex), total: n };
+    // Shown targets, warm-up wave included (the player isn't told which ones count).
+    const n = cfg.flick.count + (cfg.flick.warmWave ? 3 * cfg.flick.wavePerClass : 0);
+    return r.log().spec.kind === 'warmup' || cfg.flick.count <= 0 ? null : { left: Math.max(0, n - r.state.trialIndex), total: n };
   }
   if (r instanceof SwitchRunner) {
     const n = cfg.switch.count;
@@ -161,7 +160,7 @@ export function createRunController(initial: SessionState, cfg: Config = initial
     get restText() {
       const spec = nextBlock(session);
       if (!spec) return '';
-      if (spec.kind === 'warmup') return session.mode === 'fixed' ? leadInText(session._cfg.session.warmupMs) : WARMUP_REST_TEXT;
+      if (spec.kind === 'warmup') return WARMUP_REST_TEXT;
       if (spec.kind === 'switch') return SWITCH_REST_TEXT;
       if (spec.kind === 'tracking') return TRACKING_REST_TEXT;
       return spec.kind === 'trackswitch' ? TRACKSWITCH_REST_TEXT : ROUND_REST_TEXT;

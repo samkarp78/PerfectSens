@@ -38,7 +38,9 @@ export class FlickRunner {
 
   private advance(t: number): void {
     this.resolved++;
-    const counted = this.spec.kind !== 'warmup' && this.cfg.flick.count > 0 && this.resolved >= this.cfg.flick.count;
+    // flick.count counts scored targets; the unscored warm-up wave (when on) comes on top.
+    const fc = this.cfg.flick, warm = fc.warmWave ? 3 * fc.wavePerClass : 0;
+    const counted = this.spec.kind !== 'warmup' && fc.count > 0 && this.resolved >= fc.count + warm;
     if (counted || this.resolved >= this.targets.length) this.finished = true;
     else this.spawn(t);
   }

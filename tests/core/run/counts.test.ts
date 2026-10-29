@@ -9,7 +9,7 @@ const CM = 34.6364;
 const setup: Setup = { dpi: 800, cm360: CM, inGameSens: null, fov: 103, fovType: 'horizontal', mode: 'default' };
 /** Count mode: parts end after a set number of targets or kills; the time limit is only a safety cap. */
 const cfg = { ...defaultConfig,
-  flick: { ...defaultConfig.flick, count: 12, blockMs: 120_000 },
+  flick: { ...defaultConfig.flick, count: 12, blockMs: 120_000, warmWave: false },
   switch: { ...defaultConfig.switch, count: 15, blockMs: 120_000 },
   trackswitch: { ...defaultConfig.trackswitch, count: 6, blockMs: 120_000 } } as unknown as Config;
 const spec = (kind: BlockSpec['kind']): BlockSpec => ({ id: kind, stage: 'baseline', kind, cm360: CM, seed: 4, stepIndex: 0, arm: null });
@@ -45,5 +45,16 @@ describe('set-count parts', () => {
     const r = simulateBlock(spec('switch'), setup, defaultSimPlayer(CM, { optimalCm360: CM }), { adaptedCm360: CM, blocksDone: 0 },
       createRng(1), defaultConfig, 0);
     expect(r.endT).toBe(defaultConfig.switch.blockMs);
+  });
+});
+
+describe('set counts with a warm-up wave', () => {
+  it('the warm-up flicks come on top: 21 scored flicks out of 24 shown', () => {
+    const warmCfg = { ...cfg, flick: { ...cfg.flick, count: 21, warmWave: true } } as unknown as Config;
+    const r = simulateBlock(spec('flick'), setup, defaultSimPlayer(CM, { optimalCm360: CM }), { adaptedCm360: CM, blocksDone: 0 },
+      createRng(1), warmCfg, 0);
+    const log = r.log as FlickBlockLog;
+    expect(log.trials).toHaveLength(24);
+    expect(log.trials.filter((t) => t.target.scored)).toHaveLength(21);
   });
 });

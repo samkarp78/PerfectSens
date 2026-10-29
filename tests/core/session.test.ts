@@ -336,9 +336,8 @@ describe('fixed mode (Play-Along test block)', () => {
     expect(fixedRun({ tp: 1, switchTp: 1, tot: 1, dmg: 1 }).state.steps[0]!.score.logS).not.toBe(0);
   });
 
-  it('uses the Play-Along lead-in length and no breaks', () => {
+  it('has no breaks inside a test', () => {
     const c = configForPlayAlong();
-    expect(c.session.warmupMs).toBe(15000);
     expect(c.session.breakEveryRounds).toBeGreaterThan(1000);
   });
 });

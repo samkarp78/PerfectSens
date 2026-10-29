@@ -115,9 +115,9 @@ describe('movingAimAt and tracking-switching targets', () => {
   });
 });
 
-describe('makeFlickTargets without the warm-in wave (Play-Along)', () => {
+describe('makeFlickTargets without the warm-in wave', () => {
   it('scores from the first target', () => {
-    const t = makeFlickTargets(spec(), configForPlayAlong());
+    const t = makeFlickTargets(spec(), { ...configForPlayAlong(), flick: { ...configForPlayAlong().flick, warmWave: false } } as typeof cfg);
     expect(t.every((x) => x.scored)).toBe(true);
   });
 });
