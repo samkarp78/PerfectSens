@@ -49,9 +49,9 @@ export const defaultConfig = {
     /** The grade (spec 19.1): per-item costs. Direction (19.2): ideal first-move gains by distance class and signal scales. */
     grade: { correctionCost: 0.1, missCost: 0.2, maxGainCost: 1 },
     direction: { idealGain: { small: 1, medium: 0.97, big: 0.93 }, gainScale: 0.1, leadScaleDeg: 1, threshold: 0.5 },
-    /** A more sensitive test (spec 20), Play-Along only: head-sized targets, where a too-fast sens shows as misses and
-     *  corrections, and three big turns (90–150°), where a too-slow sens shows. Standard keeps the original targets. */
-    sensitive: { targetRadiusDeg: 0.8, trackingRadiusDeg: 1.2, yawBound: 180,
+    /** Play-Along only (spec 20): three of the long flicks are big turns (90–150°), where a too-slow sens shows. Target
+     *  sizes stay the original ones (smaller targets were dropped as too frustrating). */
+    sensitive: { yawBound: 180,
       distancesDeg: [6,8,10,12,14,15,17,18,20,21, 23,24,26,27,28,29,31,32,33,34, 40,46,52,55,58,62,66,90,120,150] },
     sim: { matchMs: 600_000, familiarityShrink: 0.5, nightSd: 0.03, maxNights: 4 } },
   demo: { player: { optimalRatio: 0.75 } },
@@ -86,17 +86,16 @@ export function partMs(kind: PartKind, cfg: Config): number {
 
 /** The config a Play-Along test block runs with: the warm-up is the short lead-in, there are no breaks, every part is
  *  playAlong.partMs long, flicks score from the first wave (the match and the lead-in already warmed the player up), and
- *  it uses the more sensitive targets (playAlong.sensitive). */
+ *  it adds the big turns (playAlong.sensitive). */
 export function configForPlayAlong(cfg: Config = defaultConfig): Config {
   const ms = cfg.playAlong.partMs;
   const hard = cfg.playAlong.sensitive;
   return {
     ...cfg,
-    flick: { ...cfg.flick, blockMs: ms, warmWave: false, targetRadiusDeg: hard.targetRadiusDeg, distancesDeg: hard.distancesDeg,
-      bounds: { ...cfg.flick.bounds, yaw: hard.yawBound } },
-    switch: { ...cfg.switch, blockMs: ms, targetRadiusDeg: hard.targetRadiusDeg },
-    tracking: { ...cfg.tracking, durationMs: ms - cfg.tracking.leadInMs, targetRadiusDeg: hard.trackingRadiusDeg },
-    trackswitch: { ...cfg.trackswitch, blockMs: ms, targetRadiusDeg: hard.trackingRadiusDeg },
+    flick: { ...cfg.flick, blockMs: ms, warmWave: false, distancesDeg: hard.distancesDeg, bounds: { ...cfg.flick.bounds, yaw: hard.yawBound } },
+    switch: { ...cfg.switch, blockMs: ms },
+    tracking: { ...cfg.tracking, durationMs: ms - cfg.tracking.leadInMs },
+    trackswitch: { ...cfg.trackswitch, blockMs: ms },
     session: { ...cfg.session, warmupMs: cfg.playAlong.leadInMs, breakEveryRounds: Number.MAX_SAFE_INTEGER },
   } as unknown as Config;
 }

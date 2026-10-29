@@ -30,13 +30,12 @@ test('Play-Along: 2 rounds of equal 20 s parts, flicks scored from the first wav
   expect(partMs('flick', defaultConfig)).toBe(14000);
 });
 
-test('Play-Along uses the more sensitive test; Standard keeps the original targets (spec 20)', () => {
+test('Play-Along keeps the original target sizes and adds big turns (spec 20)', () => {
   const pa = configForPlayAlong();
-  expect(pa.flick.targetRadiusDeg).toBe(0.8);
-  expect(pa.switch.targetRadiusDeg).toBe(0.8);
-  expect(pa.tracking.targetRadiusDeg).toBe(1.2);
-  expect(pa.trackswitch.targetRadiusDeg).toBe(1.2);
+  expect(pa.flick.targetRadiusDeg).toBe(defaultConfig.flick.targetRadiusDeg);
+  expect(pa.switch.targetRadiusDeg).toBe(defaultConfig.switch.targetRadiusDeg);
+  expect(pa.tracking.targetRadiusDeg).toBe(defaultConfig.tracking.targetRadiusDeg);
+  expect(pa.trackswitch.targetRadiusDeg).toBe(defaultConfig.trackswitch.targetRadiusDeg);
   for (const d of [90, 120, 150]) expect(pa.flick.distancesDeg).toContain(d);
-  expect(defaultConfig.flick.targetRadiusDeg).toBe(1.5);
   expect(defaultConfig.flick.distancesDeg).not.toContain(150);
 });
