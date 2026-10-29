@@ -13,21 +13,23 @@ const DAY_MS = 86_400_000;
  * adapted to it and fresh (no fatigue carried over); familiarity at the default shrinks after the first test, and each
  * night draws its own form. At each hour check it continues another night, up to sim.maxNights, then stops with "done".
  */
-export function runPlayAlongSim(setup: PaSetup, player: SimPlayer, seed: number, cfg: Config = defaultConfig):
+export function runPlayAlongSim(setup: PaSetup, player: SimPlayer, seed: number, cfg: Config = defaultConfig,
+  opts: { nightForms?: (number | undefined)[] } = {}):
   { state: PaState; nights: number; testsPerNight: number[] } {
   const sc = cfg.playAlong.sim;
   const rng = createRng(seed).fork('playalong-sim');
   const warmedUp: SimPlayer = { ...player, familiarityBonus: player.familiarityBonus * sc.familiarityShrink };
-  const formOf = (): number => Math.exp(rng.normal() * sc.nightSd);
+  // opts.nightForms[k] fixes night k's form (e.g. 0.85 for a bad night); otherwise each night draws its own.
+  const formOf = (night: number): number => { const r = Math.exp(rng.normal() * sc.nightSd); return opts.nightForms?.[night] ?? r; };
   let s = createPlayAlong(setup, seed, 0, cfg);
-  let now = 0, form = formOf();
+  let now = 0, form = formOf(0);
   const testsPerNight = [0];
 
   while (s.phase !== 'finished') {
     if (s.phase === 'hourCheck') {
       if (testsPerNight.length >= sc.maxNights) { s = answerHourCheck(s, 'done', now, cfg); break; }
       now += DAY_MS;
-      form = formOf();
+      form = formOf(testsPerNight.length);
       testsPerNight.push(0);
       s = startNight(answerHourCheck(s, 'later', now, cfg), now, cfg);
       continue;
